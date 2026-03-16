@@ -279,6 +279,105 @@ initializeEmailTables();
 // ============================================
 
 /**
+ * Extract person's name from email address
+ * @param {string} email - Email address
+ * @returns {string|null} - Extracted name or null if generic email
+ */
+function extractNameFromEmail(email) {
+  if (!email || typeof email !== 'string') return null;
+
+  // Get the part before @
+  const emailLocal = email.split('@')[0];
+  if (!emailLocal) return null;
+
+  // Replace dots and dashes with spaces
+  let name = emailLocal
+    .replace(/[.-]/g, ' ')
+    .replace(/_/g, ' ')  // Also handle underscores
+    .trim();
+
+  // Check for generic patterns (no actual person name)
+  const genericPatterns = [
+    'info', 'contact', 'hello', 'support', 'admin', 'sales',
+    'enquiry', 'help', 'office', 'team', 'mail', 'webmaster',
+    'noreply', 'no-reply', 'news', 'jobs', 'careers', 'hr'
+  ];
+
+  const nameLower = name.toLowerCase().replace(/\s+/g, '');
+  if (genericPatterns.some(pattern => nameLower === pattern || nameLower.startsWith(pattern + '.'))) {
+    return null; // Generic email, no specific person
+  }
+
+  // Handle patterns like "first.last" or "first-last"
+  const parts = name.split(/\s+/).filter(p => p.length > 0);
+
+  if (parts.length === 0) return null;
+
+  // Capitalize first letter of each part
+  const capitalized = parts.map(part => {
+    // Handle common patterns like "mcohen" -> "MCohen" or "mdoe" -> "MDoe"
+    if (part.length <= 3 && part.length > 1) {
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    }
+    return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+  }).join(' ');
+
+  return capitalized;
+}
+
+/**
+ * Extract company name from website content (title/meta tags)
+ * @param {string} textContent - Website text content
+ * @returns {string|null} - Extracted company name or null
+ */
+function extractCompanyNameSimple(textContent) {
+  if (!textContent) return null;
+
+  try {
+    // Look for title tag content
+    const titleMatch = textContent.match(/<title[^>]*>(.*?)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      let title = titleMatch[1].trim();
+      // Remove common suffixes
+      title = title
+        .replace(/\s*[-|]\s*(Home|About|Contact|Welcome|Login|Sign\s+In|Dashboard|Blog|News).*$/i, '')
+        .replace(/\s*[-|]\s*$/g, '')
+        .trim();
+
+      if (title && title.length > 2 && title.length < 100) {
+        return title;
+      }
+    }
+
+    // Look for meta description with company name
+    const descMatch = textContent.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+    if (descMatch && descMatch[1]) {
+      const desc = descMatch[1].trim();
+      // Extract first sentence/capitalized phrase
+      const match = desc.match(/^([A-Z][A-Za-z0-9\s&.]{3,50})/);
+      if (match) {
+        return match[1].trim();
+      }
+    }
+
+    // Look for h1 tag
+    const h1Match = textContent.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    if (h1Match && h1Match[1]) {
+      // Strip HTML tags from h1 content
+      const h1Text = h1Match[1].replace(/<[^>]+>/g, '').trim();
+      if (h1Text && h1Text.length > 2 && h1Text.length < 80) {
+        return h1Text;
+      }
+    }
+
+  } catch (e) {
+    // Extraction failed, return null
+  }
+
+  return null;
+}
+
+/**
  * Replace template placeholders with actual values
  * @param {string} text - Template text with placeholders
  * @param {Object} data - Data object with values to replace
@@ -286,63 +385,93 @@ initializeEmailTables();
  */
 function replaceTemplateVariables(text, data) {
   if (!text) return text;
-  
+
   let result = text;
-  
+
   // Replace all supported placeholders
+  // Removed duplicates: {{user}} (same as {{name}}), {{site}} (same as {{url}})
   const replacements = {
-    '{{name}}': data.name || data.company || 'there',
-    '{{user}}': data.name || data.company || 'there',  // Alias for {{name}}
-    '{{company}}': data.company || '',
-    '{{email}}': data.email || '',
-    '{{site}}': data.site || data.url || '',
-    '{{url}}': data.url || data.site || '',
-    '{{domain}}': data.domain || '',
+    '{{name}}': data.name || 'there',        // Person name from email, fallback to 'there'
+    '{{company}}': data.company || '',       // Company name (hybrid: LinkedIn > AI > domain)
+    '{{email}}': data.email || '',           // Email address
+    '{{url}}': data.url || '',               // Website URL
+    '{{domain}}': data.domain || '',         // Domain name
     '{{date}}': new Date().toLocaleDateString(),
     '{{year}}': new Date().getFullYear().toString(),
   };
-  
+
   for (const [placeholder, value] of Object.entries(replacements)) {
     result = result.split(placeholder).join(value);
   }
-  
+
   return result;
 }
 
 /**
  * Get site data for a contact to use in template replacement
+ * Uses hybrid approach for company name: LinkedIn > Page Content > Domain
  * @param {number} siteId - The site ID
+ * @param {string} email - Contact email address (for name extraction)
  * @returns {Object} - Site data for template replacement
  */
-function getSiteDataForTemplate(siteId) {
+function getSiteDataForTemplate(siteId, email = null) {
   if (!siteId) return {};
-  
-  const site = db.get("SELECT url, search_query FROM sites WHERE id = ?", [siteId]);
+
+  const site = db.get("SELECT url, search_query, text_content FROM sites WHERE id = ?", [siteId]);
   if (!site) return {};
-  
-  // Extract domain and company name from URL
+
+  // Extract domain
   let domain = '';
-  let company = '';
   try {
     const urlObj = new URL(site.url);
     domain = urlObj.hostname;
-    // Try to extract company name from domain (remove www., .com, etc.)
+  } catch (e) {
+    // URL parsing failed
+  }
+
+  // HYBRID APPROACH: Get company name
+  // Priority 1: LinkedIn company name (from company_executives table)
+  let company = null;
+  const executiveData = db.get(`
+    SELECT company_name
+    FROM company_executives
+    WHERE site_id = ?
+    AND company_name IS NOT NULL
+    LIMIT 1
+  `, [siteId]);
+
+  if (executiveData?.company_name) {
+    company = executiveData.company_name;
+  }
+
+  // Priority 2: Extract from page content (title/meta tags)
+  if (!company && site.text_content) {
+    company = extractCompanyNameSimple(site.text_content);
+  }
+
+  // Priority 3: Fallback to domain-based parsing
+  if (!company && domain) {
     company = domain
       .replace(/^www\./, '')
-      .replace(/\.(com|net|org|io|co|ai|app|dev|info|biz)(\.[a-z]{2})?$/i, '')
+      .replace(/\.(com|net|org|io|co|ai|app|dev|info|biz|tech|online|site|website)(\.[a-z]{2})?$/i, '')
       .split('.')
       .pop()
       .replace(/-/g, ' ')
       .replace(/\b\w/g, c => c.toUpperCase()); // Capitalize first letters
-  } catch (e) {
-    // URL parsing failed, use raw values
   }
-  
+
+  // Extract person name from email address
+  let personName = null;
+  if (email) {
+    personName = extractNameFromEmail(email);
+  }
+
   return {
-    site: site.url,
     url: site.url,
     domain: domain,
-    company: company,
+    name: personName,           // Person's name (from email) or null
+    company: company || '',     // Company name (hybrid approach)
+    email: email || '',         // Email included for convenience
   };
 }
 
@@ -1447,6 +1576,122 @@ router.post("/templates/:id/preview", (req, res) => {
   }
 });
 
+/**
+ * POST /api/email/templates/test
+ * Send a test email with current template content
+ */
+router.post("/templates/test", async (req, res) => {
+  try {
+    const { template, test_email } = req.body;
+
+    if (!test_email) {
+      return res.status(400).json({
+        success: false,
+        error: "Test email address is required",
+      });
+    }
+
+    if (!template) {
+      return res.status(400).json({
+        success: false,
+        error: "Template data is required",
+      });
+    }
+
+    // Get an active sender
+    const sender = db.get(`
+      SELECT * FROM email_senders
+      WHERE is_active = 1
+      ORDER BY created_at ASC
+      LIMIT 1
+    `);
+
+    if (!sender) {
+      return res.status(400).json({
+        success: false,
+        error: "No active email sender found. Please configure an email sender first.",
+      });
+    }
+
+    // Test data for variable replacement
+    const testData = {
+      name: "John Doe",
+      company: "Example Inc",
+      email: test_email,
+      url: "https://example.com",
+      domain: "example.com",
+      date: new Date().toLocaleDateString(),
+      year: new Date().getFullYear().toString(),
+    };
+
+    // Replace variables in subject
+    let subject = template.subject || "";
+    Object.keys(testData).forEach((key) => {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, "gi");
+      subject = subject.replace(regex, testData[key]);
+    });
+
+    // Replace variables in HTML content
+    let htmlContent = template.html_content || "";
+    Object.keys(testData).forEach((key) => {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, "gi");
+      htmlContent = htmlContent.replace(regex, testData[key]);
+    });
+
+    // Replace variables in plain text content
+    let textContent = template.text_content || "";
+    Object.keys(testData).forEach((key) => {
+      const regex = new RegExp(`\\{\\{${key}\\}\\}`, "gi");
+      textContent = textContent.replace(regex, testData[key]);
+    });
+
+    // Create transporter
+    const nodemailer = require("nodemailer");
+    let transporter;
+
+    if (sender.service === "custom") {
+      transporter = nodemailer.createTransport({
+        host: sender.smtp_host,
+        port: sender.smtp_port,
+        secure: sender.smtp_port === 465,
+        auth: {
+          user: sender.email,
+          pass: sender.password,
+        },
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service: sender.service,
+        auth: {
+          user: sender.email,
+          pass: sender.password,
+        },
+      });
+    }
+
+    // Send test email
+    const mailOptions = {
+      from: sender.email,
+      to: test_email,
+      subject: `[TEST] ${subject}`,
+      html: htmlContent,
+      text: textContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    res.json({
+      success: true,
+      message: "Test email sent successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // ============================================
 // AI TEMPLATE GENERATION
 // ============================================
@@ -1482,10 +1727,10 @@ Create an email that is:
 - Clear and concise
 
 Available template variables (use these where appropriate):
-- {{name}} - Recipient's name
-- {{company}} - Company name
+- {{name}} - Recipient's name (extracted from email)
+- {{company}} - Company name (from LinkedIn or page content)
 - {{email}} - Recipient's email
-- {{site}} - Their website URL
+- {{url}} - Their website URL
 - {{domain}} - Their domain name
 - {{date}} - Today's date
 - {{year}} - Current year
@@ -1577,7 +1822,7 @@ router.post("/templates/ai/refine", async (req, res) => {
     const systemPrompt = `You are an expert email copywriter. Refine the given email template based on the user's instruction.
 
 Maintain the same template variables that are used:
-- {{name}}, {{company}}, {{email}}, {{site}}, {{domain}}, {{date}}, {{year}}
+- {{name}}, {{company}}, {{email}}, {{url}}, {{domain}}, {{date}}, {{year}}
 
 Return JSON:
 {
@@ -1779,13 +2024,9 @@ router.post("/campaigns", (req, res) => {
     let queuedCount = 0;
 
     for (const target of uniqueEmails) {
-      // Get site data for template variable replacement
-      const siteData = getSiteDataForTemplate(target.site_id);
-      const templateData = {
-        ...siteData,
-        email: target.email,
-      };
-      
+      // Get site data for template variable replacement (includes email-based name extraction)
+      const templateData = getSiteDataForTemplate(target.site_id, target.email);
+
       // Replace template variables with actual values
       const processedSubject = replaceTemplateVariables(template.subject, templateData);
       const processedHtml = replaceTemplateVariables(template.html_content, templateData);
@@ -2050,13 +2291,9 @@ router.post("/queue/add-selected", (req, res) => {
     );
 
     for (const contact of contacts) {
-      // Get site data for template variable replacement
-      const siteData = getSiteDataForTemplate(contact.site_id);
-      const templateData = {
-        ...siteData,
-        email: contact.email,
-      };
-      
+      // Get site data for template variable replacement (includes email-based name extraction)
+      const templateData = getSiteDataForTemplate(contact.site_id, contact.email);
+
       // Replace template variables with actual values
       const processedSubject = replaceTemplateVariables(template.subject, templateData);
       const processedHtml = replaceTemplateVariables(template.html_content, templateData);
@@ -2231,8 +2468,8 @@ router.post("/queue/add-by-tag", (req, res) => {
         }
 
         // Get site data for template variable replacement
-        const siteData = getSiteDataForTemplate(contact.site_id);
-        const templateData = { ...siteData, email: contact.email };
+        // Get site data for template variable replacement (includes email-based name extraction)
+        const templateData = getSiteDataForTemplate(contact.site_id, contact.email);
 
         const processedSubject = replaceTemplateVariables(template.subject, templateData);
         const processedHtml = replaceTemplateVariables(template.html_content, templateData);

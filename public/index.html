@@ -4581,66 +4581,91 @@
                     font-size: 14px;
                   " />
               </div>
+              <!-- Content Tabs: Plain Text | HTML -->
               <div>
-                <label
-                  style="
-                    display: block;
-                    font-size: 13px;
-                    font-weight: 500;
-                    color: var(--text-secondary);
-                    margin-bottom: 6px;
-                  "
-                  >HTML Content *</label
-                >
-                <textarea
-                  name="html_content"
-                  required
-                  placeholder="<h1>Hello {{name}}!</h1><p>Your HTML here...</p>"
-                  style="
-                    width: 100%;
-                    padding: 10px 12px;
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border-medium);
-                    border-radius: var(--radius-md);
-                    font-size: 13px;
-                    font-family: 'Monaco', 'Menlo', monospace;
-                    resize: vertical;
-                    min-height: 200px;
+                <!-- Tab Buttons -->
+                <div style="display: flex; gap: 4px; border-bottom: 1px solid var(--border-light); margin-bottom: 12px;">
+                  <button
+                    type="button"
+                    id="tab-plaintext"
+                    onclick="switchContentTab('plaintext')"
+                    style="
+                      padding: 8px 16px;
+                      border: none;
+                      background: transparent;
+                      border-bottom: 2px solid var(--accent-blue);
+                      color: var(--accent-blue);
+                      font-size: 13px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      border-radius: 4px 4px 0 0;
+                    ">Plain Text</button
+                  >
+                  <button
+                    type="button"
+                    id="tab-html"
+                    onclick="switchContentTab('html')"
+                    style="
+                      padding: 8px 16px;
+                      border: none;
+                      background: transparent;
+                      border-bottom: 2px solid transparent;
+                      color: var(--text-muted);
+                      font-size: 13px;
+                      font-weight: 500;
+                      cursor: pointer;
+                      border-radius: 4px 4px 0 0;
+                    ">HTML Content</button
+                  >
+                </div>
+
+                <!-- Plain Text Panel -->
+                <div id="panel-plaintext" style="display: block;">
+                  <textarea
+                    name="text_content"
+                    id="textarea-plaintext"
+                    placeholder="Enter your plain text email content here...&#10;&#10;Hi {{name}},&#10;&#10;I hope this email finds you well."
+                    style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      background: var(--bg-secondary);
+                      border: 1px solid var(--border-medium);
+                      border-radius: var(--radius-md);
+                      font-size: 13px;
+                      font-family: 'Courier New', monospace;
+                      resize: vertical;
+                      min-height: 200px;
                   "></textarea>
+                </div>
+
+                <!-- HTML Panel -->
+                <div id="panel-html" style="display: none;">
+                  <textarea
+                    name="html_content"
+                    id="textarea-html"
+                    placeholder="<h1>Hello {{name}}!</h1><p>Your HTML here...</p>"
+                    style="
+                      width: 100%;
+                      padding: 10px 12px;
+                      background: var(--bg-secondary);
+                      border: 1px solid var(--border-medium);
+                      border-radius: var(--radius-md);
+                      font-size: 13px;
+                      font-family: 'Monaco', 'Menlo', monospace;
+                      resize: vertical;
+                      min-height: 200px;
+                  "></textarea>
+                </div>
+
+                <!-- Variables help text -->
                 <small
                   style="
                     color: var(--text-muted);
                     display: block;
-                    margin-top: 4px;
+                    margin-top: 8px;
                   "
-                  >Available: {{name}}, {{user}}, {{company}}, {{email}}, {{site}}, {{domain}}, {{url}}, {{date}}, {{year}}</small
+                  >Available: {{name}}, {{company}}, {{email}}, {{url}}, {{domain}}, {{date}}, {{year}}</small
                 >
-              </div>
-              <div>
-                <label
-                  style="
-                    display: block;
-                    font-size: 13px;
-                    font-weight: 500;
-                    color: var(--text-secondary);
-                    margin-bottom: 6px;
-                  "
-                  >Plain Text Version</label
-                >
-                <textarea
-                  name="text_content"
-                  placeholder="Plain text version for email clients that don't support HTML"
-                  style="
-                    width: 100%;
-                    padding: 10px 12px;
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border-medium);
-                    border-radius: var(--radius-md);
-                    font-size: 13px;
-                    font-family: inherit;
-                    resize: vertical;
-                    min-height: 80px;
-                  "></textarea>
               </div>
             </div>
           </div>
@@ -4683,10 +4708,197 @@
                 class="btn btn-secondary">
                 Preview
               </button>
+              <button
+                type="button"
+                onclick="openTestEmailModal()"
+                class="btn btn-secondary"
+                style="border-color: #10b981; color: #10b981;">
+                📧 Send Test Email
+              </button>
               <button type="submit" class="btn btn-primary">Save Template</button>
             </div>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TEST EMAIL MODAL -->
+    <!-- ========================================== -->
+    <div
+      id="test-email-modal"
+      style="
+        display: none;
+        position: fixed;
+        z-index: 1060;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+      ">
+      <div
+        style="
+          background: var(--bg-primary);
+          border-radius: var(--radius-lg);
+          width: 90%;
+          max-width: 500px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        ">
+        <!-- Modal Header -->
+        <div
+          style="
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          ">
+          <h2
+            style="
+              margin: 0;
+              font-size: 18px;
+              font-weight: 600;
+              color: var(--text-primary);
+            ">
+            📧 Send Test Email
+          </h2>
+          <button
+            type="button"
+            onclick="closeTestEmailModal()"
+            style="
+              background: none;
+              border: none;
+              font-size: 24px;
+              color: var(--text-muted);
+              cursor: pointer;
+              padding: 0;
+              line-height: 1;
+          ">&times;</button
+        >
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding: 24px;">
+          <div style="margin-bottom: 20px;">
+            <label
+              style="
+                display: block;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+              ">
+              Recipient Email Address *
+            </label>
+            <input
+              type="email"
+              id="test-email-recipient"
+              required
+              placeholder="your@email.com"
+              style="
+                width: 100%;
+                padding: 10px 12px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-medium);
+                border-radius: var(--radius-md);
+                font-size: 14px;
+              " />
+          </div>
+
+          <!-- Test Data Info -->
+          <div
+            style="
+              padding: 12px 16px;
+              background: rgba(16, 185, 129, 0.1);
+              border: 1px solid rgba(16, 185, 129, 0.3);
+              border-radius: var(--radius-md);
+              margin-bottom: 16px;
+            ">
+            <div
+              style="
+                font-size: 12px;
+                font-weight: 500;
+                color: #059669;
+                margin-bottom: 8px;
+              ">
+              📋 Test Variables Used:
+            </div>
+            <div
+              style="
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.6;
+              ">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{name}}</code> → John Doe</div>
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{company}}</code> → Example Inc</div>
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{email}}</code> → (your email)</div>
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{url}}</code> → https://example.com</div>
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{domain}}</code> → example.com</div>
+                <div><code style="background: rgba(16, 185, 129, 0.2); padding: 2px 6px; border-radius: 4px;">{{date}}</code> → Today</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading indicator -->
+          <div
+            id="test-email-loading"
+            style="
+              display: none;
+              text-align: center;
+              padding: 20px;
+              color: var(--text-muted);
+            ">
+            <div
+              style="
+                font-size: 14px;
+                margin-bottom: 8px;
+              ">Sending test email...</div
+            >
+          </div>
+
+          <!-- Error/Success messages -->
+          <div
+            id="test-email-message"
+            style="
+              display: none;
+              padding: 12px 16px;
+              border-radius: var(--radius-md);
+              margin-bottom: 16px;
+              font-size: 13px;
+            "></div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div
+          style="
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+          ">
+          <button
+            type="button"
+            onclick="closeTestEmailModal()"
+            class="btn btn-secondary"
+            id="test-email-cancel-btn">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onclick="sendTestEmail()"
+            class="btn btn-primary"
+            id="test-email-send-btn"
+            style="background: #10b981; border-color: #10b981;">
+            Send Test Email
+          </button>
+        </div>
       </div>
     </div>
 
@@ -7972,6 +8184,83 @@
       // EMAIL TEMPLATES FUNCTIONS
       // ============================================
       let currentTagFilter = ''; // Track current tag filter
+      let currentContentTab = 'plaintext'; // Track current content tab
+      let htmlManuallyEdited = false; // Track if HTML was manually edited
+
+      /**
+       * Convert plain text to HTML format
+       * Preserves paragraphs, line breaks, and basic formatting
+       */
+      function plainTextToHtml(plainText) {
+        if (!plainText || !plainText.trim()) return '';
+
+        // Escape HTML special characters first
+        let html = escapeHtml(plainText);
+
+        // Split by double newlines to create paragraphs
+        const paragraphs = html.split(/\n\s*\n/);
+
+        const htmlParagraphs = paragraphs.map(para => {
+          if (!para.trim()) return '';
+
+          // Convert single line breaks within paragraphs to <br>
+          // But keep paragraphs as <p> tags
+          const lines = para.split(/\n/);
+          const linesWithBr = lines
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .join('<br>');
+
+          return `<p>${linesWithBr}</p>`;
+        }).filter(p => p.length > 0);
+
+        return htmlParagraphs.join('\n');
+      }
+
+      // Switch between Plain Text and HTML content tabs
+      function switchContentTab(tab) {
+        const previousTab = currentContentTab;
+        currentContentTab = tab;
+
+        // Update tab button styles
+        const tabPlain = document.getElementById('tab-plaintext');
+        const tabHtml = document.getElementById('tab-html');
+        const panelPlain = document.getElementById('panel-plaintext');
+        const panelHtml = document.getElementById('panel-html');
+
+        if (tab === 'plaintext') {
+          tabPlain.style.borderBottomColor = 'var(--accent-blue)';
+          tabPlain.style.color = 'var(--accent-blue)';
+          tabHtml.style.borderBottomColor = 'transparent';
+          tabHtml.style.color = 'var(--text-muted)';
+          panelPlain.style.display = 'block';
+          panelHtml.style.display = 'none';
+        } else {
+          tabHtml.style.borderBottomColor = 'var(--accent-blue)';
+          tabHtml.style.color = 'var(--accent-blue)';
+          tabPlain.style.borderBottomColor = 'transparent';
+          tabPlain.style.color = 'var(--text-muted)';
+          panelHtml.style.display = 'block';
+          panelPlain.style.display = 'none';
+
+          // Auto-convert plain text to HTML when switching to HTML tab
+          // Only if: switching from plaintext AND html field is empty OR not manually edited
+          if (previousTab === 'plaintext' && !htmlManuallyEdited) {
+            const plainTextArea = document.querySelector('[name="text_content"]');
+            const htmlTextArea = document.querySelector('[name="html_content"]');
+
+            if (plainTextArea && htmlTextArea) {
+              const plainText = plainTextArea.value.trim();
+              const currentHtml = htmlTextArea.value.trim();
+
+              // Only convert if plain text exists and HTML is empty
+              if (plainText && !currentHtml) {
+                htmlTextArea.value = plainTextToHtml(plainText);
+              }
+            }
+          }
+        }
+      }
       let filterDebounceTimer = null; // Debounce timer for tag filter
       
       async function loadTemplates() {
@@ -8240,7 +8529,7 @@
         editingTemplateId = template ? template.id : null;
         lastAutoNamedCategory = null;
         document.getElementById('category-auto-hint').style.display = 'none';
-        
+
         document.getElementById("template-modal-title").textContent = template
           ? "Edit Email Template"
           : "Create Email Template";
@@ -8250,15 +8539,28 @@
           document.querySelector('[name="name"]').value = template.name;
           document.querySelector('[name="subject"]').value = template.subject;
           document.querySelector('[name="html_content"]').value =
-            template.html_content;
+            template.html_content || "";
           document.querySelector('[name="text_content"]').value =
             template.text_content || "";
           document.querySelector('[name="description"]').value =
             template.description || "";
           document.querySelector('[name="category"]').value = template.category;
           document.querySelector('[name="tags"]').value = template.tags || "";
+
+          // Reset manual edit flag and set based on existing HTML content
+          htmlManuallyEdited = !!(template.html_content && template.html_content.trim());
+
+          // Switch to appropriate tab based on content
+          if (template.html_content && template.html_content.trim()) {
+            switchContentTab('html');
+          } else {
+            switchContentTab('plaintext');
+          }
         } else {
           document.getElementById("template-form").reset();
+          // Reset to plain text tab for new templates
+          htmlManuallyEdited = false;
+          switchContentTab('plaintext');
           document.getElementById("template-id").value = "";
         }
 
@@ -8278,7 +8580,17 @@
 
         const formData = new FormData(event.target);
         const data = Object.fromEntries(formData.entries());
-        
+
+        // Get content from both textareas (handle tabs)
+        const htmlContent = document.querySelector('[name="html_content"]').value.trim();
+        const textContent = document.querySelector('[name="text_content"]').value.trim();
+
+        // Validate: at least one content type is required
+        if (!htmlContent && !textContent) {
+          showToast('Please enter either HTML or Plain Text content', 'error');
+          return;
+        }
+
         // Extract sequence number from name if present
         // Backend will auto-calculate sequence_number if not provided
         const seqMatch = data.name.match(/#(\d+)$/);
@@ -8341,7 +8653,7 @@
             method: "DELETE",
           });
           const json = await res.json();
-          
+
           if (json.success) {
             loadTemplates();
             showToast("Template deleted!", "success");
@@ -8350,6 +8662,110 @@
           }
         } catch (error) {
           showToast("Error deleting template", "error");
+        }
+      }
+
+      // ============================================
+      // TEST EMAIL FUNCTIONS
+      // ============================================
+
+      function openTestEmailModal() {
+        // Get current template content from the form
+        const htmlContent = document.querySelector('[name="html_content"]').value.trim();
+        const textContent = document.querySelector('[name="text_content"]').value.trim();
+
+        // Validate that at least one content type exists
+        if (!htmlContent && !textContent) {
+          showToast('Please enter template content before sending a test email', 'error');
+          return;
+        }
+
+        // Reset modal state
+        document.getElementById('test-email-recipient').value = '';
+        document.getElementById('test-email-loading').style.display = 'none';
+        document.getElementById('test-email-message').style.display = 'none';
+        document.getElementById('test-email-send-btn').disabled = false;
+        document.getElementById('test-email-cancel-btn').disabled = false;
+
+        // Show modal
+        document.getElementById('test-email-modal').style.display = 'flex';
+        document.getElementById('test-email-recipient').focus();
+      }
+
+      function closeTestEmailModal() {
+        document.getElementById('test-email-modal').style.display = 'none';
+      }
+
+      async function sendTestEmail() {
+        const recipientEmail = document.getElementById('test-email-recipient').value.trim();
+
+        // Validate email
+        if (!recipientEmail) {
+          showTestEmailMessage('Please enter a recipient email address', 'error');
+          return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(recipientEmail)) {
+          showTestEmailMessage('Please enter a valid email address', 'error');
+          return;
+        }
+
+        // Get current template data from form
+        const template = {
+          subject: document.querySelector('[name="subject"]').value,
+          html_content: document.querySelector('[name="html_content"]').value,
+          text_content: document.querySelector('[name="text_content"]').value
+        };
+
+        // Show loading state
+        document.getElementById('test-email-loading').style.display = 'block';
+        document.getElementById('test-email-message').style.display = 'none';
+        document.getElementById('test-email-send-btn').disabled = true;
+        document.getElementById('test-email-cancel-btn').disabled = true;
+
+        try {
+          const res = await fetch(`${API_BASE}/email/templates/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              template: template,
+              test_email: recipientEmail
+            })
+          });
+
+          const json = await res.json();
+
+          document.getElementById('test-email-loading').style.display = 'none';
+          document.getElementById('test-email-send-btn').disabled = false;
+          document.getElementById('test-email-cancel-btn').disabled = false;
+
+          if (json.success) {
+            showTestEmailMessage('✅ Test email sent successfully to ' + recipientEmail, 'success');
+          } else {
+            showTestEmailMessage('❌ ' + (json.error || 'Failed to send test email'), 'error');
+          }
+        } catch (error) {
+          document.getElementById('test-email-loading').style.display = 'none';
+          document.getElementById('test-email-send-btn').disabled = false;
+          document.getElementById('test-email-cancel-btn').disabled = false;
+          showTestEmailMessage('❌ Error: ' + error.message, 'error');
+        }
+      }
+
+      function showTestEmailMessage(message, type) {
+        const msgEl = document.getElementById('test-email-message');
+        msgEl.textContent = message;
+        msgEl.style.display = 'block';
+
+        if (type === 'success') {
+          msgEl.style.background = 'rgba(16, 185, 129, 0.1)';
+          msgEl.style.color = '#059669';
+          msgEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        } else {
+          msgEl.style.background = 'rgba(239, 68, 68, 0.1)';
+          msgEl.style.color = '#dc2626';
+          msgEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
         }
       }
 
@@ -8367,26 +8783,75 @@
       function previewTemplate() {
         const subject = document.querySelector('[name="subject"]').value;
         const html = document.querySelector('[name="html_content"]').value;
+        const text = document.querySelector('[name="text_content"]').value;
 
         const testData = {
           name: "John Doe",
           company: "Example Inc",
           email: "john@example.com",
-          site: "example.com",
+          url: "example.com",
+          domain: "example.com",
+          date: new Date().toLocaleDateString(),
+          year: new Date().getFullYear(),
         };
 
-        let preview = html;
+        // Choose content: HTML if available, otherwise format plain text
+        let previewContent;
+        let isPlainText = false;
+
+        if (html.trim()) {
+          // Use HTML as-is
+          previewContent = html;
+        } else if (text.trim()) {
+          // Convert plain text to HTML with proper formatting
+          previewContent = escapeHtml(text)
+            .replace(/\n/g, '<br>')
+            .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+          isPlainText = true;
+        } else {
+          previewContent = '<em style="color: #999;">No content available</em>';
+        }
+
+        // Replace variables
         Object.keys(testData).forEach((key) => {
           const regex = new RegExp(`\\{\\{${key}\\}\\}`, "gi");
-          preview = preview.replace(regex, testData[key]);
+          previewContent = previewContent.replace(regex, testData[key]);
         });
 
+        // Open preview window with proper styling
         const win = window.open("", "_blank");
         win.document.write(`
           <!DOCTYPE html>
           <html>
-          <head><title>Preview</title></head>
-          <body>${preview}</body>
+          <head>
+            <title>Preview: ${escapeHtml(subject || '(No Subject)')}</title>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                line-height: 1.6;
+                max-width: 800px;
+                margin: 0 auto;
+              }
+              .subject-line {
+                font-size: 20px;
+                font-weight: bold;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #ddd;
+              }
+              .plain-text-preview {
+                white-space: pre-wrap;
+                font-family: 'Courier New', monospace;
+                font-size: 14px;
+                color: #333;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="subject-line">${escapeHtml(subject || '(No Subject)')}</div>
+            ${isPlainText ? `<div class="plain-text-preview">${previewContent}</div>` : previewContent}
+          </body>
           </html>
         `);
       }
@@ -8414,8 +8879,22 @@
       document.addEventListener('DOMContentLoaded', () => {
         const subjectInput = document.querySelector('[name="subject"]');
         const htmlInput = document.querySelector('[name="html_content"]');
+        const plainTextInput = document.querySelector('[name="text_content"]');
+
         if (subjectInput) subjectInput.addEventListener('input', updateAIButtons);
-        if (htmlInput) htmlInput.addEventListener('input', updateAIButtons);
+        if (htmlInput) {
+          htmlInput.addEventListener('input', updateAIButtons);
+          // Mark HTML as manually edited when user types in it
+          htmlInput.addEventListener('input', () => {
+            htmlManuallyEdited = true;
+          });
+        }
+        // Reset manual edit flag when plain text is edited (allows new conversion)
+        if (plainTextInput) {
+          plainTextInput.addEventListener('input', () => {
+            htmlManuallyEdited = false;
+          });
+        }
       });
 
       function openAIGenerateModal() {
