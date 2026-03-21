@@ -223,24 +223,77 @@ class AIProcessor {
    * - is_wordpress = 1 (labeled as WordPress)
    * - ai_status = 'pending' (not yet processed)
    * - text_content is not empty
+   * - content does not match ignored tags
    */
   getPendingSites(limit = BATCH_SIZE) {
     const database = db.initDatabase();
     try {
       const sites = database.prepare(`
         SELECT id, url, search_query, text_content
-        FROM sites 
-        WHERE is_wordpress = 1 
+        FROM sites
+        WHERE is_wordpress = 1
           AND (ai_status = 'pending' OR ai_status IS NULL)
-          AND text_content IS NOT NULL 
+          AND text_content IS NOT NULL
           AND text_content != ''
         ORDER BY id ASC
         LIMIT ?
       `).all(limit);
-      return sites;
+
+      // Filter out sites with ignored tags in content
+      const ignoredTags = this.getIgnoredTags();
+      const filtered = sites.filter(site => {
+        if (!ignoredTags.length) return true;
+        return !this.isContentIgnored(site.text_content, ignoredTags);
+      });
+
+      return filtered;
     } finally {
       database.close();
     }
+  }
+
+  /**
+   * Get all ignored tags from database
+   * @returns {Array} - Array of ignored tag objects
+   */
+  getIgnoredTags() {
+    const database = db.initDatabase();
+    try {
+      return database.prepare(`SELECT * FROM ignored_tags`).all();
+    } finally {
+      database.close();
+    }
+  }
+
+  /**
+   * Check if content should be ignored based on ignored tags
+   * @param {string} content - Content text to check
+   * @param {Array} ignoredTags - Array of ignored tag objects
+   * @returns {boolean} - True if content should be ignored
+   */
+  isContentIgnored(content, ignoredTags) {
+    if (!content || !ignoredTags || ignoredTags.length === 0) return false;
+    const contentLower = content.toLowerCase();
+
+    return ignoredTags.some(tag => {
+      // Skip if scope is 'url' only
+      if (tag.scope === 'url') return false;
+
+      const tagValue = tag.tag.toLowerCase();
+      switch (tag.match_type) {
+        case 'exact':
+          return contentLower.includes(tagValue);
+        case 'regex':
+          try {
+            return new RegExp(tagValue, 'i').test(contentLower);
+          } catch (e) {
+            return false;
+          }
+        case 'contains':
+        default:
+          return contentLower.includes(tagValue);
+      }
+    });
   }
 
   /**
@@ -273,7 +326,9 @@ class AIProcessor {
         responseTime: elapsed,
         tokens: result.tokensUsed || 0,
         siteUrl: site.url,
-        isRelevant: result.isRelevant
+        isWordPress: result.wordpressVerification?.isWordPress,
+        wpConfidence: result.wordpressVerification?.confidence,
+        isRelevant: result.contentRelevance?.isRelevant
       });
 
       // Save results
@@ -281,18 +336,27 @@ class AIProcessor {
 
       // Update stats
       this.stats.totalProcessed++;
-      if (result.isRelevant) {
+      if (result.contentRelevance?.isRelevant) {
         this.stats.relevant++;
       } else {
         this.stats.notRelevant++;
       }
 
-      // Log result
-      const relevantIcon = result.isRelevant ? "✅" : "⚠️";
-      console.log(`✨ AI Verified | ${relevantIcon} Relevant | ${result.actualCategory} (${elapsed}ms)`);
+      // Log result with WordPress verification and content relevance
+      const wpIcon = result.wordpressVerification?.isWordPress ? "🟢 WP" : "🔴 Not WP";
+      const wpConfidence = result.wordpressVerification?.confidence || 'medium';
+      const relevantIcon = result.contentRelevance?.isRelevant ? "✅" : "⚠️";
+      const category = result.contentRelevance?.actualCategory || 'Unknown';
+      console.log(`✨ ${wpIcon} (${wpConfidence}) | ${relevantIcon} Relevant | ${category} (${elapsed}ms)`);
 
-      if (!result.isRelevant && result.mismatchReason) {
-        console.log(`      ↳ ${result.mismatchReason}`);
+      // Log WordPress indicators if not WordPress
+      if (!result.wordpressVerification?.isWordPress && result.wordpressVerification?.indicators?.length > 0) {
+        console.log(`      ↳ WP Indicators: ${result.wordpressVerification.indicators[0]}`);
+      }
+
+      // Log mismatch reason if not relevant
+      if (!result.contentRelevance?.isRelevant && result.contentRelevance?.mismatchReason) {
+        console.log(`      ↳ ${result.contentRelevance.mismatchReason}`);
       }
 
     } catch (error) {
@@ -340,17 +404,30 @@ class AIProcessor {
 
   /**
    * Save AI analysis results to database
+   * Uses actual AI results for WordPress verification instead of hardcoded values
    */
   saveAIResults(siteId, result) {
     const database = db.initDatabase();
     try {
+      // Extract WordPress verification data
+      const wpVerified = result.wordpressVerification?.isWordPress ? 1 : 0;
+      const wpConfidence = result.wordpressVerification?.confidence || 'medium';
+      const wpIndicators = result.wordpressVerification?.indicators || [];
+
+      // Extract content relevance data
+      const isRelevant = result.contentRelevance?.isRelevant ? 1 : 0;
+      const actualCategory = result.contentRelevance?.actualCategory || null;
+      const contentSummary = result.contentRelevance?.summary || null;
+      const mismatchReason = result.contentRelevance?.mismatchReason || null;
+
       database.prepare(`
         UPDATE sites SET
           ai_status = 'completed',
           ai_error = NULL,
-          ai_verified_wp = 1,
-          ai_wp_confidence = 'high',
-          ai_wp_indicators = '["detected-by-platform"]',
+          is_wordpress = ?,
+          ai_verified_wp = ?,
+          ai_wp_confidence = ?,
+          ai_wp_indicators = ?,
           ai_content_relevant = ?,
           ai_actual_category = ?,
           ai_content_summary = ?,
@@ -358,10 +435,17 @@ class AIProcessor {
           ai_processed_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(
-        result.isRelevant ? 1 : 0,
-        result.actualCategory || null,
-        result.contentSummary || null,
-        result.mismatchReason || null,
+        // Update original WordPress detection based on AI verification
+        wpVerified,
+        // AI verification fields from actual AI analysis
+        wpVerified,
+        wpConfidence,
+        JSON.stringify(wpIndicators),
+        // Content relevance fields
+        isRelevant,
+        actualCategory,
+        contentSummary,
+        mismatchReason,
         siteId
       );
     } finally {

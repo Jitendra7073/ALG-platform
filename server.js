@@ -264,6 +264,76 @@ app.delete("/api/excluded-domains/:id", (req, res) => {
   }
 });
 
+// =====================================================
+// IGNORED TAGS ENDPOINTS
+// =====================================================
+
+// Get all ignored tags
+app.get("/api/ignored-tags", (req, res) => {
+  try {
+    const tags = db.getAllIgnoredTags();
+    res.json({ success: true, data: tags });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Add ignored tag
+app.post("/api/ignored-tags", (req, res) => {
+  try {
+    const { tag, match_type, scope, reason } = req.body;
+    if (!tag || tag.trim() === "") {
+      return res.status(400).json({ success: false, error: "Tag is required" });
+    }
+
+    const result = db.addIgnoredTag(tag, match_type, scope, reason);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error.message.includes("UNIQUE")) {
+      res.status(400).json({ success: false, error: "Tag already exists" });
+    } else {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+});
+
+// Update ignored tag
+app.put("/api/ignored-tags/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tag, match_type, scope, reason } = req.body;
+    if (!tag || tag.trim() === "") {
+      return res.status(400).json({ success: false, error: "Tag is required" });
+    }
+
+    const result = db.updateIgnoredTag(parseInt(id), tag, match_type, scope, reason);
+    if (!result) {
+      return res.status(404).json({ success: false, error: "Tag not found" });
+    }
+    res.json({ success: true, data: result });
+  } catch (error) {
+    if (error.message.includes("UNIQUE")) {
+      res.status(400).json({ success: false, error: "Tag already exists" });
+    } else {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+});
+
+// Delete ignored tag
+app.delete("/api/ignored-tags/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = db.deleteIgnoredTag(parseInt(id));
+    if (!result) {
+      return res.status(404).json({ success: false, error: "Tag not found" });
+    }
+    res.json({ success: true, message: "Tag deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get all keywords
 app.get("/api/keywords", (req, res) => {
   try {
@@ -422,6 +492,29 @@ app.get("/api/ai/processor/stats", (req, res) => {
   }
 });
 
+// Get AI verification breakdown for dashboard
+app.get("/api/sites/ai-breakdown", (req, res) => {
+  try {
+    const database = db.initDatabase();
+
+    const breakdown = database.prepare(`
+      SELECT
+        COUNT(CASE WHEN ai_verified_wp = 1 THEN 1 END) as verified,
+        COUNT(CASE WHEN ai_verified_wp = 0 THEN 1 END) as not_verified,
+        COUNT(CASE WHEN ai_status = 'pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN ai_status = 'completed' THEN 1 END) as completed
+      FROM sites
+      WHERE is_wordpress = 1
+    `).get();
+
+    database.close();
+    res.json({ success: true, data: breakdown });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get content categories distribution for dashboard
 // Requeue WordPress sites for AI verification
 // Resets ai_status to 'pending' for sites that need re-verification
 app.post("/api/ai/requeue", (req, res) => {
@@ -555,6 +648,20 @@ app.get("/api/sites/all", (req, res) => {
   }
 });
 
+// Get single site by ID
+app.get("/api/sites/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const site = db.getSiteById(parseInt(id));
+    if (!site) {
+      return res.status(404).json({ success: false, error: "Site not found" });
+    }
+    res.json({ success: true, data: site });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get scraper status
 app.get("/api/scraper/status", (req, res) => {
   const status = Array.from(runningScrapers.entries()).map(
@@ -573,7 +680,7 @@ app.get("/api/scraper/status", (req, res) => {
 app.post("/api/scraper/start/:keywordId", async (req, res) => {
   try {
     const { keywordId } = req.params;
-    const { country } = req.body; // New: optional country parameter
+    const { country, customCountrySettings } = req.body; // New: optional country and custom settings
     const keyword = db.getKeywordById(parseInt(keywordId));
 
     if (!keyword) {
@@ -593,7 +700,13 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
     db.updateKeywordStatus(parseInt(keywordId), "running");
 
     // Start scraper in background
-    runScraper(parseInt(keywordId), keyword.keyword, keyword.max_sites, country || 'in');
+    runScraper(
+      parseInt(keywordId),
+      keyword.keyword,
+      keyword.max_sites,
+      country || 'in',
+      customCountrySettings || null
+    );
 
     res.json({ success: true, message: "Scraper started" });
   } catch (error) {
@@ -891,6 +1004,20 @@ app.get("/api/contacts/emails", (req, res) => {
   }
 });
 
+// Get single email by ID
+app.get("/api/contacts/emails/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const email = db.getEmailById(parseInt(id));
+    if (!email) {
+      return res.status(404).json({ success: false, error: "Email not found" });
+    }
+    res.json({ success: true, data: email });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get phones with pagination
 app.get("/api/contacts/phones", (req, res) => {
   try {
@@ -899,6 +1026,20 @@ app.get("/api/contacts/phones", (req, res) => {
     const search = req.query.search || null;
     const result = db.getPhones(page, limit, search);
     res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single phone by ID
+app.get("/api/contacts/phones/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const phone = db.getPhoneById(parseInt(id));
+    if (!phone) {
+      return res.status(404).json({ success: false, error: "Phone not found" });
+    }
+    res.json({ success: true, data: phone });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -926,6 +1067,20 @@ app.get("/api/contacts/linkedin", (req, res) => {
     const search = req.query.search || null;
     const result = db.getLinkedinProfiles(page, limit, search);
     res.json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get single LinkedIn profile by ID
+app.get("/api/contacts/linkedin/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const linkedin = db.getLinkedinById(parseInt(id));
+    if (!linkedin) {
+      return res.status(404).json({ success: false, error: "LinkedIn profile not found" });
+    }
+    res.json({ success: true, data: linkedin });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1036,6 +1191,28 @@ app.delete("/api/executives/:id", (req, res) => {
         .json({ success: false, error: "Executive not found" });
     }
     res.json({ success: true, message: "Executive deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Bulk delete executives
+app.delete("/api/executives/bulk", (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid IDs array" });
+    }
+
+    let deletedCount = 0;
+    for (const id of ids) {
+      const result = db.deleteExecutive(parseInt(id));
+      if (result) deletedCount++;
+    }
+
+    res.json({ success: true, data: { deleted: deletedCount } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1224,7 +1401,7 @@ async function scrapeExecutives() {
   }
 }
 
-async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in') {
+async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in', customCountrySettings = null) {
   const scraperData = {
     keyword,
     status: "running",
@@ -1247,7 +1424,20 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
     'sg': { gl: 'sg', hl: 'en', locale: 'en-SG', timezoneId: 'Asia/Singapore', domain: 'google.com.sg' },
   };
 
-  const settings = regionalSettings[countryCode.toLowerCase()] || regionalSettings['in'];
+  // Use custom settings if provided, otherwise use predefined settings, otherwise default to India
+  let settings;
+  if (customCountrySettings && customCountrySettings.domain) {
+    // Custom country settings
+    settings = {
+      gl: customCountrySettings.gl || countryCode,
+      hl: customCountrySettings.hl || 'en',
+      locale: customCountrySettings.locale || 'en-US',
+      timezoneId: customCountrySettings.timezoneId || 'America/New_York',
+      domain: customCountrySettings.domain
+    };
+  } else {
+    settings = regionalSettings[countryCode.toLowerCase()] || regionalSettings['in'];
+  }
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     executablePath:
@@ -1261,20 +1451,220 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
       "--disable-setuid-sandbox",
       "--disable-infobars",
       "--profile-directory=Default",
+      "--disable-features=IsolateOrigins,site-per-process",
+      "--disable-site-isolation-trials",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
+      "--start-maximized",
+      "--disable-extensions-except=",
+      "--disable-plugins-discovery",
+      "--disable-default-apps",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-popup-blocking",
     ],
-    ignoreDefaultArgs: ["--disable-extensions"],
+    ignoreDefaultArgs: ["--disable-extensions", "--enable-automation"],
     viewport: { width: 1920, height: 1080 },
     locale: settings.locale,
     timezoneId: settings.timezoneId,
     permissions: ["geolocation"],
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
   });
 
   try {
     const page = await context.newPage();
 
+    // ========== ANTI-DETECTION MEASURES ==========
+    // Set realistic user agent
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': `${settings.locale},en;q=0.9`,
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Cache-Control': 'max-age=0'
+    });
+
+    // Inject anti-detection scripts to hide automation
+    await page.addInitScript(() => {
+      // Hide webdriver property
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined,
+      });
+
+      // Override navigator plugins
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5],
+      });
+
+      // Override navigator languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en'],
+      });
+
+      // Override platform
+      Object.defineProperty(navigator, 'platform', {
+        get: () => 'Win32',
+      });
+
+      // Override chrome runtime
+      window.chrome = {
+        runtime: {},
+      };
+
+      // Override permissions
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) => (
+        parameters.name === 'notifications' ?
+          Promise.resolve({ state: Notification.permission }) :
+          originalQuery(parameters)
+      );
+
+      // Remove automation indicators
+      delete navigator.__proto__.webdriver;
+    });
+
     // Navigate to Google with regional parameters
     const searchUrl = `https://www.${settings.domain}/search?q=${encodeURIComponent(keyword)}&gl=${settings.gl}&hl=${settings.hl}`;
-    await page.goto(searchUrl, { waitUntil: "networkidle" });
+
+    console.log(`[Scraper] Navigating to: ${searchUrl}`);
+
+    // ========== ROBUST PAGE LOADING STRATEGY ==========
+    // Try multiple approaches to load the page with increasing timeouts
+    let pageLoaded = false;
+    let loadAttempts = 0;
+    const maxLoadAttempts = 3;
+
+    while (!pageLoaded && loadAttempts < maxLoadAttempts) {
+      loadAttempts++;
+      const timeout = 10000 + (loadAttempts * 10000); // 10s, 20s, 30s
+
+      try {
+        console.log(`[Scraper] Load attempt ${loadAttempts}/${maxLoadAttempts} (timeout: ${timeout}ms)`);
+
+        // Try different wait conditions based on attempt
+        const waitConditions = ["commit", "domcontentloaded", "load"];
+        const waitCondition = waitConditions[loadAttempts - 1] || "domcontentloaded";
+
+        await page.goto(searchUrl, {
+          waitUntil: waitCondition,
+          timeout: timeout
+        });
+
+        // If we got here, page loaded successfully
+        pageLoaded = true;
+        console.log(`[Scraper] ✅ Page loaded successfully (${waitCondition})`);
+
+      } catch (error) {
+        console.log(`[Scraper] ⚠️  Attempt ${loadAttempts} failed: ${error.message}`);
+
+        if (loadAttempts < maxLoadAttempts) {
+          console.log(`[Scraper] Retrying...`);
+
+          // Small delay before retry
+          await page.waitForTimeout(2000);
+
+          // Try to navigate to Google homepage first as fallback
+          if (loadAttempts === 2) {
+            try {
+              console.log(`[Scraper] Trying alternative approach: Navigate to Google homepage first...`);
+              await page.goto(`https://www.${settings.domain}/`, {
+                waitUntil: "domcontentloaded",
+                timeout: 10000
+              });
+              await page.waitForTimeout(1000);
+
+              // Now try typing the search query
+              const searchBox = await page.$('textarea[name="q"], input[name="q"]');
+              if (searchBox) {
+                await page.waitForTimeout(Math.random() * 1000 + 500);
+                await searchBox.fill(keyword);
+                await page.waitForTimeout(Math.random() * 500 + 200);
+                await searchBox.press("Enter");
+
+                // Wait for search results
+                await page.waitForSelector("div#search", { timeout: 15000 });
+                pageLoaded = true;
+                console.log(`[Scraper] ✅ Search completed via alternative approach`);
+                continue;
+              }
+            } catch (fallbackError) {
+              console.log(`[Scraper] Alternative approach also failed: ${fallbackError.message}`);
+            }
+          }
+        } else {
+          // Final attempt failed - throw the error
+          throw new Error(`Failed to load page after ${maxLoadAttempts} attempts. Last error: ${error.message}`);
+        }
+      }
+    }
+
+    // Additional wait to ensure page is fully settled
+    await page.waitForTimeout(1500);
+
+    // ========== EARLY CAPTCHA DETECTION ==========
+    // Check for CAPTCHA immediately after page load
+    const captchaSelectors = [
+      'form[action*="captcha"]',
+      'iframe[src*="captcha"]',
+      'div[class*="captcha"]',
+      '[id*="captcha"]',
+      'textarea[name="captcha"]'
+    ];
+
+    let captchaDetected = false;
+    for (const selector of captchaSelectors) {
+      const captcha = await page.$(selector);
+      if (captcha) {
+        captchaDetected = true;
+        break;
+      }
+    }
+
+    // Also check for CAPTCHA in page text
+    if (!captchaDetected) {
+      const pageText = await page.evaluate(() => document.body.innerText);
+      if (pageText.toLowerCase().includes('captcha') ||
+          pageText.toLowerCase().includes('verify you are human') ||
+          pageText.toLowerCase().includes('unusual traffic')) {
+        captchaDetected = true;
+      }
+    }
+
+    if (captchaDetected) {
+      console.log('[Scraper] ⚠️  CAPTCHA detected! Please solve it in the browser window.');
+      console.log('[Scraper] Waiting for you to solve the CAPTCHA (max 60 seconds)...');
+
+      // Wait for CAPTCHA to be solved (check every 2 seconds, max 60 seconds)
+      let captchaSolved = false;
+      for (let i = 0; i < 30; i++) {
+        await page.waitForTimeout(2000);
+
+        // Check if CAPTCHA is gone
+        const stillHasCaptcha = await page.evaluate(() => {
+          const captchaElements = document.querySelectorAll('form[action*="captcha"], iframe[src*="captcha"], [class*="captcha"], [id*="captcha"]');
+          const text = document.body.innerText.toLowerCase();
+          return captchaElements.length > 0 ||
+                 text.includes('captcha') ||
+                 text.includes('verify you are human');
+        });
+
+        if (!stillHasCaptcha) {
+          captchaSolved = true;
+          console.log('[Scraper] ✅ CAPTCHA solved! Continuing...');
+          break;
+        }
+
+        console.log(`[Scraper] Still waiting for CAPTCHA... (${(i + 1) * 2}s elapsed)`);
+      }
+
+      if (!captchaSolved) {
+        throw new Error('CAPTCHA not solved within 60 seconds. Please try again later.');
+      }
+    }
 
     // Accept cookies if needed
     try {
@@ -1287,36 +1677,52 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
       }
     } catch (e) {}
 
-    // Type search query
-    const searchBox = await page.$('textarea[name="q"], input[name="q"]');
-    if (searchBox) {
-      // Random delay to appear more human
-      await page.waitForTimeout(Math.random() * 1000 + 500);
+    // Check if we're already on search results page (from alternative approach)
+    const currentUrl = page.url();
+    const isSearchResultsPage = currentUrl.includes('/search?') && currentUrl.includes('q=');
 
-      // Type with random delays between characters
-      await searchBox.fill(keyword);
-      await page.waitForTimeout(Math.random() * 500 + 200);
-      await searchBox.press("Enter");
+    // Only type search query if not already on search results
+    if (!isSearchResultsPage) {
+      const searchBox = await page.$('textarea[name="q"], input[name="q"]');
+      if (searchBox) {
+        // Random delay to appear more human
+        await page.waitForTimeout(Math.random() * 1000 + 500);
 
-      await page.waitForSelector("div#search", { timeout: 15000 });
+        // Type with random delays between characters
+        await searchBox.fill(keyword);
+        await page.waitForTimeout(Math.random() * 500 + 200);
+        await searchBox.press("Enter");
 
-      // Scroll down to load more results naturally
+        await page.waitForSelector("div#search", { timeout: 15000 });
+
+        // Scroll down to load more results naturally
+        await page.evaluate(() => {
+          window.scrollBy(0, window.innerHeight);
+        });
+        await page.waitForTimeout(1000);
+      } else {
+        console.log('[Scraper] ⚠️  Search box not found, may already be on results page');
+      }
+    } else {
+      console.log('[Scraper] ✅ Already on search results page, skipping search box');
+    }
+
+    // Wait for search results to be loaded
+    try {
+      await page.waitForSelector("div#search", { timeout: 5000 });
+    } catch (e) {
+      console.log('[Scraper] ⚠️  Search results div not found, page may not have loaded properly');
+    }
+
+    // Scroll down to load more results naturally
+    try {
       await page.evaluate(() => {
         window.scrollBy(0, window.innerHeight);
       });
       await page.waitForTimeout(1000);
-
-      // Check if CAPTCHA is present
-      const captcha = await page.$(
-        'form[action*="captcha"] #captcha, textarea[name="captcha"], iframe[src*="captcha"]',
-      );
-      if (captcha) {
-        console.log(
-          "[Scraper] ⚠️  CAPTCHA detected! Please solve it in the browser window.",
-        );
-        console.log("[Scraper] Waiting 30 seconds for CAPTCHA to be solved...");
-        await page.waitForTimeout(30000);
-      }
+    } catch (e) {
+      console.log('[Scraper] ⚠️  Could not scroll page');
+    }
 
       // Extract URLs from multiple pages
       const urls = [];
@@ -1325,32 +1731,64 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
       let pageNum = 0;
 
       // Calculate how many Google pages to turn (assume ~10 results per page, cap at 10 pages)
-      const maxPages = Math.min(Math.ceil(maxSites / 10) + 1, 10);
+      // Increased cap to ensure we get enough sites AFTER filtering
+      const maxPages = Math.min(Math.ceil(maxSites / 5) + 2, 10);
 
-      while (pageNum < maxPages && urls.length < maxSites) {
+      // Keep fetching pages until we have enough URLs (before filtering)
+      // We'll apply the maxSites limit AFTER filtering out domains/tags
+      while (pageNum < maxPages && urls.length < maxSites * 1.5) {
         console.log(`[Scraper] Scraping Google page ${pageNum + 1}...`);
 
         // Extract URLs from current page
-        const pageUrls = await page.evaluate(() => {
-          const results = [];
-          const links = document.querySelectorAll("div#search a[href]");
+        let pageUrls = [];
+        try {
+          pageUrls = await page.evaluate(() => {
+            const results = [];
+            const links = document.querySelectorAll("div#search a[href]");
 
-          for (const link of links) {
-            const href = link.getAttribute("href");
-            if (
-              href &&
-              !href.includes("google.") &&
-              !href.startsWith("#") &&
-              !href.startsWith("/url?q=")
-            ) {
-              if (href.startsWith("http")) {
-                const urlWithoutHash = href.split("#")[0];
-                results.push(urlWithoutHash);
+            for (const link of links) {
+              const href = link.getAttribute("href");
+              if (
+                href &&
+                !href.includes("google.") &&
+                !href.startsWith("#") &&
+                !href.startsWith("/url?q=")
+              ) {
+                if (href.startsWith("http")) {
+                  const urlWithoutHash = href.split("#")[0];
+                  results.push(urlWithoutHash);
+                }
               }
             }
+            return results;
+          });
+        } catch (e) {
+          console.log(`[Scraper] ⚠️  Could not extract URLs from page: ${e.message}`);
+          console.log(`[Scraper] Trying alternative URL extraction...`);
+
+          // Try alternative approach - just get all links
+          try {
+            pageUrls = await page.evaluate(() => {
+              const results = [];
+              const links = document.querySelectorAll('a[href]');
+
+              for (const link of links) {
+                const href = link.getAttribute("href");
+                if (href && href.startsWith("http") &&
+                    !href.includes("google.") &&
+                    !href.includes("facebook.") &&
+                    !href.includes("twitter.") &&
+                    !href.includes("linkedin.")) {
+                  results.push(href.split("#")[0]);
+                }
+              }
+              return results;
+            });
+          } catch (e2) {
+            console.log(`[Scraper] ❌ Alternative URL extraction also failed: ${e2.message}`);
+            break; // Exit the while loop if we can't extract URLs
           }
-          return results;
-        });
+        }
 
         // Add new URLs with domain-level uniqueness
         for (const url of pageUrls) {
@@ -1435,13 +1873,9 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
         return true;
       });
 
-      // Strictly enforce the maxSites limit on newUrls just in case the last Google page returned too many
-      if (newUrls.length > maxSites) {
-        newUrls = newUrls.slice(0, maxSites);
-      }
-
       // Filter out URLs from excluded domains
       const excludedDomains = db.getAllExcludedDomains().map(d => d.domain);
+      let domainExcludedCount = 0;
       if (excludedDomains.length > 0) {
         const domainExcluded = [];
         newUrls = newUrls.filter(url => {
@@ -1451,6 +1885,7 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
           }
           return true;
         });
+        domainExcludedCount = domainExcluded.length;
         if (domainExcluded.length > 0) {
           console.log(
             `[Scraper] ⛔ Excluded ${domainExcluded.length} URLs (blocked domains):`,
@@ -1459,8 +1894,39 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
         }
       }
 
+      // Filter out URLs with ignored tags
+      const ignoredTags = db.getAllIgnoredTags();
+      let tagIgnoredCount = 0;
+      if (ignoredTags.length > 0) {
+        const tagIgnored = [];
+        newUrls = newUrls.filter(url => {
+          if (db.isUrlIgnored(url, ignoredTags)) {
+            tagIgnored.push(url);
+            return false;
+          }
+          return true;
+        });
+        tagIgnoredCount = tagIgnored.length;
+        if (tagIgnored.length > 0) {
+          console.log(
+            `[Scraper] 🏷️  Ignored ${tagIgnored.length} URLs (blocked tags):`,
+          );
+          tagIgnored.forEach(u => console.log(`  🏷️  ${u}`));
+        }
+      }
+
+      // ✅ Apply maxSites limit AFTER all filtering (domains + tags + duplicates)
+      // This ensures we always scrape maxSites sites, even after exclusions
+      if (newUrls.length > maxSites) {
+        const before = newUrls.length;
+        newUrls = newUrls.slice(0, maxSites);
+        console.log(
+          `[Scraper] 📊 Limited to ${maxSites} sites (had ${before} after filtering)`,
+        );
+      }
+
       console.log(
-        `[Scraper] Found ${urls.length} URLs, ${newUrls.length} new (limited to ${maxSites}), ${duplicates.length} duplicates`,
+        `[Scraper] Found ${urls.length} URLs from Google, ${newUrls.length} after filtering (${duplicates.length} duplicates, ${domainExcludedCount} excluded domains, ${tagIgnoredCount} ignored tags)`,
       );
       if (duplicates.length > 0) {
         console.log(
@@ -1505,7 +1971,6 @@ async function runScraper(keywordId, keyword, maxSites = 20, countryCode = 'in')
           console.error("[Scraper] Executive scraping error:", err),
         );
       }, 2000); // Start after 2 seconds
-    }
   } catch (error) {
     console.error(`Scraper error for keyword ${keyword}:`, error);
     db.updateKeywordStatus(keywordId, "error");

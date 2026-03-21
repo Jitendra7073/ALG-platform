@@ -1,0 +1,183 @@
+/* ========================================
+   WORDPRESS DETECTOR COLOR SYSTEM
+   ======================================== */
+
+/* LIGHT MODE (Default) */
+:root {
+  /* === PRIMARY SCALE (Purple-Violet) === */
+  --primary-50:  #faf5ff;
+  --primary-100: #f3e8ff;
+  --primary-200: #e9d5ff;
+  --primary-300: #d8b4fe;
+  --primary-400: #c084fc;
+  --primary-500: #a855f7;  /* Main brand */
+  --primary-600: #9333ea;
+  --primary-700: #7e22ce;
+  --primary-800: #6b21a8;
+  --primary-900: #581c87;
+
+  /* === SECONDARY SCALE (Indigo-Blue) === */
+  --secondary-500: #6366f1;
+  --secondary-600: #4f46e5;
+
+  /* === NEUTRAL SCALE === */
+  --neutral-50:  #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-400: #a3a3a3;
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
+
+  /* === SEMANTIC COLORS === */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #0ea5e9;
+
+  /* === SEMANTIC TOKENS === */
+  /* Backgrounds */
+  --bg-primary: #fafafa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f5f5f5;
+  --bg-elevated: #ffffff;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text */
+  --text-primary: #262626;
+  --text-secondary: #525252;
+  --text-tertiary: #a3a3a3;
+  --text-inverse: #ffffff;
+  --text-link: #9333ea;
+
+  /* Borders */
+  --border-default: #e5e5e5;
+  --border-strong: #d4d4d4;
+  --border-subtle: #f5f5f5;
+
+  /* Interactive */
+  --primary: #a855f7;
+  --primary-hover: #9333ea;
+  --success-bg: #d1fae5;
+  --warning-bg: #fef3c7;
+  --danger-bg: #fee2e2;
+  --info-bg: #e0f2fe;
+
+  /* === GRADIENTS === */
+  --gradient-primary: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-info: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+
+  /* === SHADOWS === */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-primary: 0 4px 15px rgba(168, 85, 247, 0.3);
+  --shadow-success: 0 4px 15px rgba(16, 185, 129, 0.3);
+  --shadow-danger: 0 4px 15px rgba(239, 68, 68, 0.3);
+
+  /* === GLOWS === */
+  --glow-primary: 0 0 20px rgba(168, 85, 247, 0.15);
+  --glow-success: 0 0 20px rgba(16, 185, 129, 0.15);
+  --glow-danger: 0 0 20px rgba(239, 68, 68, 0.15);
+
+  /* === TRANSITIONS === */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
+
+/* DARK MODE */
+[data-theme="dark"] {
+  /* === PRIMARY SCALE (Purple-Violet) === */
+  --primary-50:  #581c87;
+  --primary-100: #6b21a8;
+  --primary-200: #7e22ce;
+  --primary-300: #9333ea;
+  --primary-400: #a855f7;
+  --primary-500: #c084fc;  /* Lighter for dark mode */
+  --primary-600: #d8b4fe;
+  --primary-700: #e9d5ff;
+  --primary-800: #f3e8ff;
+  --primary-900: #faf5ff;
+
+  /* === SECONDARY SCALE (Indigo-Blue) === */
+  --secondary-500: #818cf8;
+  --secondary-600: #6366f1;
+
+  /* === NEUTRAL SCALE (Inverted) === */
+  --neutral-50:  #171717;
+  --neutral-100: #262626;
+  --neutral-200: #404040;
+  --neutral-300: #525252;
+  --neutral-400: #737373;
+  --neutral-500: #a3a3a3;
+  --neutral-600: #d4d4d4;
+  --neutral-700: #e5e5e5;
+  --neutral-800: #f5f5f5;
+  --neutral-900: #fafafa;
+
+  /* === SEMANTIC TOKENS === */
+  /* Backgrounds */
+  --bg-primary: #171717;
+  --bg-secondary: #262626;
+  --bg-tertiary: #404040;
+  --bg-elevated: #262626;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d4;
+  --text-tertiary: #a3a3a3;
+  --text-inverse: #171717;
+  --text-link: #c084fc;
+
+  /* Borders */
+  --border-default: #404040;
+  --border-strong: #525252;
+  --border-subtle: #262626;
+
+  /* Interactive */
+  --primary-hover: #c084fc;
+
+  /* Status backgrounds (with transparency) */
+  --success-bg: rgba(16, 185, 129, 0.15);
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --danger-bg: rgba(239, 68, 68, 0.15);
+  --info-bg: rgba(14, 165, 233, 0.15);
+
+  /* === GRADIENTS === */
+  --gradient-primary: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  --gradient-info: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
+
+  /* === SHADOWS (Stronger for dark mode) === */
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --shadow-primary: 0 4px 15px rgba(168, 85, 247, 0.4);
+  --shadow-success: 0 4px 15px rgba(16, 185, 129, 0.4);
+  --shadow-danger: 0 4px 15px rgba(239, 68, 68, 0.4);
+
+  /* === GLOWS (Stronger for dark mode) === */
+  --glow-primary: 0 0 30px rgba(168, 85, 247, 0.3);
+  --glow-success: 0 0 30px rgba(16, 185, 129, 0.3);
+  --glow-danger: 0 0 30px rgba(239, 68, 68, 0.3);
+}
+
+/* === SMOOTH TRANSITIONS FOR THEME SWITCHING === */
+*, *::before, *::after {
+  transition-property: background-color, color, border-color, box-shadow;
+  transition-duration: var(--transition-normal);
+  transition-timing-function: ease;
+}
+
+/* Disable transitions during theme switch to prevent flash */
+.theme-switching *, .theme-switching *::before, .theme-switching *::after {
+  transition: none !important;
+}

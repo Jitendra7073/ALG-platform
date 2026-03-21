@@ -179,6 +179,22 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_excluded_domains_domain ON excluded_domains(domain);
   `);
 
+  // Create ignored_tags table for tag-based filtering during scraping and AI analysis
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ignored_tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tag TEXT NOT NULL UNIQUE,
+      match_type TEXT DEFAULT 'contains',
+      scope TEXT DEFAULT 'url',
+      reason TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ignored_tags_tag ON ignored_tags(tag);
+  `);
+
   // Create contacts table (replaces emails/phones columns in sites table)
   db.exec(`
     CREATE TABLE IF NOT EXISTS contacts (
@@ -307,82 +323,87 @@ function initDatabase() {
  */
 function saveSearchResults(query, results, country = 'in') {
   const db = initDatabase();
+  db.exec('PRAGMA foreign_keys = OFF');
 
-  const wordpressCount = results.filter((r) => r.isWordPress).length;
-  const nonWordpressCount = results.length - wordpressCount;
+  try {
+    const wordpressCount = results.filter((r) => r.isWordPress).length;
+    const nonWordpressCount = results.length - wordpressCount;
 
-  // Insert search record
-  const insertSearch = db.prepare(`
-    INSERT INTO searches (query, country, total_sites, wordpress_count, non_wordpress_count)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+    // Insert search record
+    const insertSearch = db.prepare(`
+      INSERT INTO searches (query, country, total_sites, wordpress_count, non_wordpress_count)
+      VALUES (?, ?, ?, ?, ?)
+    `);
 
-  const searchResult = insertSearch.run(
-    query,
-    country,
-    results.length,
-    wordpressCount,
-    nonWordpressCount,
-  );
-  const searchId = searchResult.lastInsertRowid;
+    const searchResult = insertSearch.run(
+      query,
+      country,
+      results.length,
+      wordpressCount,
+      nonWordpressCount,
+    );
+    const searchId = searchResult.lastInsertRowid;
 
-  // Insert site records
-  const insertSite = db.prepare(`
-    INSERT INTO sites (
-      search_id, url, country, is_wordpress, confidence_score, 
-      indicators, error, search_query, emails, phones, 
-      linkedin_profiles, text_content
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+    // Insert site records
+    const insertSite = db.prepare(`
+      INSERT INTO sites (
+        search_id, url, country, is_wordpress, confidence_score,
+        indicators, error, search_query, emails, phones,
+        linkedin_profiles, text_content
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-  const insertContact = db.prepare(`
-    INSERT INTO contacts (site_id, type, value, source_page)
-    VALUES (?, ?, ?, ?)
-  `);
+    const insertContact = db.prepare(`
+      INSERT INTO contacts (site_id, type, value, source_page)
+      VALUES (?, ?, ?, ?)
+    `);
 
-  const insertMany = db.transaction((sites) => {
-    for (const site of sites) {
-      const siteResult = insertSite.run(
-        searchId,
-        site.url,
-        country,
-        site.isWordPress ? 1 : 0,
-        site.confidenceScore || 0,
-        JSON.stringify(site.indicators || []),
-        site.error || null,
-        query,
-        JSON.stringify(site.emails || []),
-        JSON.stringify(site.phones || []),
-        JSON.stringify(site.linkedin_profiles || []),
-        site.text_content || null,
-      );
+    const insertMany = db.transaction((sites) => {
+      for (const site of sites) {
+        const siteResult = insertSite.run(
+          searchId,
+          site.url,
+          country,
+          site.isWordPress ? 1 : 0,
+          site.confidenceScore || 0,
+          JSON.stringify(site.indicators || []),
+          site.error || null,
+          query,
+          JSON.stringify(site.emails || []),
+          JSON.stringify(site.phones || []),
+          JSON.stringify(site.linkedin_profiles || []),
+          site.text_content || null,
+        );
 
-      const siteId = siteResult.lastInsertRowid;
+        const siteId = siteResult.lastInsertRowid;
 
-      // Insert contacts (legacy support for contacts table)
-      if (site.emails && site.emails.length > 0) {
-        for (const email of site.emails) {
-          insertContact.run(siteId, "email", email, site.url);
+        // Insert contacts (legacy support for contacts table)
+        if (site.emails && site.emails.length > 0) {
+          for (const email of site.emails) {
+            insertContact.run(siteId, "email", email, site.url);
+          }
+        }
+        if (site.phones && site.phones.length > 0) {
+          for (const phone of site.phones) {
+            insertContact.run(siteId, "phone", phone, site.url);
+          }
+        }
+        if (site.linkedin_profiles && site.linkedin_profiles.length > 0) {
+          for (const linkedin of site.linkedin_profiles) {
+            insertContact.run(siteId, "linkedin", linkedin, site.url);
+          }
         }
       }
-      if (site.phones && site.phones.length > 0) {
-        for (const phone of site.phones) {
-          insertContact.run(siteId, "phone", phone, site.url);
-        }
-      }
-      if (site.linkedin_profiles && site.linkedin_profiles.length > 0) {
-        for (const linkedin of site.linkedin_profiles) {
-          insertContact.run(siteId, "linkedin", linkedin, site.url);
-        }
-      }
-    }
-  });
+    });
 
-  insertMany(results);
+    insertMany(results);
 
-  db.close();
-  return searchId;
+    return searchId;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -599,18 +620,23 @@ function getKeywordById(id) {
  */
 function addKeyword(keyword, maxSites = 20) {
   const db = initDatabase();
-  const result = db
-    .prepare(
-      `
-    INSERT INTO keywords (keyword, status, max_sites)
-    VALUES (?, 'pending', ?)
-  `,
-    )
-    .run(keyword.trim(), maxSites);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(
+        `
+      INSERT INTO keywords (keyword, status, max_sites)
+      VALUES (?, 'pending', ?)
+    `,
+      )
+      .run(keyword.trim(), maxSites);
 
-  const created = getKeywordById(result.lastInsertRowid);
-  db.close();
-  return created;
+    const created = getKeywordById(result.lastInsertRowid);
+    return created;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -621,15 +647,20 @@ function addKeyword(keyword, maxSites = 20) {
  */
 function updateKeyword(id, keyword) {
   const db = initDatabase();
-  db.prepare(
-    `
-    UPDATE keywords
-    SET keyword = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `,
-  ).run(keyword.trim(), id);
-  db.close();
-  return getKeywordById(id);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(
+      `
+      UPDATE keywords
+      SET keyword = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    ).run(keyword.trim(), id);
+    return getKeywordById(id);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -640,41 +671,49 @@ function updateKeyword(id, keyword) {
  */
 function deleteKeyword(id) {
   const db = initDatabase();
-  
-  // Get the keyword text to find related searches
-  const keyword = db.prepare("SELECT keyword FROM keywords WHERE id = ?").get(id);
-  
-  if (keyword) {
-    // Find all searches that match this keyword
-    const searches = db.prepare("SELECT id FROM searches WHERE query = ?").all(keyword.keyword);
-    const searchIds = searches.map(s => s.id);
-    
-    if (searchIds.length > 0) {
-      const placeholders = searchIds.map(() => '?').join(',');
-      
-      // Get all site IDs from those searches
-      const sites = db.prepare(`SELECT id FROM sites WHERE search_id IN (${placeholders})`).all(...searchIds);
-      const siteIds = sites.map(s => s.id);
-      
-      if (siteIds.length > 0) {
-        const sitePlaceholders = siteIds.map(() => '?').join(',');
-        // Delete contacts for those sites
-        db.prepare(`DELETE FROM contacts WHERE site_id IN (${sitePlaceholders})`).run(...siteIds);
-        // Delete executives for those sites
-        db.prepare(`DELETE FROM company_executives WHERE site_id IN (${sitePlaceholders})`).run(...siteIds);
+
+  // Disable foreign key constraints to allow force deletion
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  try {
+    // Get the keyword text to find related searches
+    const keyword = db.prepare("SELECT keyword FROM keywords WHERE id = ?").get(id);
+
+    if (keyword) {
+      // Find all searches that match this keyword
+      const searches = db.prepare("SELECT id FROM searches WHERE query = ?").all(keyword.keyword);
+      const searchIds = searches.map(s => s.id);
+
+      if (searchIds.length > 0) {
+        const placeholders = searchIds.map(() => '?').join(',');
+
+        // Get all site IDs from those searches
+        const sites = db.prepare(`SELECT id FROM sites WHERE search_id IN (${placeholders})`).all(...searchIds);
+        const siteIds = sites.map(s => s.id);
+
+        if (siteIds.length > 0) {
+          const sitePlaceholders = siteIds.map(() => '?').join(',');
+          // Delete contacts for those sites
+          db.prepare(`DELETE FROM contacts WHERE site_id IN (${sitePlaceholders})`).run(...siteIds);
+          // Delete executives for those sites
+          db.prepare(`DELETE FROM company_executives WHERE site_id IN (${sitePlaceholders})`).run(...siteIds);
+        }
+
+        // Delete sites for those searches
+        db.prepare(`DELETE FROM sites WHERE search_id IN (${placeholders})`).run(...searchIds);
+        // Delete the searches themselves
+        db.prepare(`DELETE FROM searches WHERE id IN (${placeholders})`).run(...searchIds);
       }
-      
-      // Delete sites for those searches
-      db.prepare(`DELETE FROM sites WHERE search_id IN (${placeholders})`).run(...searchIds);
-      // Delete the searches themselves
-      db.prepare(`DELETE FROM searches WHERE id IN (${placeholders})`).run(...searchIds);
     }
+
+    // Finally delete the keyword
+    const result = db.prepare("DELETE FROM keywords WHERE id = ?").run(id);
+    return result.changes > 0;
+  } finally {
+    // Re-enable foreign key constraints
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
   }
-  
-  // Finally delete the keyword
-  const result = db.prepare("DELETE FROM keywords WHERE id = ?").run(id);
-  db.close();
-  return result.changes > 0;
 }
 
 // ============ EXCLUDED DOMAINS CRUD OPERATIONS ============
@@ -738,11 +777,16 @@ function addExcludedDomain(domain, reason = '') {
     throw new Error('Invalid domain');
   }
   const db = initDatabase();
-  const result = db
-    .prepare(`INSERT INTO excluded_domains (domain, reason) VALUES (?, ?)`)
-    .run(normalized, reason.trim() || null);
-  db.close();
-  return getExcludedDomainById(result.lastInsertRowid);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(`INSERT INTO excluded_domains (domain, reason) VALUES (?, ?)`)
+      .run(normalized, reason.trim() || null);
+    return getExcludedDomainById(result.lastInsertRowid);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -758,10 +802,15 @@ function updateExcludedDomain(id, domain, reason) {
     throw new Error('Invalid domain');
   }
   const db = initDatabase();
-  db.prepare(`UPDATE excluded_domains SET domain = ?, reason = ? WHERE id = ?`)
-    .run(normalized, reason ? reason.trim() : null, id);
-  db.close();
-  return getExcludedDomainById(id);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(`UPDATE excluded_domains SET domain = ?, reason = ? WHERE id = ?`)
+      .run(normalized, reason ? reason.trim() : null, id);
+    return getExcludedDomainById(id);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -771,11 +820,16 @@ function updateExcludedDomain(id, domain, reason) {
  */
 function deleteExcludedDomain(id) {
   const db = initDatabase();
-  const result = db
-    .prepare(`DELETE FROM excluded_domains WHERE id = ?`)
-    .run(id);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(`DELETE FROM excluded_domains WHERE id = ?`)
+      .run(id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -811,6 +865,189 @@ function filterExcludedUrls(urls) {
   return { allowed, excluded };
 }
 
+// =====================================================
+// IGNORED TAGS FUNCTIONS
+// =====================================================
+
+/**
+ * Get all ignored tags
+ * @returns {Array} - Array of ignored tag objects
+ */
+function getAllIgnoredTags() {
+  const db = initDatabase();
+  const tags = db
+    .prepare(`SELECT * FROM ignored_tags ORDER BY created_at DESC`)
+    .all();
+  db.close();
+  return tags;
+}
+
+/**
+ * Get ignored tag by ID
+ * @param {number} id - Tag ID
+ * @returns {Object|null} - Ignored tag or null
+ */
+function getIgnoredTagById(id) {
+  const db = initDatabase();
+  const tag = db
+    .prepare(`SELECT * FROM ignored_tags WHERE id = ?`)
+    .get(id);
+  db.close();
+  return tag || null;
+}
+
+/**
+ * Add a new ignored tag
+ * @param {string} tag - Tag to ignore (e.g., "blog", "/learn/")
+ * @param {string} matchType - Match type: 'contains', 'exact', 'regex'
+ * @param {string} scope - Where to check: 'url', 'content', 'both'
+ * @param {string} reason - Optional reason
+ * @returns {Object} - Created ignored tag
+ */
+function addIgnoredTag(tag, matchType = 'contains', scope = 'url', reason = '') {
+  const db = initDatabase();
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(`INSERT INTO ignored_tags (tag, match_type, scope, reason) VALUES (?, ?, ?, ?)`)
+      .run(tag.trim().toLowerCase(), matchType, scope, reason.trim() || null);
+    return getIgnoredTagById(result.lastInsertRowid);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
+}
+
+/**
+ * Update an ignored tag
+ * @param {number} id - Tag ID
+ * @param {string} tag - New tag value
+ * @param {string} matchType - New match type
+ * @param {string} scope - New scope
+ * @param {string} reason - New reason
+ * @returns {Object} - Updated ignored tag
+ */
+function updateIgnoredTag(id, tag, matchType, scope, reason) {
+  const db = initDatabase();
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(`UPDATE ignored_tags SET tag = ?, match_type = ?, scope = ?, reason = ? WHERE id = ?`)
+      .run(tag.trim().toLowerCase(), matchType, scope, reason ? reason.trim() : null, id);
+    return getIgnoredTagById(id);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
+}
+
+/**
+ * Delete an ignored tag
+ * @param {number} id - Tag ID
+ * @returns {boolean} - True if deleted
+ */
+function deleteIgnoredTag(id) {
+  const db = initDatabase();
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(`DELETE FROM ignored_tags WHERE id = ?`)
+      .run(id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
+}
+
+/**
+ * Check if a URL should be ignored based on ignored tags
+ * @param {string} url - URL to check
+ * @param {Array<Object>} ignoredTags - Array of ignored tag objects
+ * @returns {boolean} - True if URL should be ignored
+ */
+function isUrlIgnored(url, ignoredTags) {
+  if (!ignoredTags || ignoredTags.length === 0) return false;
+  const urlLower = url.toLowerCase();
+
+  return ignoredTags.some(tag => {
+    // Skip if scope is 'content' only
+    if (tag.scope === 'content') return false;
+
+    const tagValue = tag.tag.toLowerCase();
+
+    switch (tag.match_type) {
+      case 'exact':
+        return urlLower === tagValue || urlLower === `/${tagValue}` || urlLower.endsWith(`/${tagValue}`);
+      case 'regex':
+        try {
+          const regex = new RegExp(tagValue, 'i');
+          return regex.test(urlLower);
+        } catch (e) {
+          console.error(`Invalid regex in ignored tag: ${tagValue}`);
+          return false;
+        }
+      case 'contains':
+      default:
+        return urlLower.includes(tagValue);
+    }
+  });
+}
+
+/**
+ * Check if content should be ignored based on ignored tags
+ * @param {string} content - Content text to check
+ * @param {Array<Object>} ignoredTags - Array of ignored tag objects
+ * @returns {boolean} - True if content should be ignored
+ */
+function isContentIgnored(content, ignoredTags) {
+  if (!content || !ignoredTags || ignoredTags.length === 0) return false;
+  const contentLower = content.toLowerCase();
+
+  return ignoredTags.some(tag => {
+    // Skip if scope is 'url' only
+    if (tag.scope === 'url') return false;
+
+    const tagValue = tag.tag.toLowerCase();
+
+    switch (tag.match_type) {
+      case 'exact':
+        return contentLower.includes(tagValue);
+      case 'regex':
+        try {
+          const regex = new RegExp(tagValue, 'i');
+          return regex.test(contentLower);
+        } catch (e) {
+          console.error(`Invalid regex in ignored tag: ${tagValue}`);
+          return false;
+        }
+      case 'contains':
+      default:
+        return contentLower.includes(tagValue);
+    }
+  });
+}
+
+/**
+ * Filter an array of URLs, removing those matching ignored tags
+ * @param {Array<string>} urls - URLs to filter
+ * @returns {Object} - { allowed: string[], ignored: string[] }
+ */
+function filterIgnoredUrls(urls) {
+  const ignoredTags = getAllIgnoredTags();
+  const allowed = [];
+  const ignored = [];
+
+  for (const url of urls) {
+    if (isUrlIgnored(url, ignoredTags)) {
+      ignored.push(url);
+    } else {
+      allowed.push(url);
+    }
+  }
+
+  return { allowed, ignored };
+}
+
 /**
  * Update keyword status
  * @param {number} id - Keyword ID
@@ -819,15 +1056,20 @@ function filterExcludedUrls(urls) {
  */
 function updateKeywordStatus(id, status) {
   const db = initDatabase();
-  db.prepare(
-    `
-    UPDATE keywords
-    SET status = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `,
-  ).run(status, id);
-  db.close();
-  return getKeywordById(id);
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(
+      `
+      UPDATE keywords
+      SET status = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+    ).run(status, id);
+    return getKeywordById(id);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -1087,6 +1329,25 @@ function getPendingAISites(limit = 10) {
 }
 
 /**
+ * Get a single site by ID
+ * @param {number} id - Site ID
+ * @returns {Object|null} - Site object or null if not found
+ */
+function getSiteById(id) {
+  const db = initDatabase();
+  const site = db
+    .prepare(
+      `
+    SELECT * FROM sites WHERE id = ?
+  `,
+    )
+    .get(id);
+
+  db.close();
+  return site || null;
+}
+
+/**
  * Update a site with AI classification results
  * @param {number} siteId - The ID of the site
  * @param {Object} aiData - The structured AI response
@@ -1096,11 +1357,12 @@ function updateSiteAIResults(siteId, aiData) {
   const db = initDatabase();
 
   try {
+    db.exec('PRAGMA foreign_keys = OFF');
     const result = db
       .prepare(
         `
-      UPDATE sites 
-      SET 
+      UPDATE sites
+      SET
         ai_status = 'completed',
         classification = ?,
         relevance_score = ?,
@@ -1133,12 +1395,13 @@ function updateSiteAIResults(siteId, aiData) {
         siteId,
       );
 
-    db.close();
     return result.changes > 0;
   } catch (error) {
-    db.close();
     console.error(`Error updating AI results for site ${siteId}:`, error);
     return false;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
   }
 }
 
@@ -1149,8 +1412,13 @@ function updateSiteAIResults(siteId, aiData) {
  */
 function updateSiteAIStatus(siteId, status) {
   const db = initDatabase();
-  db.prepare(`UPDATE sites SET ai_status = ? WHERE id = ?`).run(status, siteId);
-  db.close();
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.prepare(`UPDATE sites SET ai_status = ? WHERE id = ?`).run(status, siteId);
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -1240,6 +1508,90 @@ function getEmails(page = 1, limit = 50, search = null) {
       totalPages: Math.ceil(countResult.total / limit),
     },
   };
+}
+
+/**
+ * Get a single email contact by ID
+ * @param {number} id - Contact ID
+ * @returns {Object|null} - Email contact with site info or null
+ */
+function getEmailById(id) {
+  const db = initDatabase();
+  try {
+    const email = db.prepare(`
+      SELECT
+        c.id,
+        c.value as email,
+        c.source_page,
+        c.created_at,
+        s.url as site_url,
+        s.is_wordpress,
+        s.search_query
+      FROM contacts c
+      INNER JOIN sites s ON c.site_id = s.id
+      WHERE c.type = 'email' AND c.id = ?
+    `).get(id);
+
+    return email || null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Get a single phone contact by ID
+ * @param {number} id - Contact ID
+ * @returns {Object|null} - Phone contact with site info or null
+ */
+function getPhoneById(id) {
+  const db = initDatabase();
+  try {
+    const phone = db.prepare(`
+      SELECT
+        c.id,
+        c.value as phone,
+        c.source_page,
+        c.created_at,
+        s.url as site_url,
+        s.is_wordpress,
+        s.search_query
+      FROM contacts c
+      INNER JOIN sites s ON c.site_id = s.id
+      WHERE c.type = 'phone' AND c.id = ?
+    `).get(id);
+
+    return phone || null;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Get a single LinkedIn contact by ID
+ * @param {number} id - Contact ID
+ * @returns {Object|null} - LinkedIn contact with site info or null
+ */
+function getLinkedinById(id) {
+  const db = initDatabase();
+  try {
+    const linkedin = db.prepare(`
+      SELECT
+        c.id,
+        c.value as linkedin_url,
+        c.source_page,
+        c.created_at,
+        s.url as site_url,
+        s.is_wordpress,
+        s.search_query
+      FROM contacts c
+      INNER JOIN sites s ON c.site_id = s.id
+      WHERE c.type = 'linkedin' AND c.id = ?
+    `).get(id);
+
+    return linkedin || null;
+  } finally {
+    db.close();
+  }
 }
 
 /**
@@ -1605,7 +1957,8 @@ function getContactStats() {
       (SELECT COUNT(*) FROM contacts WHERE type = 'linkedin') as total_linkedin,
       (SELECT COUNT(DISTINCT site_id) FROM contacts WHERE type = 'email') as sites_with_emails,
       (SELECT COUNT(DISTINCT site_id) FROM contacts WHERE type = 'phone') as sites_with_phones,
-      (SELECT COUNT(DISTINCT site_id) FROM contacts WHERE type = 'linkedin') as sites_with_linkedin
+      (SELECT COUNT(DISTINCT site_id) FROM contacts WHERE type = 'linkedin') as sites_with_linkedin,
+      (SELECT COUNT(DISTINCT site_id) FROM contacts) as sites_with_contacts
   `,
     )
     .get();
@@ -1625,6 +1978,7 @@ function saveExecutive(executive) {
   const db = initDatabase();
 
   try {
+    db.exec('PRAGMA foreign_keys = OFF');
     const result = db
       .prepare(
         `
@@ -1649,14 +2003,15 @@ function saveExecutive(executive) {
         executive.role_category || null,
       );
 
-    db.close();
     return { success: true, id: result.lastInsertRowid };
   } catch (err) {
-    db.close();
     if (err.message.includes("UNIQUE")) {
       return { success: false, error: "Profile already exists" };
     }
     return { success: false, error: err.message };
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
   }
 }
 
@@ -1893,34 +2248,39 @@ function getStructuredExecutives(page = 1, limit = 20, search = null) {
 function updateSiteAIResults(siteId, aiData) {
   const db = initDatabase();
 
-  const result = db
-    .prepare(
-      `
-    UPDATE sites 
-    SET 
-      ai_processed = 1,
-      ai_status = 'completed',
-      classification = ?,
-      relevance_score = ?,
-      tags = ?,
-      primary_language = ?,
-      value_proposition = ?,
-      ai_reasoning = ?
-    WHERE id = ?
-  `,
-    )
-    .run(
-      aiData.classification || null,
-      aiData.relevanceScore || 0,
-      aiData.tags ? JSON.stringify(aiData.tags) : null,
-      aiData.primaryLanguage || null,
-      aiData.valueProposition || null,
-      aiData.reasoning || null,
-      siteId,
-    );
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(
+        `
+      UPDATE sites
+      SET
+        ai_processed = 1,
+        ai_status = 'completed',
+        classification = ?,
+        relevance_score = ?,
+        tags = ?,
+        primary_language = ?,
+        value_proposition = ?,
+        ai_reasoning = ?
+      WHERE id = ?
+    `,
+      )
+      .run(
+        aiData.classification || null,
+        aiData.relevanceScore || 0,
+        aiData.tags ? JSON.stringify(aiData.tags) : null,
+        aiData.primaryLanguage || null,
+        aiData.valueProposition || null,
+        aiData.reasoning || null,
+        siteId,
+      );
 
-  db.close();
-  return result.changes > 0;
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -1931,11 +2291,16 @@ function updateSiteAIResults(siteId, aiData) {
  */
 function updateSiteAIStatus(siteId, status) {
   const db = initDatabase();
-  const result = db
-    .prepare("UPDATE sites SET ai_processed = 1, ai_status = ? WHERE id = ?")
-    .run(status, siteId);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare("UPDATE sites SET ai_processed = 1, ai_status = ? WHERE id = ?")
+      .run(status, siteId);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 // ============ NEW CRUD OPERATIONS ============
@@ -1947,13 +2312,20 @@ function updateSiteAIStatus(siteId, status) {
  */
 function deleteSite(id) {
   const db = initDatabase();
-  db.exec('PRAGMA foreign_keys = ON');
-  // Manually delete related data to ensure cascade
-  db.prepare("DELETE FROM contacts WHERE site_id = ?").run(id);
-  db.prepare("DELETE FROM company_executives WHERE site_id = ?").run(id);
-  const result = db.prepare("DELETE FROM sites WHERE id = ?").run(id);
-  db.close();
-  return result.changes > 0;
+  // Disable foreign key constraints to allow force deletion
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  try {
+    // Manually delete related data to ensure cascade
+    db.prepare("DELETE FROM contacts WHERE site_id = ?").run(id);
+    db.prepare("DELETE FROM company_executives WHERE site_id = ?").run(id);
+    const result = db.prepare("DELETE FROM sites WHERE id = ?").run(id);
+    return result.changes > 0;
+  } finally {
+    // Re-enable foreign key constraints
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -1964,14 +2336,21 @@ function deleteSite(id) {
 function bulkDeleteSites(ids) {
   if (!ids || ids.length === 0) return 0;
   const db = initDatabase();
-  db.exec('PRAGMA foreign_keys = ON');
-  const placeholders = ids.map(() => '?').join(',');
-  // Manually delete related data to ensure cascade
-  db.prepare(`DELETE FROM contacts WHERE site_id IN (${placeholders})`).run(...ids);
-  db.prepare(`DELETE FROM company_executives WHERE site_id IN (${placeholders})`).run(...ids);
-  const result = db.prepare(`DELETE FROM sites WHERE id IN (${placeholders})`).run(...ids);
-  db.close();
-  return result.changes;
+  // Disable foreign key constraints to allow force deletion
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    // Manually delete related data to ensure cascade
+    db.prepare(`DELETE FROM contacts WHERE site_id IN (${placeholders})`).run(...ids);
+    db.prepare(`DELETE FROM company_executives WHERE site_id IN (${placeholders})`).run(...ids);
+    const result = db.prepare(`DELETE FROM sites WHERE id IN (${placeholders})`).run(...ids);
+    return result.changes;
+  } finally {
+    // Re-enable foreign key constraints
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2002,17 +2381,22 @@ function getSiteDeletionPreview(ids) {
  */
 function updateSite(id, data) {
   const db = initDatabase();
-  const result = db
-    .prepare(
-      `
-    UPDATE sites 
-    SET confidence_score = ?, indicators = ?
-    WHERE id = ?
-  `,
-    )
-    .run(data.confidence_score || 0, data.indicators || "", id);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(
+        `
+      UPDATE sites
+      SET confidence_score = ?, indicators = ?
+      WHERE id = ?
+    `,
+      )
+      .run(data.confidence_score || 0, data.indicators || "", id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2022,9 +2406,14 @@ function updateSite(id, data) {
  */
 function deleteContact(id) {
   const db = initDatabase();
-  const result = db.prepare("DELETE FROM contacts WHERE id = ?").run(id);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db.prepare("DELETE FROM contacts WHERE id = ?").run(id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2035,17 +2424,22 @@ function deleteContact(id) {
  */
 function updateContact(id, data) {
   const db = initDatabase();
-  const result = db
-    .prepare(
-      `
-    UPDATE contacts 
-    SET value = ?
-    WHERE id = ?
-  `,
-    )
-    .run(data.value, id);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(
+        `
+      UPDATE contacts
+      SET value = ?
+      WHERE id = ?
+    `,
+      )
+      .run(data.value, id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2055,11 +2449,16 @@ function updateContact(id, data) {
  */
 function deleteExecutive(id) {
   const db = initDatabase();
-  const result = db
-    .prepare("DELETE FROM company_executives WHERE id = ?")
-    .run(id);
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare("DELETE FROM company_executives WHERE id = ?")
+      .run(id);
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2070,23 +2469,28 @@ function deleteExecutive(id) {
  */
 function updateExecutive(id, data) {
   const db = initDatabase();
-  const result = db
-    .prepare(
-      `
-    UPDATE company_executives 
-    SET name = ?, role_category = ?, headline = ?, profile_url = ?
-    WHERE id = ?
-  `,
-    )
-    .run(
-      data.name || null,
-      data.role_category || null,
-      data.headline || null,
-      data.profile_url || null,
-      id,
-    );
-  db.close();
-  return result.changes > 0;
+  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    const result = db
+      .prepare(
+        `
+      UPDATE company_executives
+      SET name = ?, role_category = ?, headline = ?, profile_url = ?
+      WHERE id = ?
+    `,
+      )
+      .run(
+        data.name || null,
+        data.role_category || null,
+        data.headline || null,
+        data.profile_url || null,
+        id,
+      );
+    return result.changes > 0;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 /**
@@ -2098,23 +2502,31 @@ function deleteAllData() {
   const db = initDatabase();
   const counts = {};
 
-  // Email tables (via shared db, but we'll use this db instance)
-  try { counts.email_send_log = db.prepare("DELETE FROM email_send_log").run().changes; } catch (e) { counts.email_send_log = 0; }
-  try { counts.email_queue = db.prepare("DELETE FROM email_queue").run().changes; } catch (e) { counts.email_queue = 0; }
-  try { counts.email_campaigns = db.prepare("DELETE FROM email_campaigns").run().changes; } catch (e) { counts.email_campaigns = 0; }
-  try { counts.email_templates = db.prepare("DELETE FROM email_templates").run().changes; } catch (e) { counts.email_templates = 0; }
-  try { counts.email_senders = db.prepare("DELETE FROM email_senders").run().changes; } catch (e) { counts.email_senders = 0; }
+  // Disable foreign keys to allow force deletion
+  db.exec('PRAGMA foreign_keys = OFF');
 
-  // Core data tables (order matters for FK)
-  counts.company_executives = db.prepare("DELETE FROM company_executives").run().changes;
-  counts.contacts = db.prepare("DELETE FROM contacts").run().changes;
-  counts.sites = db.prepare("DELETE FROM sites").run().changes;
-  counts.searches = db.prepare("DELETE FROM searches").run().changes;
-  counts.keywords = db.prepare("DELETE FROM keywords").run().changes;
-  counts.excluded_domains = db.prepare("DELETE FROM excluded_domains").run().changes;
+  try {
+    // Email tables (via shared db, but we'll use this db instance)
+    try { counts.email_send_log = db.prepare("DELETE FROM email_send_log").run().changes; } catch (e) { counts.email_send_log = 0; }
+    try { counts.email_queue = db.prepare("DELETE FROM email_queue").run().changes; } catch (e) { counts.email_queue = 0; }
+    try { counts.email_campaigns = db.prepare("DELETE FROM email_campaigns").run().changes; } catch (e) { counts.email_campaigns = 0; }
+    try { counts.email_templates = db.prepare("DELETE FROM email_templates").run().changes; } catch (e) { counts.email_templates = 0; }
+    try { counts.email_senders = db.prepare("DELETE FROM email_senders").run().changes; } catch (e) { counts.email_senders = 0; }
 
-  db.close();
-  return counts;
+    // Core data tables (order matters for FK)
+    counts.company_executives = db.prepare("DELETE FROM company_executives").run().changes;
+    counts.contacts = db.prepare("DELETE FROM contacts").run().changes;
+    counts.sites = db.prepare("DELETE FROM sites").run().changes;
+    counts.searches = db.prepare("DELETE FROM searches").run().changes;
+    counts.keywords = db.prepare("DELETE FROM keywords").run().changes;
+    counts.excluded_domains = db.prepare("DELETE FROM excluded_domains").run().changes;
+
+    return counts;
+  } finally {
+    // Re-enable foreign keys
+    db.exec('PRAGMA foreign_keys = ON');
+    db.close();
+  }
 }
 
 module.exports = {
@@ -2135,10 +2547,14 @@ module.exports = {
   updateKeywordStatus,
   getSitesByWordpressStatus,
   getAllSites,
+  getSiteById,
   getDistinctCategories,
   // Contact retrieval
   getEmails,
+  getEmailById,
+  getPhoneById,
   getPhones,
+  getLinkedinById,
   getContactStats,
   getAllContacts,
   getLinkedinProfiles,
@@ -2174,6 +2590,15 @@ module.exports = {
   isUrlExcluded,
   filterExcludedUrls,
   extractDomain,
+  // Ignored tags
+  getAllIgnoredTags,
+  getIgnoredTagById,
+  addIgnoredTag,
+  updateIgnoredTag,
+  deleteIgnoredTag,
+  isUrlIgnored,
+  isContentIgnored,
+  filterIgnoredUrls,
   // Reset
   deleteAllData,
   // Low-level SQLite wrappers (used by email-senders-templates-api.js & email-queue-worker.js)

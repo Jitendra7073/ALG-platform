@@ -388,6 +388,9 @@ function replaceTemplateVariables(text, data) {
 
   let result = text;
 
+  // Convert country code to full name
+  const regionFullName = getCountryFullName(data.region);
+
   // Replace all supported placeholders
   // Removed duplicates: {{user}} (same as {{name}}), {{site}} (same as {{url}})
   const replacements = {
@@ -396,6 +399,7 @@ function replaceTemplateVariables(text, data) {
     '{{email}}': data.email || '',           // Email address
     '{{url}}': data.url || '',               // Website URL
     '{{domain}}': data.domain || '',         // Domain name
+    '{{region}}': regionFullName || data.region || '',         // Region/country full name
     '{{date}}': new Date().toLocaleDateString(),
     '{{year}}': new Date().getFullYear().toString(),
   };
@@ -408,6 +412,71 @@ function replaceTemplateVariables(text, data) {
 }
 
 /**
+ * Convert country code to full country name
+ * @param {string} code - Country code (e.g., 'in', 'us', 'uk')
+ * @returns {string} - Full country name or original code if not found
+ */
+function getCountryFullName(code) {
+  if (!code) return '';
+
+  const countryNames = {
+    'in': 'India',
+    'us': 'United States',
+    'uk': 'United Kingdom',
+    'ca': 'Canada',
+    'au': 'Australia',
+    'de': 'Germany',
+    'fr': 'France',
+    'ae': 'United Arab Emirates',
+    'sg': 'Singapore',
+    'jp': 'Japan',
+    'br': 'Brazil',
+    'za': 'South Africa',
+    'cn': 'China',
+    'it': 'Italy',
+    'es': 'Spain',
+    'nl': 'Netherlands',
+    'se': 'Sweden',
+    'no': 'Norway',
+    'dk': 'Denmark',
+    'fi': 'Finland',
+    'ch': 'Switzerland',
+    'at': 'Austria',
+    'be': 'Belgium',
+    'pl': 'Poland',
+    'cz': 'Czech Republic',
+    'gr': 'Greece',
+    'pt': 'Portugal',
+    'ru': 'Russia',
+    'mx': 'Mexico',
+    'ar': 'Argentina',
+    'co': 'Colombia',
+    'cl': 'Chile',
+    'pe': 'Peru',
+    'kr': 'South Korea',
+    'tw': 'Taiwan',
+    'th': 'Thailand',
+    'my': 'Malaysia',
+    'id': 'Indonesia',
+    'ph': 'Philippines',
+    'vn': 'Vietnam',
+    'hk': 'Hong Kong',
+    'nz': 'New Zealand',
+    'ie': 'Ireland',
+    'il': 'Israel',
+    'sa': 'Saudi Arabia',
+    'qa': 'Qatar',
+    'kw': 'Kuwait',
+    'tr': 'Turkey',
+    'eg': 'Egypt',
+    'ng': 'Nigeria',
+    'ke': 'Kenya',
+  };
+
+  return countryNames[code.toLowerCase()] || code;
+}
+
+/**
  * Get site data for a contact to use in template replacement
  * Uses hybrid approach for company name: LinkedIn > Page Content > Domain
  * @param {number} siteId - The site ID
@@ -417,7 +486,7 @@ function replaceTemplateVariables(text, data) {
 function getSiteDataForTemplate(siteId, email = null) {
   if (!siteId) return {};
 
-  const site = db.get("SELECT url, search_query, text_content FROM sites WHERE id = ?", [siteId]);
+  const site = db.get("SELECT url, search_query, text_content, country FROM sites WHERE id = ?", [siteId]);
   if (!site) return {};
 
   // Extract domain
@@ -472,6 +541,7 @@ function getSiteDataForTemplate(siteId, email = null) {
     name: personName,           // Person's name (from email) or null
     company: company || '',     // Company name (hybrid approach)
     email: email || '',         // Email included for convenience
+    region: site.country || '', // Region/country for {{region}} variable
   };
 }
 

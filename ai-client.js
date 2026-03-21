@@ -142,32 +142,57 @@ Analyze if the actual content matches the search keyword intent.`;
 
   /**
    * AI Analysis for a WordPress site
-   * 
-   * Performs content relevance check + generates summary
-   * 
+   *
+   * Performs TWO tasks:
+   * 1. WordPress Verification - Confirms if site is actually built with WordPress
+   * 2. Content Relevance Check - Verifies if content matches search keyword intent
+   *
    * @param {string} searchKeyword - The keyword used to find this site
-   * @param {string} siteUrl - The URL of the site  
+   * @param {string} siteUrl - The URL of the site
    * @param {string} textContent - Scraped text content
-   * @returns {Promise<Object>} Complete analysis result
+   * @returns {Promise<Object>} Complete analysis result with WordPress verification and content relevance
    */
   async analyzeSite(searchKeyword, siteUrl, textContent) {
-    const systemPrompt = `You are an AI analyst for a lead generation system. Perform a Content Relevance Check on this website:
+    const systemPrompt = `You are an AI analyst for a WordPress lead generation system.
+Analyze this website and provide TWO assessments:
 
-**TASK: Content Relevance Check**
-Verify if the site's ACTUAL content matches the search keyword intent.
-- Be helpful: If the page has a dedicated section for the keyword, it is RELEVANT.
-- Do NOT mark coupon sites as "mismatch" just because they offer cashback too.
-- Look for active discounts, products, or services matching the intention.
+**TASK 1: WordPress Verification**
+Determine if this website is ACTUALLY built with WordPress.
+Look for:
+- WordPress-specific URLs (/wp-content/, /wp-includes/, /wp-admin/, /wp-json/)
+- WordPress meta generator tags (e.g., "WordPress 6.x")
+- WordPress-specific CSS classes (wp-block-, wp-element-, etc.)
+- WordPress themes and plugins structure
+- WordPress REST API endpoints
+- wp-emoji-release.min.js or similar WordPress scripts
 
-PREDEFINED CATEGORIES (you MUST pick exactly one):
-"Digital Marketing", "E-commerce", "Web Development", "Agency", "Blog", "Education", "Technology", "SaaS", "Finance", "Healthcare", "Real Estate", "News & Media", "Legal Services", "Consulting", "Non-profit", "Entertainment", "Travel & Hospitality", "Automotive", "Fashion & Beauty", "Food & Restaurant", "Manufacturing", "Coupons & Deals", "Cashback & Rewards", "Photography", "Sports & Fitness", "Other"
+**TASK 2: Content Relevance Check**
+Verify if the site's content matches the search keyword intent.
+- Be helpful: If the page has relevant content, it should be marked relevant
+- Consider related/near-relevant topics as acceptable
+- For coupon sites: Having coupons OR related deals (cashback, rewards) is relevant
+- Look for active products, services, or content matching the intention
 
-Return JSON:
+**PREDEFINED CATEGORIES (you MUST pick exactly one):**
+"Digital Marketing", "E-commerce", "Web Development", "Agency", "Blog", "Education",
+"Technology", "SaaS", "Finance", "Healthcare", "Real Estate", "News & Media",
+"Legal Services", "Consulting", "Non-profit", "Entertainment", "Travel & Hospitality",
+"Automotive", "Fashion & Beauty", "Food & Restaurant", "Manufacturing",
+"Coupons & Deals", "Cashback & Rewards", "Photography", "Sports & Fitness", "Other"
+
+**Return JSON:**
 {
-  "isRelevant": true/false,
-  "actualCategory": "One of the predefined categories above that best fits the site",
-  "contentSummary": "2-3 sentence description of what the site does",
-  "mismatchReason": "Why not relevant (null if relevant)"
+  "wordpressVerification": {
+    "isWordPress": true/false,
+    "confidence": "high"/"medium"/"low",
+    "indicators": ["array of WordPress indicators found OR reasons why not WordPress"]
+  },
+  "contentRelevance": {
+    "isRelevant": true/false,
+    "actualCategory": "One of the predefined categories",
+    "summary": "2-3 sentence description of what the site does",
+    "mismatchReason": "Why not relevant (null if relevant)"
+  }
 }`;
 
     const userMessage = `SEARCH KEYWORD: "${searchKeyword}"
@@ -177,7 +202,7 @@ WEBSITE CONTENT:
 ${textContent.substring(0, 5000)}`;
 
     const result = await this.chatJSON(systemPrompt, userMessage);
-    
+
     return {
       ...result.content,
       responseTime: result.responseTime,
