@@ -2964,4 +2964,241 @@ router.patch("/queue/items/:id/resume", (req, res) => {
   }
 });
 
+/**
+ * POST /api/email/queue/bulk/pause
+ * Pause all queued/sending emails
+ */
+router.post("/queue/bulk/pause", (req, res) => {
+  try {
+    const result = db.run(`
+      UPDATE email_queue
+      SET status = 'paused'
+      WHERE status IN ('queued', 'sending')
+        AND (scheduled_at IS NULL OR scheduled_at <= CURRENT_TIMESTAMP)
+    `);
+    res.json({
+      success: true,
+      message: `Paused ${result.changes} emails`,
+      count: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/email/queue/bulk/resume
+ * Resume all paused emails
+ */
+router.post("/queue/bulk/resume", (req, res) => {
+  try {
+    const result = db.run(`
+      UPDATE email_queue
+      SET status = 'queued'
+      WHERE status = 'paused'
+    `);
+    res.json({
+      success: true,
+      message: `Resumed ${result.changes} emails`,
+      count: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/email/queue/bulk/cancel
+ * Cancel all queued/sending/paused emails
+ */
+router.post("/queue/bulk/cancel", (req, res) => {
+  try {
+    const result = db.run(`
+      UPDATE email_queue
+      SET status = 'cancelled', error_message = 'Cancelled by user'
+      WHERE status IN ('queued', 'sending', 'paused')
+    `);
+    res.json({
+      success: true,
+      message: `Cancelled ${result.changes} emails`,
+      count: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/email/queue/bulk/retry-failed
+ * Retry all failed emails
+ */
+router.post("/queue/bulk/retry-failed", (req, res) => {
+  try {
+    const result = db.run(`
+      UPDATE email_queue
+      SET status = 'queued', error_message = NULL, attempts = 0
+      WHERE status = 'failed'
+    `);
+    res.json({
+      success: true,
+      message: `Retrying ${result.changes} failed emails`,
+      count: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/email/queue/items/:id
+ * Get a single queue item by ID
+ */
+router.get("/queue/items/:id", (req, res) => {
+  try {
+    const item = db.get(`
+      SELECT eq.id, eq.recipient_email, eq.subject, eq.status, eq.attempts,
+             eq.error_message, eq.sent_at, eq.created_at, eq.scheduled_at,
+             es.name as sender_name, es.email as sender_email,
+             ec.name as campaign_name
+      FROM email_queue eq
+      LEFT JOIN email_senders es ON eq.sender_id = es.id
+      LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+      WHERE eq.id = ?
+    `, [req.params.id]);
+
+    if (!item) {
+      return res.status(404).json({ success: false, error: "Queue item not found" });
+    }
+
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/email/queue/items/:id/cancel
+ * Cancel a specific queue item
+ */
+router.delete("/queue/items/:id/cancel", (req, res) => {
+  try {
+    const item = db.get("SELECT * FROM email_queue WHERE id = ?", [
+      req.params.id,
+    ]);
+    if (!item) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Queue item not found" });
+    }
+    if (item.status === "sent" || item.status === "cancelled") {
+      return res.status(400).json({
+        success: false,
+        error: "Cannot cancel sent or already cancelled emails",
+      });
+    }
+    db.run(
+      "UPDATE email_queue SET status = 'cancelled', error_message = 'Cancelled by user' WHERE id = ?",
+      [req.params.id]
+    );
+    res.json({ success: true, message: "Queue item cancelled" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/email/queue/items/:id/retry
+ * Retry a failed queue item
+ */
+router.post("/queue/items/:id/retry", (req, res) => {
+  try {
+    const item = db.get("SELECT * FROM email_queue WHERE id = ?", [
+      req.params.id,
+    ]);
+    if (!item) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Queue item not found" });
+    }
+    if (item.status !== "failed" && item.status !== "cancelled") {
+      return res.status(400).json({
+        success: false,
+        error: "Only failed or cancelled emails can be retried",
+      });
+    }
+    db.run(
+      "UPDATE email_queue SET status = 'queued', error_message = NULL, attempts = 0 WHERE id = ?",
+      [req.params.id]
+    );
+    res.json({ success: true, message: "Queue item queued for retry" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/email/queue/history
+ * Get email sending history with pagination
+ */
+router.get("/queue/history", (req, res) => {
+  try {
+    const { limit = 100, offset = 0, status, startDate, endDate } = req.query;
+
+    let sql = `
+      SELECT eq.id, eq.recipient_email, eq.subject, eq.status, eq.attempts,
+             eq.error_message, eq.sent_at, eq.created_at, eq.scheduled_at,
+             es.name as sender_name, es.email as sender_email,
+             ec.name as campaign_name
+      FROM email_queue eq
+      LEFT JOIN email_senders es ON eq.sender_id = es.id
+      LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+      WHERE 1=1
+    `;
+    const params = [];
+    const conditions = [];
+
+    // Status filter
+    if (status && status !== 'all') {
+      conditions.push('eq.status = ?');
+      params.push(status);
+    }
+
+    // Date range filter
+    if (startDate) {
+      conditions.push('date(eq.created_at) >= date(?)');
+      params.push(startDate);
+    }
+    if (endDate) {
+      conditions.push('date(eq.created_at) <= date(?)');
+      params.push(endDate);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' AND ' + conditions.join(' AND ');
+    }
+
+    sql += ' ORDER BY eq.created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+
+    const items = db.all(sql, params);
+
+    // Get total count
+    let countSql = 'SELECT COUNT(*) as total FROM email_queue eq WHERE 1=1';
+    if (conditions.length > 0) {
+      countSql += ' AND ' + conditions.join(' AND ');
+    }
+    const countResult = db.get(countSql, params.slice(0, -2));
+
+    res.json({
+      success: true,
+      data: items,
+      total: countResult.total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

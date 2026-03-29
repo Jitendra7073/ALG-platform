@@ -7,13 +7,21 @@ const { LinkedInCompanyScraper } = require("./linkedin-company-scraper");
 const emailRouter = require("./email-senders-templates-api");
 const worker = require("./email-queue-worker");
 const aiWorker = require("./ai-processor"); // Import new AI classification worker
+const aiRetryManager = require("./ai-retry-manager"); // Import AI retry manager
+const logger = require("./system-logger"); // Import system logger
 
 const app = express();
 const PORT = 8080;
 const userDataDir = "C:\\automation_chrome";
 
 // Start background workers
+logger.system('Starting server...');
 aiWorker.start();
+aiRetryManager.start(); // Start AI retry manager
+
+// Intercept console to capture all logs
+logger.interceptConsole();
+logger.system('Server initialized on port ' + PORT);
 
 // Track executive scraper status
 let executiveScraperStatus = { running: false, progress: 0, total: 0 };
@@ -182,9 +190,13 @@ const runningScrapers = new Map();
 
 // Import Email API router
 const emailApiRouter = require("./email-senders-templates-api");
+const linkedinCredentialsRouter = require("./linkedin-credentials-api");
 
 // Mount email API routes
 app.use("/api/email", emailApiRouter);
+
+// Mount LinkedIn credentials API routes
+app.use("/api/linkedin/credentials", linkedinCredentialsRouter);
 
 // ============ API ROUTES ============
 
@@ -559,30 +571,138 @@ app.post("/api/ai/requeue", (req, res) => {
 app.post("/api/ai/requeue-all", (req, res) => {
   try {
     const database = db.initDatabase();
-    
+
     const result = database.prepare(`
-      UPDATE sites 
-      SET ai_status = 'pending', 
+      UPDATE sites
+      SET ai_status = 'pending',
           ai_verified_wp = NULL,
           ai_content_relevant = NULL,
           ai_actual_category = NULL,
           ai_content_summary = NULL,
           ai_mismatch_reason = NULL,
           ai_error = NULL
-      WHERE is_wordpress = 1 
+      WHERE is_wordpress = 1
         AND text_content IS NOT NULL
     `).run();
-    
+
     database.close();
-    
+
     const requeued = result.changes;
     console.log(`🔄 Requeued ALL ${requeued} WordPress sites for fresh AI verification`);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: `Requeued ${requeued} WordPress sites for fresh AI verification`,
       requeued
     });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// =====================================================
+// AI RETRY MANAGER ENDPOINTS
+// =====================================================
+
+// Get retry manager statistics
+app.get("/api/ai/retry/stats", (req, res) => {
+  try {
+    const stats = aiRetryManager.getStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manually retry specific sites
+app.post("/api/ai/retry/manual", (req, res) => {
+  try {
+    const { siteIds } = req.body;
+
+    if (!Array.isArray(siteIds) || siteIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "siteIds must be a non-empty array"
+      });
+    }
+
+    aiRetryManager.manualRetry(siteIds).then(requeued => {
+      res.json({
+        success: true,
+        message: `Re-queued ${requeued} sites for AI processing`,
+        requeued
+      });
+    }).catch(error => {
+      res.status(500).json({ success: false, error: error.message });
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get stuck sites details
+app.get("/api/ai/retry/stuck-sites", (req, res) => {
+  try {
+    const database = db.initDatabase();
+
+    // Sites stuck in processing
+    const stuckProcessing = database.prepare(`
+      SELECT id, url, search_query, ai_processed_at
+      FROM sites
+      WHERE ai_status = 'processing'
+        AND ai_processed_at < datetime('now', '-5 minutes')
+      ORDER BY ai_processed_at ASC
+      LIMIT 20
+    `).all();
+
+    // Failed sites that can be retried
+    const retryableFailed = database.prepare(`
+      SELECT id, url, search_query, ai_error, retry_count, last_retried_at
+      FROM sites
+      WHERE ai_status = 'failed'
+        AND (retry_count IS NULL OR retry_count < 3)
+        AND text_content IS NOT NULL
+      ORDER BY ai_processed_at ASC
+      LIMIT 20
+    `).all();
+
+    // Old pending sites
+    const oldPending = database.prepare(`
+      SELECT id, url, search_query, checked_at
+      FROM sites
+      WHERE ai_status = 'pending'
+        AND checked_at < datetime('now', '-1 day')
+      ORDER BY checked_at ASC
+      LIMIT 20
+    `).all();
+
+    database.close();
+
+    res.json({
+      success: true,
+      data: {
+        stuckInProcessing: stuckProcessing,
+        retryableFailed: retryableFailed,
+        oldPending: oldPending
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Trigger immediate retry check
+app.post("/api/ai/retry/check-now", (req, res) => {
+  try {
+    aiRetryManager.checkAndRetryStuckSites();
+
+    res.json({
+      success: true,
+      message: "Retry check triggered successfully"
+    });
+
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2787,6 +2907,98 @@ worker.start();
 // Serve frontend
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// =====================================================
+// SYSTEM LOGS ENDPOINTS
+// =====================================================
+
+// Get recent logs
+app.get("/api/logs", (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const type = req.query.type || 'all';
+    const search = req.query.search || null;
+
+    const logs = logger.getFormattedLogs(limit, type, search);
+
+    res.json({
+      success: true,
+      data: logs
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get log statistics
+app.get("/api/logs/stats", (req, res) => {
+  try {
+    const stats = logger.getStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get recent activity
+app.get("/api/logs/recent", (req, res) => {
+  try {
+    const minutes = parseInt(req.query.minutes) || 5;
+    const activity = logger.getRecentActivity(minutes);
+
+    res.json({
+      success: true,
+      data: activity
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Clear logs
+app.post("/api/logs/clear", (req, res) => {
+  try {
+    logger.clear();
+
+    res.json({
+      success: true,
+      message: "Logs cleared successfully"
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Export logs
+app.get("/api/logs/export", (req, res) => {
+  try {
+    const logs = logger.export();
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', 'attachment; filename=system-logs.json');
+    res.send(logs);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get log types info
+app.get("/api/logs/types", (req, res) => {
+  try {
+    const types = logger.logTypes;
+
+    res.json({
+      success: true,
+      data: types
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Start server

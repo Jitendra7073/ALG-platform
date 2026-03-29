@@ -150,9 +150,11 @@ Analyze if the actual content matches the search keyword intent.`;
    * @param {string} searchKeyword - The keyword used to find this site
    * @param {string} siteUrl - The URL of the site
    * @param {string} textContent - Scraped text content
+   * @param {string} pageTitle - Page title
+   * @param {string} metaDescription - Meta description
    * @returns {Promise<Object>} Complete analysis result with WordPress verification and content relevance
    */
-  async analyzeSite(searchKeyword, siteUrl, textContent) {
+  async analyzeSite(searchKeyword, siteUrl, textContent, pageTitle = '', metaDescription = '') {
     const systemPrompt = `You are an AI analyst for a WordPress lead generation system.
 Analyze this website and provide TWO assessments:
 
@@ -166,12 +168,27 @@ Look for:
 - WordPress REST API endpoints
 - wp-emoji-release.min.js or similar WordPress scripts
 
-**TASK 2: Content Relevance Check**
-Verify if the site's content matches the search keyword intent.
-- Be helpful: If the page has relevant content, it should be marked relevant
-- Consider related/near-relevant topics as acceptable
-- For coupon sites: Having coupons OR related deals (cashback, rewards) is relevant
-- Look for active products, services, or content matching the intention
+**TASK 2: Content Relevance Check (STRICT)**
+IMPORTANT: Be STRICT when determining relevance. The search keyword represents what the user is LOOKING FOR.
+
+Rules:
+1. The site must DIRECTLY offer products/services/content matching the search keyword
+2. A blog post ABOUT a topic is NOT the same as offering that service
+   - "About digital marketing" blog ≠ Digital Marketing Agency
+   - "Benefits of yoga" article ≠ Yoga Studio
+3. Educational content about a topic ≠ Service provider for that topic
+   - "How to learn photography" course ≠ Photography Studio
+4. Only mark as relevant if the site PRIMARLY offers/services the keyword
+
+Examples of NOT relevant:
+- Search: "digital marketing agency" → Site: "Digital marketing blog" → NOT relevant (blog, not agency)
+- Search: "yoga studio" → Site: "Benefits of yoga article" → NOT relevant (article, not studio)
+- Search: "web development" → Site: "Learn web development course" → NOT relevant (course, not service)
+
+Examples of RELEVANT:
+- Search: "digital marketing" → Site: "Digital marketing agency" → Relevant (direct match)
+- Search: "coupons" → Site: "Coupon deals website" → Relevant (direct match)
+- Search: "yoga classes" → Site: "Yoga studio offering classes" → Relevant (direct match)
 
 **PREDEFINED CATEGORIES (you MUST pick exactly one):**
 "Digital Marketing", "E-commerce", "Web Development", "Agency", "Blog", "Education",
@@ -190,16 +207,27 @@ Verify if the site's content matches the search keyword intent.
   "contentRelevance": {
     "isRelevant": true/false,
     "actualCategory": "One of the predefined categories",
-    "summary": "2-3 sentence description of what the site does",
-    "mismatchReason": "Why not relevant (null if relevant)"
+    "summary": "2-3 sentence description of what the site ACTUALLY does (be honest)",
+    "mismatchReason": "If not relevant, explain WHY it doesn't match the search keyword intent"
   }
 }`;
 
-    const userMessage = `SEARCH KEYWORD: "${searchKeyword}"
-SITE URL: ${siteUrl}
+    // Build content with metadata for better context
+    let content = `SEARCH KEYWORD: "${searchKeyword}"
+SITE URL: ${siteUrl}`;
 
-WEBSITE CONTENT:
+    if (pageTitle) {
+      content += `\nPAGE TITLE: ${pageTitle}`;
+    }
+
+    if (metaDescription) {
+      content += `\nMETA DESCRIPTION: ${metaDescription}`;
+    }
+
+    content += `\n\nWEBSITE CONTENT:
 ${textContent.substring(0, 5000)}`;
+
+    const userMessage = content;
 
     const result = await this.chatJSON(systemPrompt, userMessage);
 

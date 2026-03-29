@@ -15,6 +15,7 @@
 require("dotenv").config();
 const db = require("./database");
 const aiClient = require("./ai-client");
+const logger = require("./system-logger"); // Import logger
 
 const BATCH_SIZE = 5;              // Sites per batch
 const POLL_INTERVAL_MS = 30000;    // Check for pending sites every 30 seconds
@@ -59,31 +60,99 @@ class AIProcessor {
   }
 
   /**
+   * Validate if search keyword appears in page metadata (pre-AI filter)
+   * This saves API costs by filtering obviously irrelevant sites
+   *
+   * @param {Object} site - Site object with url, search_query, text_content, page_title, meta_description
+   * @returns {Object} - { passed: boolean, reason: string }
+   */
+  validateKeywordPresence(site) {
+    if (!site.search_query || !site.search_query.trim()) {
+      return { passed: true, reason: null }; // No keyword to validate
+    }
+
+    const keyword = site.search_query.toLowerCase().trim();
+    const url = site.url.toLowerCase();
+    const title = (site.page_title || '').toLowerCase();
+    const metaDesc = (site.meta_description || '').toLowerCase();
+    const content = (site.text_content || '').toLowerCase().substring(0, 2000); // Check first 2000 chars
+
+    // Extract key terms from search query (remove common words)
+    const stopWords = ['and', 'or', 'the', 'in', 'at', 'for', 'with', 'amp', '&'];
+    const keyTerms = keyword.split(/[\s&]+/)
+      .map(term => term.trim())
+      .filter(term => term.length > 2 && !stopWords.includes(term));
+
+    if (keyTerms.length === 0) {
+      return { passed: true, reason: null }; // No valid key terms to check
+    }
+
+    // Check if ANY key term appears in important places
+    let foundInUrl = false;
+    let foundInTitle = false;
+    let foundInMeta = false;
+    let foundInContent = false;
+
+    for (const term of keyTerms) {
+      if (url.includes(term)) foundInUrl = true;
+      if (title.includes(term)) foundInTitle = true;
+      if (metaDesc.includes(term)) foundInMeta = true;
+      if (content.includes(term)) foundInContent = true;
+    }
+
+    // Pass validation if keyword found in at least 2 places
+    const foundCount = [foundInUrl, foundInTitle, foundInMeta, foundInContent].filter(Boolean).length;
+
+    if (foundCount >= 2) {
+      return { passed: true, reason: null };
+    }
+
+    // Failed validation - explain why
+    const reasons = [];
+    if (!foundInUrl && !foundInTitle && !foundInMeta && !foundInContent) {
+      return {
+        passed: false,
+        reason: `Keyword "${site.search_query}" not found in URL, title, meta description, or content`
+      };
+    }
+
+    if (foundCount === 1) {
+      const location = foundInUrl ? 'URL' : foundInTitle ? 'title' : foundInMeta ? 'meta description' : 'content';
+      return {
+        passed: false,
+        reason: `Keyword "${site.search_query}" only found in ${location} (requires presence in multiple places)`
+      };
+    }
+
+    return { passed: true, reason: null };
+  }
+
+  /**
    * Start the background worker with auto-polling
    */
   start() {
     if (this.isRunning) {
-      console.log("⚠️  AI Processor: Already running");
+      logger.warning('AI Processor already running');
       return;
     }
 
     if (!aiClient.isConfigured()) {
-      console.log("⚠️  AI Processor: OPENROUTER_API_KEY not set. Worker disabled.");
+      logger.error('AI Processor: OPENROUTER_API_KEY not set. Worker disabled.');
       return;
     }
 
     this.isRunning = true;
-    console.log("\n🤖 AI Processor: Started");
-    console.log(`   Model: ${aiClient.getStats().model}`);
-    console.log(`   Poll Interval: ${POLL_INTERVAL_MS / 1000}s`);
-    console.log(`   Batch Size: ${BATCH_SIZE}`);
+    logger.system('AI Processor started');
+    logger.ai(`Model: ${aiClient.getStats().model}`);
+    logger.ai(`Poll Interval: ${POLL_INTERVAL_MS / 1000}s`);
+    logger.ai(`Batch Size: ${BATCH_SIZE}`);
 
     // Check backlog immediately on start
     const pending = this.getPendingCount();
     if (pending > 0) {
-      console.log(`   📋 Found ${pending} WordPress sites pending AI verification`);
+      logger.ai(`Found ${pending} WordPress sites pending AI verification`);
     } else {
-      console.log("   ✓ No pending sites. Watching for new scrapes...");
+      logger.ai('No pending sites. Watching for new scrapes...');
     }
 
     // Start polling loop
@@ -143,7 +212,7 @@ class AIProcessor {
         return;
       }
 
-      console.log(`🤖 Processing batch of ${pendingSites.length} sites...`);
+      logger.ai(`Processing batch of ${pendingSites.length} sites...`);
 
       for (const site of pendingSites) {
         if (!this.isRunning) break;
@@ -176,13 +245,13 @@ class AIProcessor {
   stop() {
     this.isRunning = false;
     this.isProcessing = false;
-    
+
     if (this.pollIntervalId) {
       clearInterval(this.pollIntervalId);
       this.pollIntervalId = null;
     }
-    
-    console.log("🤖 AI Processor: Stopped");
+
+    logger.system('AI Processor stopped');
     this.printStats();
   }
 
@@ -190,11 +259,7 @@ class AIProcessor {
    * Print processing statistics
    */
   printStats() {
-    console.log("\n📊 AI Processor Stats:");
-    console.log(`   Total Processed: ${this.stats.totalProcessed}`);
-    console.log(`   Content Relevant: ${this.stats.relevant}`);
-    console.log(`   Content Not Relevant: ${this.stats.notRelevant}`);
-    console.log(`   Failed: ${this.stats.failed}`);
+    logger.ai(`Processor Stats - Total: ${this.stats.totalProcessed}, Relevant: ${this.stats.relevant}, Not Relevant: ${this.stats.notRelevant}, Failed: ${this.stats.failed}`);
   }
 
   /**
@@ -229,7 +294,7 @@ class AIProcessor {
     const database = db.initDatabase();
     try {
       const sites = database.prepare(`
-        SELECT id, url, search_query, text_content
+        SELECT id, url, search_query, text_content, page_title, meta_description
         FROM sites
         WHERE is_wordpress = 1
           AND (ai_status = 'pending' OR ai_status IS NULL)
@@ -301,9 +366,50 @@ class AIProcessor {
    */
   async processSite(site) {
     const startTime = Date.now();
-    
+
     try {
       process.stdout.write(`   → [${site.id}] ${this.truncateUrl(site.url)} `);
+
+      // Pre-AI keyword validation: Check if keyword appears in page metadata
+      const keywordValidated = this.validateKeywordPresence(site);
+
+      if (!keywordValidated.passed) {
+        // Mark as not relevant without calling AI
+        const elapsed = Date.now() - startTime;
+
+        this.addToHistory({
+          type: 'site_analysis',
+          provider: 'Pre-AI Filter',
+          model: 'keyword_validation',
+          success: true,
+          responseTime: elapsed,
+          tokens: 0,
+          siteUrl: site.url,
+          isRelevant: false,
+          filterReason: keywordValidated.reason
+        });
+
+        // Save as not relevant
+        this.saveAIResults(site.id, {
+          wordpressVerification: {
+            isWordPress: true,
+            confidence: 'high',
+            indicators: ['Skipped WordPress verification - filtered by keyword validation']
+          },
+          contentRelevance: {
+            isRelevant: false,
+            actualCategory: 'Other',
+            summary: 'Site content does not appear to match search keyword based on URL, title, and content analysis.',
+            mismatchReason: keywordValidated.reason
+          }
+        });
+
+        this.stats.totalProcessed++;
+        this.stats.notRelevant++;
+
+        console.log(`⚡ FILTERED (${keywordValidated.reason})`);
+        return;
+      }
 
       // Mark as processing
       this.updateSiteStatus(site.id, "processing");
@@ -312,7 +418,9 @@ class AIProcessor {
       const result = await aiClient.analyzeSite(
         site.search_query,
         site.url,
-        site.text_content
+        site.text_content,
+        site.page_title || '',
+        site.meta_description || ''
       );
 
       const elapsed = Date.now() - startTime;
@@ -347,21 +455,26 @@ class AIProcessor {
       const wpConfidence = result.wordpressVerification?.confidence || 'medium';
       const relevantIcon = result.contentRelevance?.isRelevant ? "✅" : "⚠️";
       const category = result.contentRelevance?.actualCategory || 'Unknown';
-      console.log(`✨ ${wpIcon} (${wpConfidence}) | ${relevantIcon} Relevant | ${category} (${elapsed}ms)`);
+
+      if (result.contentRelevance?.isRelevant) {
+        logger.success(`[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} (${elapsed}ms)`);
+      } else {
+        logger.warning(`[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} - Not relevant (${elapsed}ms)`);
+      }
 
       // Log WordPress indicators if not WordPress
       if (!result.wordpressVerification?.isWordPress && result.wordpressVerification?.indicators?.length > 0) {
-        console.log(`      ↳ WP Indicators: ${result.wordpressVerification.indicators[0]}`);
+        logger.ai(`↳ WP Indicators: ${result.wordpressVerification.indicators[0]}`);
       }
 
       // Log mismatch reason if not relevant
       if (!result.contentRelevance?.isRelevant && result.contentRelevance?.mismatchReason) {
-        console.log(`      ↳ ${result.contentRelevance.mismatchReason}`);
+        logger.ai(`↳ ${result.contentRelevance.mismatchReason}`);
       }
 
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      console.log(`❌ Failed: ${error.message}`);
+      logger.error(`[${site.id}] Failed: ${error.message}`);
       this.stats.totalProcessed++;
       this.stats.failed++;
       this.updateSiteStatus(site.id, "failed", error.message);

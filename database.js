@@ -349,9 +349,9 @@ function saveSearchResults(query, results, country = 'in') {
       INSERT INTO sites (
         search_id, url, country, is_wordpress, confidence_score,
         indicators, error, search_query, emails, phones,
-        linkedin_profiles, text_content
+        linkedin_profiles, text_content, page_title, meta_description
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertContact = db.prepare(`
@@ -374,6 +374,8 @@ function saveSearchResults(query, results, country = 'in') {
           JSON.stringify(site.phones || []),
           JSON.stringify(site.linkedin_profiles || []),
           site.text_content || null,
+          site.page_title || null,
+          site.meta_description || null,
         );
 
         const siteId = siteResult.lastInsertRowid;

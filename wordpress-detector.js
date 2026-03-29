@@ -764,11 +764,25 @@ async function checkWordPress(page, url) {
         return text;
       });
 
-      // Store up to 2,000 chars
-      result.text_content = pageText.substring(0, 2000);
+      // Store up to 5,000 chars (increased from 2,000 for better AI analysis)
+      result.text_content = pageText.substring(0, 5000);
+
+      // Extract page title for better context
+      result.page_title = await page.evaluate(() => {
+        return document.title || "";
+      });
+
+      // Extract meta description for better context
+      result.meta_description = await page.evaluate(() => {
+        const metaDesc = document.querySelector('meta[name="description"]');
+        return metaDesc ? metaDesc.getAttribute('content') || "" : "";
+      });
+
     } catch (e) {
       console.log(`      ⚠️  Could not extract text content: ${e.message}`);
       result.text_content = "";
+      result.page_title = "";
+      result.meta_description = "";
     }
 
     // ========== CONTACT EXTRACTION (ONLY FOR WORDPRESS SITES) ==========
@@ -1360,8 +1374,21 @@ async function main() {
       });
     }
 
+    // Filter out URLs matching ignored tags (URL scope)
+    const ignoredUrls = [];
+    const ignoredTags = db.getAllIgnoredTags().filter(t => t.scope === 'url' || !t.scope);
+    if (ignoredTags.length > 0) {
+      newUrls = newUrls.filter(url => {
+        if (db.isUrlIgnored(url, ignoredTags)) {
+          ignoredUrls.push(url);
+          return false;
+        }
+        return true;
+      });
+    }
+
     if (newUrls.length === 0) {
-      console.log("All URLs already exist in database or are excluded. Nothing to scrape.");
+      console.log("All URLs already exist in database or are excluded/ignored. Nothing to scrape.");
       if (duplicates.length > 0) {
         console.log(
           `\nSkipped ${
@@ -1376,11 +1403,18 @@ async function main() {
           } URLs (blocked domains):\n  - ${domainExcluded.join("\n  - ")}`,
         );
       }
+      if (ignoredUrls.length > 0) {
+        console.log(
+          `\n🚫 Ignored ${
+            ignoredUrls.length
+          } URLs (ignored tags):\n  - ${ignoredUrls.join("\n  - ")}`,
+        );
+      }
       return;
     }
 
     console.log(
-      `Found ${urls.length} total URLs, ${newUrls.length} new to check, ${duplicates.length} already exist, ${domainExcluded.length} excluded by domain.\n`,
+      `Found ${urls.length} total URLs, ${newUrls.length} new to check, ${duplicates.length} already exist, ${domainExcluded.length} excluded by domain, ${ignoredUrls.length} ignored by tags.\n`,
     );
 
     if (duplicates.length > 0) {
@@ -1392,6 +1426,12 @@ async function main() {
     if (domainExcluded.length > 0) {
       console.log("⛔ Excluded by domain:");
       domainExcluded.forEach((url) => console.log(`  ⛔ ${url}`));
+      console.log("");
+    }
+
+    if (ignoredUrls.length > 0) {
+      console.log("🚫 Ignored by tags:");
+      ignoredUrls.forEach((url) => console.log(`  🚫 ${url}`));
       console.log("");
     }
 

@@ -1,10 +1,16 @@
 /**
  * LinkedIn Company Scraper
  * Extracts founders, co-founders, and CEOs from LinkedIn company pages
+ *
+ * Features:
+ * - Uses stored credentials from database
+ * - Automatic login to LinkedIn
+ * - Supports multiple credential accounts (only one active at a time)
  */
 
 const { chromium } = require("playwright");
 const path = require("path");
+const db = require("./database");
 
 // Delay configurations (in milliseconds)
 const MIN_DELAY = 2000;
@@ -18,9 +24,30 @@ function randomDelay(min, max) {
 class LinkedInCompanyScraper {
   static context = null;
   static page = null;
+  static currentCredential = null;
 
+  /**
+   * Initialize browser and login to LinkedIn using stored credentials
+   */
   async init() {
     console.log("🔐 Initializing browser for LinkedIn company scraping...");
+
+    // Get active credential from database
+    const activeCredential = this.getActiveCredential();
+
+    if (!activeCredential || !activeCredential.email || !activeCredential.password) {
+      console.log("⚠️  No active LinkedIn credential found with email and password.");
+      console.log("💡 Please add a LinkedIn credential in the admin panel:");
+      console.log("   1. Go to http://localhost:8080");
+      console.log("   2. Navigate to 'LinkedIn' tab");
+      console.log("   3. Click 'Add Credential'");
+      console.log("   4. Enter LinkedIn email and password");
+      console.log("   5. Click the toggle to set it as active");
+      throw new Error("No active LinkedIn credential found. Please add credentials in the admin panel.");
+    }
+
+    console.log(`📋 Using credential: ${activeCredential.name} (${activeCredential.email})`);
+    this.currentCredential = activeCredential;
 
     // Use the same persistent context as WordPress detector
     this.context = await chromium.launchPersistentContext(
@@ -67,11 +94,436 @@ class LinkedInCompanyScraper {
     });
 
     console.log("✅ Browser context created successfully");
+
+    // Login to LinkedIn
+    await this.loginToLinkedIn(activeCredential);
+  }
+
+  /**
+   * Get active LinkedIn credential from database
+   */
+  getActiveCredential() {
+    const database = db.initDatabase();
+    try {
+      const credential = database.prepare(`
+        SELECT * FROM linkedin_credentials
+        WHERE is_active = 1
+        ORDER BY last_used DESC
+        LIMIT 1
+      `).get();
+
+      return credential || null;
+    } finally {
+      database.close();
+    }
+  }
+
+  /**
+   * Login to LinkedIn using credentials
+   */
+  async loginToLinkedIn(credential) {
+    try {
+      console.log("🔑 Logging in to LinkedIn...");
+
+      // Go to LinkedIn login page
+      console.log("   📄 Navigating to LinkedIn login page...");
+      try {
+        await this.page.goto("https://www.linkedin.com/login", {
+          waitUntil: "domcontentloaded",
+          timeout: 90000, // Increased from 30s to 90s
+        });
+      } catch (gotoError) {
+        // Fallback: try with 'load' strategy if domcontentloaded fails
+        console.log("⚠️  domcontentloaded timeout, trying with 'load' strategy...");
+        await this.page.goto("https://www.linkedin.com/login", {
+          waitUntil: "load",
+          timeout: 60000,
+        });
+      }
+
+      // Give page extra time to fully render
+      await this.page.waitForTimeout(5000);
+
+      // Debug: Check current state
+      const currentUrl = this.page.url();
+      const pageTitle = await this.page.title();
+      console.log(`   📍 Current URL: ${currentUrl}`);
+      console.log(`   📄 Page title: ${pageTitle}`);
+
+      // Take screenshot for debugging
+      await this.page.screenshot({ path: 'linkedin-page-loaded.png' });
+      console.log("   📸 Screenshot saved to linkedin-page-loaded.png");
+
+      // Check if already logged in
+      if (!currentUrl.includes("login")) {
+        console.log("✅ Already logged in to LinkedIn!");
+        await this.markCredentialAsUsed();
+        return;
+      }
+
+      // Debug: List all input elements on the page
+      console.log("   🔍 Analyzing page structure...");
+      const inputInfo = await this.page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        const buttons = Array.from(document.querySelectorAll('button'));
+
+        return {
+          inputCount: inputs.length,
+          inputs: inputs.map(input => ({
+            type: input.type,
+            id: input.id,
+            name: input.name,
+            className: input.className,
+            placeholder: input.placeholder,
+            visible: input.offsetParent !== null
+          })),
+          buttonCount: buttons.length,
+          buttons: buttons.map(btn => ({
+            type: btn.type,
+            text: btn.textContent?.trim(),
+            className: btn.className
+          }))
+        };
+      });
+
+      console.log(`   📊 Found ${inputInfo.inputCount} input elements:`);
+      inputInfo.inputs.forEach((input, i) => {
+        console.log(`      Input ${i + 1}: type="${input.type}", id="${input.id}", visible=${input.visible}`);
+      });
+      console.log(`   📊 Found ${inputInfo.buttonCount} buttons:`);
+      inputInfo.buttons.forEach((btn, i) => {
+        if (btn.text) console.log(`      Button ${i + 1}: type="${btn.type}", text="${btn.text}"`);
+      });
+
+      // Use the elements we found during analysis
+      console.log("   ✨ Using discovered form elements...");
+
+      // Get all inputs and filter for visible ones
+      const allInputs = await this.page.$$("input");
+      let emailField = null;
+      let passwordField = null;
+
+      // Find the first visible text/email input (that's the email field)
+      for (const input of allInputs) {
+        const type = await input.evaluate(el => el.type);
+        const inputId = await input.evaluate(el => el.id || "");
+        const visible = await input.evaluate(el => el.offsetParent !== null);
+
+        // Look for email field - can be type="email" or type="text" with id="username"
+        if (visible && !emailField) {
+          if (type === 'email' || type === 'text' && inputId === 'username') {
+            emailField = input;
+            console.log(`   ✓ Found email field: type="${type}", id="${inputId}"`);
+          }
+        }
+
+        if (type === 'password' && visible && !passwordField) {
+          passwordField = input;
+          console.log("   ✓ Found password field (visible password input)");
+        }
+
+        if (emailField && passwordField) break;
+      }
+
+      // If we couldn't find the fields, throw error with screenshot
+      if (!emailField || !passwordField) {
+        console.log("   ❌ Could not find login form fields");
+        console.log(`      Email field found: ${emailField ? 'YES' : 'NO'}`);
+        console.log(`      Password field found: ${passwordField ? 'YES' : 'NO'}`);
+        await this.page.screenshot({ path: 'linkedin-no-form-fields.png' });
+        throw new Error("Login form not found. LinkedIn may have changed their page layout or you need to complete verification manually.");
+      }
+
+      // Fill in email using the element handle we found
+      console.log("   ⏳ Filling email field...");
+      try {
+        await emailField.fill(credential.email);
+        console.log(`   ✓ Email entered: ${credential.email}`);
+      } catch (fillError) {
+        console.log("   ❌ Failed to fill email field:", fillError.message);
+        await this.page.screenshot({ path: 'linkedin-fill-email-error.png' });
+        throw fillError;
+      }
+
+      await this.page.waitForTimeout(randomDelay(500, 1000));
+
+      // Fill in password using the element handle
+      console.log("   ⏳ Filling password field...");
+      try {
+        await passwordField.fill(credential.password);
+        console.log("   ✓ Password entered");
+      } catch (fillError) {
+        console.log("   ❌ Failed to fill password field:", fillError.message);
+        await this.page.screenshot({ path: 'linkedin-fill-password-error.png' });
+        throw fillError;
+      }
+
+      await this.page.waitForTimeout(randomDelay(500, 1000));
+
+      // Find and click sign in button
+      console.log("   🔍 Looking for Sign in button...");
+      let buttonClicked = false;
+
+      try {
+        const buttons = await this.page.$$("button");
+        console.log(`      Found ${buttons.length} buttons total`);
+
+        // Detailed analysis of all buttons
+        for (let i = 0; i < buttons.length; i++) {
+          const buttonText = await buttons[i].evaluate(el => el.textContent || "");
+          const trimmedText = buttonText.trim();
+          const buttonClass = await buttons[i].evaluate(el => el.className || "");
+          const buttonType = await buttons[i].evaluate(el => el.getAttribute('type') || '');
+
+          if (trimmedText) {
+            console.log(`      Button ${i + 1}: "${trimmedText}" (type="${buttonType}")`);
+            console.log(`         Class snippet: ${buttonClass.substring(0, 50)}...`);
+          }
+        }
+
+        console.log("\n   🎯 Trying multiple strategies to click Sign in button...\n");
+
+        // STRATEGY 1: Exact text match "Sign in"
+        console.log("   Strategy 1: Looking for exact text 'Sign in'...");
+        for (let i = 0; i < buttons.length; i++) {
+          const buttonText = await buttons[i].evaluate(el => el.textContent || "");
+          const trimmedText = buttonText.trim();
+
+          if (trimmedText === "Sign in") {
+            console.log(`      → Found button ${i + 1} with exact text: "${trimmedText}"`);
+
+            // Try multiple click methods
+            try {
+              // Method 1: Direct click
+              await buttons[i].click();
+              console.log("      ✓✓✓ CLICKED via direct click()!");
+              buttonClicked = true;
+              break;
+            } catch (err1) {
+              console.log(`      ⚠️  Direct click failed: ${err1.message}`);
+              try {
+                // Method 2: Click via JS
+                await buttons[i].evaluate(el => el.click());
+                console.log("      ✓✓✓ CLICKED via JS evaluate()!");
+                buttonClicked = true;
+                break;
+              } catch (err2) {
+                console.log(`      ⚠️  JS click failed: ${err2.message}`);
+                try {
+                  // Method 3: Click via focus + Enter
+                  await buttons[i].focus();
+                  await this.page.keyboard.press('Enter');
+                  console.log("      ✓✓✓ CLICKED via focus + Enter!");
+                  buttonClicked = true;
+                  break;
+                } catch (err3) {
+                  console.log(`      ⚠️  Focus + Enter failed: ${err3.message}`);
+                }
+              }
+            }
+          }
+        }
+
+        // STRATEGY 2: Text match with innerText
+        if (!buttonClicked) {
+          console.log("\n   Strategy 2: Using innerText instead of textContent...");
+          for (let i = 0; i < buttons.length; i++) {
+            try {
+              const innerText = await buttons[i].evaluate(el => el.innerText || "");
+              if (innerText.trim() === "Sign in") {
+                console.log(`      → Found via innerText, button ${i + 1}`);
+                await buttons[i].click({ timeout: 5000 });
+                console.log("      ✓✓✓ CLICKED via innerText match!");
+                buttonClicked = true;
+                break;
+              }
+            } catch (err) {
+              // Skip this button
+            }
+          }
+        }
+
+        // STRATEGY 3: XPath selector
+        if (!buttonClicked) {
+          console.log("\n   Strategy 3: Using XPath to find button with text 'Sign in'...");
+          try {
+            const xpathButton = await this.page.waitForSelector("//button[contains(., 'Sign in') and not(contains(., 'Sign in with'))]", {
+              timeout: 5000
+            });
+            await xpathButton.click();
+            console.log("      ✓✓✓ CLICKED via XPath!");
+            buttonClicked = true;
+          } catch (xpathError) {
+            console.log(`      ⚠️  XPath failed: ${xpathError.message}`);
+          }
+        }
+
+        // STRATEGY 4: Get all buttons, filter in JS
+        if (!buttonClicked) {
+          console.log("\n   Strategy 4: Filtering buttons in browser context...");
+          const buttonIndex = await this.page.evaluate(() => {
+            const buttons = Array.from(document.querySelectorAll('button'));
+            for (let i = 0; i < buttons.length; i++) {
+              const text = buttons[i].textContent || buttons[i].innerText || "";
+              if (text.trim() === "Sign in") {
+                return i;
+              }
+            }
+            return -1;
+          });
+
+          if (buttonIndex >= 0) {
+            console.log(`      → Found button at index ${buttonIndex} in browser context`);
+            const allButtons = await this.page.$$("button");
+            await allButtons[buttonIndex].click();
+            console.log("      ✓✓✓ CLICKED via browser context evaluation!");
+            buttonClicked = true;
+          }
+        }
+
+        // STRATEGY 5: Use Playwright's getByText with exact match
+        if (!buttonClicked) {
+          console.log("\n   Strategy 5: Using locator with exact text...");
+          try {
+            const locator = this.page.getByText("Sign in", { exact: true });
+            await locator.click({ timeout: 5000 });
+            console.log("      ✓✓✓ CLICKED via getByText exact match!");
+            buttonClicked = true;
+          } catch (locatorError) {
+            console.log(`      ⚠️  getByText failed: ${locatorError.message}`);
+          }
+        }
+
+        if (!buttonClicked) {
+          await this.page.screenshot({ path: 'linkedin-button-not-found.png' });
+          throw new Error("Failed to click Sign in button after trying all strategies");
+        }
+
+      } catch (buttonError) {
+        console.log("   ❌ Failed to click sign-in button:", buttonError.message);
+        console.log("   📸 Saving screenshot...");
+        await this.page.screenshot({ path: 'linkedin-button-error.png', fullPage: true });
+        throw buttonError;
+      }
+
+      // Wait for navigation or page load
+      await this.page.waitForTimeout(3000);
+
+      // Check for CAPTCHA or checkpoint
+      const finalUrl = this.page.url();
+
+      if (finalUrl.includes('checkpoint') || finalUrl.includes('verify') || finalUrl.includes('challenge')) {
+        console.log('\n' + '='.repeat(70));
+        console.log('🛑 SECURITY VERIFICATION DETECTED');
+        console.log('='.repeat(70));
+        console.log('\n📋 LinkedIn requires additional verification.');
+        console.log('\n🔍 Possible reasons:');
+        console.log('   • CAPTCHA challenge (image or puzzle)');
+        console.log('   • Email verification required');
+        console.log('   • Phone verification required');
+        console.log('   • Unusual activity detected');
+        console.log('\n✋ WHAT TO DO:');
+        console.log('   1. Check the browser window (should be visible)');
+        console.log('   2. Complete the verification process');
+        console.log('   3. Enter code if sent to email/phone');
+        console.log('   4. Solve CAPTCHA if presented');
+        console.log('   5. Wait for redirect to LinkedIn feed');
+        console.log('\n⏳ Scraper is PAUSED and waiting...');
+        console.log('⏸️  DO NOT close the browser window');
+        console.log('⏸️  You have 5 minutes to complete verification\n');
+
+        // Wait for user to complete verification manually
+        // Monitor URL for successful login (redirect away from checkpoint/verify)
+        try {
+          await this.page.waitForUrl(
+            (url) => {
+              return !url.includes('checkpoint') &&
+                     !url.includes('verify') &&
+                     !url.includes('challenge') &&
+                     !url.includes('login') &&
+                     (url.includes('feed') || url.includes('in/') || url.includes('company/'));
+            },
+            { timeout: 300000 } // 5 minutes
+          );
+
+          console.log('✅ Verification successful! Continuing...\n');
+
+        } catch (timeoutError) {
+          // Check if we're actually logged in despite timeout
+          const finalCheckUrl = this.page.url();
+          if (!finalCheckUrl.includes('login') && !finalCheckUrl.includes('checkpoint')) {
+            console.log('✅ Verification appears successful (URL changed). Continuing...\n');
+          } else {
+            throw new Error('Verification timed out after 5 minutes. Please complete manual verification and try again.');
+          }
+        }
+      } else if (finalUrl.includes("login")) {
+        // Still on login page - likely wrong credentials or other error
+        throw new Error("Login failed. Please check your email and password. If credentials are correct, LinkedIn may require additional verification.");
+      } else {
+        console.log("✅ Successfully logged in to LinkedIn!");
+      }
+
+      // Mark credential as used
+      await this.markCredentialAsUsed();
+
+    } catch (error) {
+      console.error("❌ LinkedIn login failed:", error.message);
+      throw new Error(`LinkedIn login failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Mark the current credential as used
+   */
+  async markCredentialAsUsed() {
+    if (!this.currentCredential) return;
+
+    const database = db.initDatabase();
+    try {
+      database.prepare(`
+        UPDATE linkedin_credentials
+        SET last_used = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(this.currentCredential.id);
+      console.log("📊 Credential marked as used");
+    } finally {
+      database.close();
+    }
   }
 
   async close() {
     if (this.page) await this.page.close();
     if (this.context) await this.context.close();
+    this.currentCredential = null;
+  }
+
+  /**
+   * Check if we're logged in to LinkedIn
+   */
+  async isLoggedIn() {
+    try {
+      const currentUrl = this.page.url();
+      return !currentUrl.includes("login") && !currentUrl.includes("checkpoint");
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Ensure we're logged in before scraping
+   */
+  async ensureLoggedIn() {
+    if (!this.context || !this.page || this.page.isClosed()) {
+      await this.init();
+      return;
+    }
+
+    const loggedIn = await this.isLoggedIn();
+    if (!loggedIn) {
+      console.log("🔄 Not logged in, re-authenticating...");
+      await this.loginToLinkedIn(this.currentCredential);
+    }
   }
 
   /**
@@ -83,6 +535,9 @@ class LinkedInCompanyScraper {
   async scrapeCompanyPage(companyUrl, siteId) {
     try {
       console.log(`\n🏢 Scraping company: ${companyUrl}`);
+
+      // Ensure we're logged in
+      await this.ensureLoggedIn();
 
       // Check if browser context is still valid
       if (!this.context || this.context.browser()?.isConnected() === false) {
@@ -111,8 +566,8 @@ class LinkedInCompanyScraper {
       // Navigate directly to the filtered people page
       console.log(`📄 Navigating to filtered people page...`);
       await this.page.goto(peopleUrl, {
-        waitUntil: "networkidle",
-        timeout: 60000,
+        waitUntil: "domcontentloaded",
+        timeout: 90000, // Increased to 90 seconds
       });
 
       // Wait for page to load
