@@ -91,6 +91,10 @@ function initDatabase() {
       ai_reasoning TEXT,
       ai_is_wordpress INTEGER DEFAULT NULL,
       ai_is_genuine_match INTEGER DEFAULT NULL,
+      page_title TEXT,
+      meta_description TEXT,
+      retry_count INTEGER DEFAULT 0,
+      last_retried_at DATETIME,
       checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (search_id) REFERENCES searches(id)
     )
@@ -119,6 +123,10 @@ function initDatabase() {
     { name: "ai_processed_at", type: "DATETIME" },
     { name: "ai_is_wordpress", type: "INTEGER DEFAULT NULL" },
     { name: "ai_is_genuine_match", type: "INTEGER DEFAULT NULL" },
+    { name: "page_title", type: "TEXT" },
+    { name: "meta_description", type: "TEXT" },
+    { name: "retry_count", type: "INTEGER DEFAULT 0" },
+    { name: "last_retried_at", type: "DATETIME" },
   ];
 
   for (const col of migrationColumns) {
@@ -270,6 +278,8 @@ function initDatabase() {
     { name: "ai_reasoning", type: "TEXT" },
     { name: "ai_is_wordpress", type: "INTEGER DEFAULT NULL" },
     { name: "ai_is_genuine_match", type: "INTEGER DEFAULT NULL" },
+    { name: "retry_count", type: "INTEGER DEFAULT 0" },
+    { name: "last_retried_at", type: "DATETIME" },
   ];
 
   for (const col of aiColumns) {
@@ -962,7 +972,38 @@ function deleteIgnoredTag(id) {
 }
 
 /**
- * Check if a URL should be ignored based on ignored tags
+ * Delete all ignored tags
+ * @returns {number} - Number of tags deleted
+ */
+function deleteAllIgnoredTags() {
+  const db = initDatabase();
+  try {
+    const result = db.prepare(`DELETE FROM ignored_tags`).run();
+    return result.changes;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Bulk delete ignored tags
+ * @param {Array<number>} ids - Array of tag IDs to delete
+ * @returns {number} - Number of tags deleted
+ */
+function bulkDeleteIgnoredTags(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  const db = initDatabase();
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    const result = db.prepare(`DELETE FROM ignored_tags WHERE id IN (${placeholders})`).run(...ids);
+    return result.changes;
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Check if a URL should be ignored based on tags
  * @param {string} url - URL to check
  * @param {Array<Object>} ignoredTags - Array of ignored tag objects
  * @returns {boolean} - True if URL should be ignored
@@ -1448,7 +1489,8 @@ function getEmails(page = 1, limit = 50, search = null) {
         c.created_at,
         s.url as site_url,
         s.is_wordpress,
-        s.search_query
+        s.search_query,
+        s.ai_actual_category
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email' AND c.value LIKE ?
@@ -1478,7 +1520,8 @@ function getEmails(page = 1, limit = 50, search = null) {
         c.created_at,
         s.url as site_url,
         s.is_wordpress,
-        s.search_query
+        s.search_query,
+        s.ai_actual_category
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email'
@@ -1528,7 +1571,8 @@ function getEmailById(id) {
         c.created_at,
         s.url as site_url,
         s.is_wordpress,
-        s.search_query
+        s.search_query,
+        s.ai_actual_category
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email' AND c.id = ?
@@ -1818,7 +1862,8 @@ function getAllContacts(type = "all", page = 1, limit = 50, search = null) {
       c.created_at,
       s.url as site_url,
       s.is_wordpress,
-      s.search_query
+      s.search_query,
+      s.ai_actual_category
     FROM contacts c
     INNER JOIN sites s ON c.site_id = s.id
     WHERE ${whereClause}
@@ -2598,6 +2643,8 @@ module.exports = {
   addIgnoredTag,
   updateIgnoredTag,
   deleteIgnoredTag,
+  deleteAllIgnoredTags,
+  bulkDeleteIgnoredTags,
   isUrlIgnored,
   isContentIgnored,
   filterIgnoredUrls,

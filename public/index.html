@@ -2399,8 +2399,30 @@
       background: var(--bg-secondary);
       border: 1px solid var(--border-default);
       border-radius: 20px;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+
+    .keywords-table-container table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .keywords-table-container thead th:first-child {
+      border-top-left-radius: 20px;
+    }
+
+    .keywords-table-container thead th:last-child {
+      border-top-right-radius: 20px;
+    }
+
+    .keywords-table-container tbody tr:last-child td:first-child {
+      border-bottom-left-radius: 20px;
+    }
+
+    .keywords-table-container tbody tr:last-child td:last-child {
+      border-bottom-right-radius: 20px;
     }
 
     .keyword-cell {
@@ -2804,6 +2826,46 @@
       margin-bottom: 24px;
     }
 
+    .tag-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: 16px;
+      padding: 20px;
+      position: relative;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      cursor: pointer;
+    }
+
+    .tag-card.selected {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.05);
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.1);
+    }
+
+    .tag-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--border-strong);
+    }
+
+    .tag-card-selection {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 2;
+    }
+
+    .tag-card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding-right: 30px;
+      /* Space for checkbox */
+    }
+
     .keyword-stat-card {
       background: var(--bg-secondary);
       border: 1px solid var(--border-default);
@@ -3180,24 +3242,8 @@
       color: var(--warning);
     }
 
+    .domain-count-badge svg,
     .tag-count-badge svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 12px;
-    background: var(--danger-bg);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    border-radius: 16px;
-    color: var(--danger);
-    font-size: 12px;
-    font-weight: 600;
-    }
-
-    .domain-count-badge svg {
       width: 14px;
       height: 14px;
     }
@@ -3400,18 +3446,35 @@
       background: var(--bg-secondary);
       border: 1px solid var(--border-default);
       border-radius: 16px;
-      overflow: hidden;
+      overflow: visible;
       box-shadow: var(--shadow-sm);
+      position: relative;
     }
 
     .sites-table-container table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .sites-table-container thead th:first-child {
+      border-top-left-radius: 16px;
+    }
+
+    .sites-table-container thead th:last-child {
+      border-top-right-radius: 16px;
+    }
+
+    .sites-table-container tbody tr:last-child td:first-child {
+      border-bottom-left-radius: 16px;
+    }
+
+    .sites-table-container tbody tr:last-child td:last-child {
+      border-bottom-right-radius: 16px;
     }
 
     .sites-table-container thead {
       background: var(--bg-primary);
-      border-bottom: 1px solid var(--border-default);
     }
 
     .sites-table-container th {
@@ -5733,7 +5796,7 @@
               <input type="number" id="keyword-limit" class="form-input" placeholder="Leave empty for unlimited" min="1"
                 max="10000" onkeypress="if (event.key === 'Enter') addKeyword();" />
             </div>
-            <button class="btn-submit" onclick="addKeyword()">
+            <button type="button" class="btn-submit" onclick="addKeyword()">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -6153,8 +6216,9 @@
                 <input type="checkbox" class="select-all-checkbox" id="emails-select-all"
                   onchange="toggleSelectAllEmails()" />
               </th>
-              <th style="width: 25%">Email Address</th>
-              <th style="width: 30%">Site URL</th>
+              <th style="width: 22%">Email Address</th>
+              <th style="width: 20%">Site URL</th>
+              <th style="width: 13%">Category</th>
               <th style="width: 12%">Type</th>
               <th style="width: 12%">Status</th>
               <th style="width: 12%">Found Date</th>
@@ -6163,7 +6227,7 @@
           </thead>
           <tbody id="emails-table">
             <tr>
-              <td colspan="7" class="empty-state">
+              <td colspan="8" class="empty-state">
                 <div class="empty-state-icon">📧</div>
                 Loading...
               </td>
@@ -6182,20 +6246,23 @@
           </div>
           <div style="display: flex; gap: 10px;">
             <!-- Bulk Controls -->
-            <button class="btn-warning" onclick="bulkPauseQueue()" style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+            <button class="btn-warning" onclick="bulkPauseQueue()"
+              style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="6" y="4" width="4" height="16"></rect>
                 <rect x="14" y="4" width="4" height="16"></rect>
               </svg>
               Pause All
             </button>
-            <button class="btn-success" onclick="bulkResumeQueue()" style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+            <button class="btn-success" onclick="bulkResumeQueue()"
+              style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               Resume All
             </button>
-            <button class="btn-danger" onclick="bulkCancelQueue()" style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+            <button class="btn-danger" onclick="bulkCancelQueue()"
+              style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -6203,7 +6270,8 @@
               </svg>
               Cancel All
             </button>
-            <button class="btn-secondary" onclick="bulkRetryFailed()" style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+            <button class="btn-secondary" onclick="bulkRetryFailed()"
+              style="padding: 8px 16px; border-radius: 6px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>
@@ -6215,18 +6283,27 @@
         </div>
 
         <!-- History Tabs -->
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">
-          <button class="history-tab active" onclick="switchEmailHistoryTab('sent')" data-tab="sent" style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; border-bottom: 2px solid var(--primary); color: var(--primary);">
-            ✅ Sent (<span id="history-sent-count">0</span>)
+        <div
+          style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">
+          <button class="history-tab active" onclick="switchEmailHistoryTab('sent')" data-tab="sent"
+            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; border-bottom: 2px solid var(--primary); color: var(--primary);">
+            Sent
           </button>
-          <button class="history-tab" onclick="switchEmailHistoryTab('scheduled')" data-tab="scheduled" style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
-            📅 Scheduled (<span id="history-scheduled-count">0</span>)
+          <button class="history-tab" onclick="switchEmailHistoryTab('scheduled')" data-tab="scheduled"
+            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
+            Scheduled
           </button>
-          <button class="history-tab" onclick="switchEmailHistoryTab('failed')" data-tab="failed" style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
-            ❌ Failed (<span id="history-failed-count">0</span>)
+          <button class="history-tab" onclick="switchEmailHistoryTab('failed')" data-tab="failed"
+            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
+            Failed
           </button>
-          <button class="history-tab" onclick="switchEmailHistoryTab('all')" data-tab="all" style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
-            📋 All History
+          <button class="history-tab" onclick="switchEmailHistoryTab('cancelled')" data-tab="cancelled"
+            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
+            Cancelled
+          </button>
+          <button class="history-tab" onclick="switchEmailHistoryTab('all')" data-tab="all"
+            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
+            All History
           </button>
         </div>
 
@@ -6251,18 +6328,19 @@
             <thead>
               <tr>
                 <th style="width: 5%;">ID</th>
-                <th style="width: 20%;">Recipient</th>
-                <th style="width: 25%;">Subject</th>
-                <th style="width: 12%;">Status</th>
-                <th style="width: 12%;">Sender</th>
-                <th style="width: 13%;">Date</th>
+                <th style="width: 15%;">Site</th>
+                <th style="width: 15%;">Recipient</th>
+                <th style="width: 20%;">Subject</th>
+                <th style="width: 10%;">Status</th>
+                <th style="width: 10%;">Sender</th>
+                <th style="width: 12%;">Date</th>
                 <th style="width: 8%;">Attempts</th>
                 <th style="width: 5%; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="email-history-table">
               <tr>
-                <td colspan="8" class="empty-state">
+                <td colspan="9" class="empty-state">
                   <div class="empty-state-icon">📨</div>
                   Select a tab to view email history
                 </td>
@@ -8353,6 +8431,14 @@
             </svg>
             <span id="ignored-total-count">0</span> ignored
           </span>
+          <div
+            style="display: flex; align-items: center; gap: 8px; margin-right: 12px; padding-right: 12px; border-right: 1px solid var(--border-default);">
+            <input type="checkbox" id="ignored-tags-select-all" class="select-all-checkbox"
+              onchange="toggleSelectAllIgnoredTags()">
+            <label for="ignored-tags-select-all"
+              style="font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer;">Select
+              All</label>
+          </div>
           <button class="btn-primary-warning" onclick="openIgnoreTagModal()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -8360,6 +8446,23 @@
             </svg>
             Add Tag
           </button>
+        </div>
+      </div>
+
+      <!-- Bulk Actions Bar -->
+      <div class="bulk-actions-bar" id="ignored-tags-bulk-actions" style="display: none;">
+        <div class="bulk-actions-left">
+          <span class="bulk-selected-count" id="ignored-tags-selected-count">0 tags selected</span>
+        </div>
+        <div class="bulk-actions-right">
+          <button class="bulk-action-btn danger" onclick="bulkDeleteIgnoredTags()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Delete Selected
+          </button>
+          <button class="bulk-action-btn secondary" onclick="clearIgnoredTagSelection()">Cancel</button>
         </div>
       </div>
 
@@ -8607,20 +8710,25 @@
       </div>
 
       <!-- Console Stats -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px;">
-        <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div class="stat-card"
+          style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Total Logs</div>
           <div id="console-total-logs" style="font-size: 24px; font-weight: 600; color: var(--text-primary);">0</div>
         </div>
-        <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
+        <div class="stat-card"
+          style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Errors</div>
           <div id="console-error-count" style="font-size: 24px; font-weight: 600; color: #ef4444;">0</div>
         </div>
-        <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
+        <div class="stat-card"
+          style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Warnings</div>
           <div id="console-warning-count" style="font-size: 24px; font-weight: 600; color: #f59e0b;">0</div>
         </div>
-        <div class="stat-card" style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
+        <div class="stat-card"
+          style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 16px; border-radius: 8px;">
           <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Success</div>
           <div id="console-success-count" style="font-size: 24px; font-weight: 600; color: #22c55e;">0</div>
         </div>
@@ -8641,9 +8749,11 @@
           <option value="retry">🔄 Retry</option>
           <option value="system">⚙️ System</option>
         </select>
-        <input type="text" id="console-search" placeholder="Search logs..." onkeyup="searchConsoleLogs()" style="flex: 2; min-width: 300px;">
+        <input type="text" id="console-search" placeholder="Search logs..." onkeyup="searchConsoleLogs()"
+          style="flex: 2; min-width: 300px;">
         <button class="btn-secondary" onclick="toggleAutoRefresh()" id="auto-refresh-btn" style="white-space: nowrap;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="display: inline-block;">
             <polyline points="23 4 23 10 17 10"></polyline>
             <polyline points="1 20 1 14 7 14"></polyline>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -8653,9 +8763,11 @@
       </div>
 
       <!-- Console Output -->
-      <div id="console-output" style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; height: 600px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;">
+      <div id="console-output"
+        style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; height: 600px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6;">
         <div style="color: var(--text-muted); text-align: center; padding: 40px;">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.3;">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="opacity: 0.3;">
             <polyline points="4 17 10 11 4 5"></polyline>
             <line x1="12" y1="19" x2="20" y2="19"></line>
           </svg>
@@ -9092,7 +9204,8 @@
                     color: var(--text-muted);
                     display: block;
                     margin-top: 8px;
-                  ">Available: {{name}}, {{company}}, {{email}}, {{url}}, {{domain}}, {{region}}, {{date}},
+                  ">Available: {{name}}, {{company}}, {{email}}, {{url}}, {{domain}}, {{region}}, {{sender_name}},
+                {{receiver_name}}, {{date}},
                 {{year}}</small>
             </div>
           </div>
@@ -10826,7 +10939,8 @@
             align-items: center;
           ">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <div class="page-icon info" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+          <div class="page-icon info"
+            style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
               <polyline points="22,6 12,13 2,6"></polyline>
@@ -11196,11 +11310,16 @@
 
     async function loadKeywords() {
       try {
+        console.log("Loading keywords from:", `${API_BASE}/keywords`);
         const res = await fetch(`${API_BASE}/keywords`);
         const json = await res.json();
+        console.log("Keywords response:", json);
+
         if (json.success) {
           renderKeywords(json.data);
           updateKeywordStats(json.data);
+        } else {
+          console.error("Failed to load keywords:", json.error);
         }
       } catch (error) {
         console.error("Error loading keywords:", error);
@@ -11894,7 +12013,7 @@
       const tbody = document.getElementById("emails-table");
       if (emails.length === 0) {
         tbody.innerHTML =
-          '<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">📧</div>No emails found yet</td></tr>';
+          '<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">📧</div>No emails found yet</td></tr>';
         document.getElementById("emails-pagination").style.display = "none";
         document.getElementById("emails-bulk-actions").style.display = "none";
         return;
@@ -11918,6 +12037,9 @@
             <div class="site-url-cell">
               <a href="${escapeHtml(e.site_url)}" target="_blank" class="site-url">${escapeHtml(truncate(e.site_url, 45))}</a>
             </div>
+          </td>
+          <td>
+            ${e.ai_actual_category ? `<span class="site-category-badge">${escapeHtml(e.ai_actual_category)}</span>` : '<span style="color: var(--text-tertiary); font-size: 12px;">-</span>'}
           </td>
           <td>
             <span class="site-status-badge ${e.is_wordpress ? "wordpress" : "not-verified"}">
@@ -13279,32 +13401,49 @@
       const limitInput = document.getElementById("keyword-limit");
 
       try {
+        console.log("Submitting keyword:", { keyword, max_sites, API_BASE });
         const res = await fetch(`${API_BASE}/keywords`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keyword, max_sites }),
         });
+
+        console.log("Response status:", res.status, res.statusText);
         const json = await res.json();
+        console.log("Response JSON:", json);
+
         if (json.success) {
           input.value = "";
           limitInput.value = "";
-          loadKeywords();
+          await loadKeywords();
           showToast(`Keyword "${keyword}" added successfully`, "success");
         } else {
-          alert(json.error || "Failed to add keyword");
+          console.error("Server error:", json.error);
+          showToast(json.error || "Failed to add keyword", "error");
         }
       } catch (error) {
-        alert("Error adding keyword");
+        console.error("Network error:", error);
+        showToast("Error adding keyword: " + error.message, "error");
       }
     }
 
     async function deleteKeyword(id) {
       if (!confirm("Delete this keyword?")) return;
       try {
-        await fetch(`${API_BASE}/keywords/${id}`, { method: "DELETE" });
-        loadKeywords();
+        console.log("Deleting keyword:", id);
+        const res = await fetch(`${API_BASE}/keywords/${id}`, { method: "DELETE" });
+        const json = await res.json();
+        console.log("Delete response:", json);
+
+        if (json.success || res.ok) {
+          await loadKeywords();
+          showToast("Keyword deleted successfully", "success");
+        } else {
+          showToast(json.error || "Failed to delete keyword", "error");
+        }
       } catch (error) {
-        alert("Error deleting keyword");
+        console.error("Delete error:", error);
+        showToast("Error deleting keyword: " + error.message, "error");
       }
     }
 
@@ -13617,14 +13756,19 @@
       }
     }
 
+    let selectedIgnoredTagIds = new Set();
+
     async function loadIgnoredTags() {
       try {
         const res = await fetch(`${API_BASE}/ignored-tags`);
         const { data } = await res.json();
         const grid = document.getElementById('ignored-tags-grid');
         const countBadge = document.getElementById('ignored-total-count');
+        const selectAllCheckbox = document.getElementById('ignored-tags-select-all');
 
         if (data.length === 0) {
+          if (selectAllCheckbox) selectAllCheckbox.checked = false;
+          clearIgnoredTagSelection();
           grid.innerHTML = `
               <div class="empty-state-large">
                 <div class="empty-state-icon">🏷️</div>
@@ -13638,7 +13782,17 @@
 
         if (countBadge) countBadge.textContent = data.length;
 
+        // Reset select all if some tags were deleted
+        const allLoadedIds = data.map(t => t.id);
+        const filteredSelection = new Set();
+        selectedIgnoredTagIds.forEach(id => {
+          if (allLoadedIds.includes(id)) filteredSelection.add(id);
+        });
+        selectedIgnoredTagIds = filteredSelection;
+        updateIgnoredTagSelectionUI();
+
         grid.innerHTML = data.map(tag => {
+          const isSelected = selectedIgnoredTagIds.has(tag.id);
           const matchTypeLabel = {
             'contains': 'Contains',
             'exact': 'Exact',
@@ -13652,7 +13806,10 @@
           }[tag.scope] || tag.scope;
 
           return `
-              <div class="tag-card" id="ignored-tag-card-${tag.id}">
+              <div class="tag-card ${isSelected ? 'selected' : ''}" id="ignored-tag-card-${tag.id}" onclick="handleTagCardClick(${tag.id}, event)">
+                <div class="tag-card-selection">
+                  <input type="checkbox" class="tag-row-check" data-id="${tag.id}" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleIgnoredTagSelection(${tag.id})">
+                </div>
                 <div class="tag-card-header">
                   <div class="tag-icon">🏷️</div>
                   <div class="tag-info">
@@ -13885,6 +14042,7 @@
         const res = await fetch(`${API_BASE}/ignored-tags/${id}`, { method: 'DELETE' });
         const json = await res.json();
         if (json.success) {
+          selectedIgnoredTagIds.delete(id);
           loadIgnoredTags();
           showToast('Tag removed from ignore list', 'success');
         } else {
@@ -13892,6 +14050,127 @@
         }
       } catch (error) {
         showToast('Error removing ignored tag', 'error');
+      }
+    }
+
+    function handleTagCardClick(id, event) {
+      // If clicking a button or checkbox, ignore
+      if (event.target.closest('button') || event.target.closest('input[type="checkbox"]')) return;
+      toggleIgnoredTagSelection(id);
+    }
+
+    function toggleIgnoredTagSelection(id) {
+      if (selectedIgnoredTagIds.has(id)) {
+        selectedIgnoredTagIds.delete(id);
+      } else {
+        selectedIgnoredTagIds.add(id);
+      }
+      updateIgnoredTagSelectionUI();
+
+      // Update card visual state
+      const card = document.getElementById(`ignored-tag-card-${id}`);
+      const checkbox = card?.querySelector('.tag-row-check');
+      if (card) card.classList.toggle('selected', selectedIgnoredTagIds.has(id));
+      if (checkbox) checkbox.checked = selectedIgnoredTagIds.has(id);
+    }
+
+    function toggleSelectAllIgnoredTags() {
+      const selectAllCheckbox = document.getElementById("ignored-tags-select-all");
+      const checkboxes = document.querySelectorAll(".tag-row-check");
+
+      checkboxes.forEach((cb) => {
+        const id = parseInt(cb.dataset.id);
+        cb.checked = selectAllCheckbox.checked;
+        if (selectAllCheckbox.checked) {
+          selectedIgnoredTagIds.add(id);
+        } else {
+          selectedIgnoredTagIds.delete(id);
+        }
+
+        // Update card visual state
+        const card = document.getElementById(`ignored-tag-card-${id}`);
+        if (card) card.classList.toggle('selected', selectAllCheckbox.checked);
+      });
+
+      updateIgnoredTagSelectionUI();
+    }
+
+    function updateIgnoredTagSelectionUI() {
+      const bulkActions = document.getElementById("ignored-tags-bulk-actions");
+      const selectedCount = document.getElementById("ignored-tags-selected-count");
+      const count = selectedIgnoredTagIds.size;
+
+      if (bulkActions) bulkActions.style.display = count > 0 ? "flex" : "none";
+      if (selectedCount) selectedCount.textContent = `${count} tag${count !== 1 ? 's' : ''} selected`;
+
+      // Update select all checkbox state
+      const selectAllCheckbox = document.getElementById("ignored-tags-select-all");
+      const totalCheckboxes = document.querySelectorAll(".tag-row-check").length;
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = count > 0 && count === totalCheckboxes;
+        selectAllCheckbox.indeterminate = count > 0 && count < totalCheckboxes;
+      }
+    }
+
+    function clearIgnoredTagSelection() {
+      selectedIgnoredTagIds.clear();
+      const selectAllCheckbox = document.getElementById("ignored-tags-select-all");
+      if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+      document.querySelectorAll(".tag-card").forEach(card => card.classList.remove('selected'));
+      document.querySelectorAll(".tag-row-check").forEach(cb => cb.checked = false);
+
+      updateIgnoredTagSelectionUI();
+    }
+
+    async function bulkDeleteIgnoredTags() {
+      const ids = Array.from(selectedIgnoredTagIds);
+      if (ids.length === 0) return;
+
+      if (!confirm(`Are you sure you want to delete ${ids.length} selected tag(s)?`)) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/ignored-tags-bulk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Server returned ${res.status}: ${text.substring(0, 50)}`);
+        }
+
+        const json = await res.json();
+
+        if (json.success) {
+          showToast(json.message || `Successfully deleted ${ids.length} tags`, 'success');
+          clearIgnoredTagSelection();
+          loadIgnoredTags();
+        } else {
+          showToast(json.error || 'Failed to delete tags', 'error');
+        }
+      } catch (error) {
+        console.error('Bulk delete error:', error);
+        showToast(`Bulk delete failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function deleteAllIgnoredTags() {
+      if (!confirm('Are you sure you want to clear the ENTIRE ignored tags list? This action cannot be undone.'))
+        return;
+      try {
+        const res = await fetch(`${API_BASE}/ignored-tags`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          selectedIgnoredTagIds.clear();
+          loadIgnoredTags();
+          showToast(json.message || 'All ignored tags removed', 'success');
+        } else {
+          showToast(json.error || 'Failed to clear ignored tags', 'error');
+        }
+      } catch (error) {
+        showToast('Error clearing ignored tags', 'error');
       }
     }
 
@@ -16442,26 +16721,19 @@
     let templateSelectorAction = "queue"; // 'queue' or 'start'
 
     function toggleSelectAllEmails() {
-      const selectAll = document.getElementById("email-select-all");
-      const headerCheck = document.getElementById("email-header-check");
+      const selectAll = document.getElementById("emails-select-all");
+      const isChecked = selectAll ? selectAll.checked : false;
+
       const checkboxes = document.querySelectorAll(".email-row-check");
-
-      // Determine which checkbox was clicked and use its state
-      const isChecked = selectAll?.checked || headerCheck?.checked || false;
-
-      // Sync both select-all checkboxes
-      if (selectAll) selectAll.checked = isChecked;
-      if (headerCheck) headerCheck.checked = isChecked;
-
-      // Update all row checkboxes and the Set
       selectedEmailIds.clear();
+
       checkboxes.forEach((cb) => {
         cb.checked = isChecked;
         if (isChecked) {
           selectedEmailIds.add(parseInt(cb.dataset.id));
         }
       });
-      updateSelectedCount();
+      updateEmailSelectionUI();
     }
 
     function updateEmailSelection() {
@@ -16475,11 +16747,6 @@
       });
 
       updateEmailSelectionUI();
-    }
-
-    function updateSelectedCount() {
-      const countEl = document.getElementById("email-selected-count");
-      if (countEl) countEl.textContent = `${selectedEmailIds.size} selected`;
     }
 
     function toggleQueueSettings() {
@@ -16879,15 +17146,11 @@
         if (json.success) {
           showToast(json.message, "success");
           selectedEmailIds.clear();
-          updateSelectedCount();
           // Uncheck all
           document
             .querySelectorAll(".email-row-check")
             .forEach((cb) => (cb.checked = false));
-          const selectAll = document.getElementById("email-select-all");
-          const headerCheck = document.getElementById("email-header-check");
-          if (selectAll) selectAll.checked = false;
-          if (headerCheck) headerCheck.checked = false;
+          updateEmailSelectionUI();
 
           // Refresh
           loadEmails();
@@ -16926,14 +17189,10 @@
         if (json.success) {
           showToast(json.message, "success");
           selectedEmailIds.clear();
-          updateSelectedCount();
           document
             .querySelectorAll(".email-row-check")
             .forEach((cb) => (cb.checked = false));
-          const selectAll = document.getElementById("email-select-all");
-          const headerCheck = document.getElementById("email-header-check");
-          if (selectAll) selectAll.checked = false;
-          if (headerCheck) headerCheck.checked = false;
+          updateEmailSelectionUI();
           loadEmails();
           refreshEmailQueueStats();
         } else {
@@ -17730,7 +17989,7 @@
 
     async function loadEmailHistory() {
       const tableBody = document.getElementById('email-history-table');
-      tableBody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">⏳</div>Loading...</td></tr>';
+      tableBody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">⏳</div>Loading...</td></tr>';
 
       try {
         let status = currentHistoryTab === 'all' ? '' : currentHistoryTab;
@@ -17760,8 +18019,12 @@
         // Build URL params
         let url = `${API_BASE}/email/queue/history?limit=${historyPageSize}&offset=${historyCurrentPage * historyPageSize}`;
         if (status) url += `&status=${status}`;
-        if (startDate) url += `&startDate=${startDate}`;
-        if (endDate) url += `&endDate=${endDate}`;
+
+        // Don't apply date filters for scheduled tab - we want to see the whole future queue
+        if (status !== 'scheduled') {
+          if (startDate) url += `&startDate=${startDate}`;
+          if (endDate) url += `&endDate=${endDate}`;
+        }
 
         const res = await fetch(url);
         const json = await res.json();
@@ -17772,10 +18035,10 @@
           updateHistoryPagination();
           updateHistoryCounts();
         } else {
-          tableBody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">❌</div>${json.error || 'Failed to load history'}</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">❌</div>${json.error || 'Failed to load history'}</td></tr>`;
         }
       } catch (e) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">❌</div>Error loading history</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">❌</div>Error loading history</td></tr>`;
       }
     }
 
@@ -17783,7 +18046,7 @@
       const tableBody = document.getElementById('email-history-table');
 
       if (!items || items.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">📭</div>No emails found</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">📭</div>No emails found</td></tr>`;
         return;
       }
 
@@ -17871,6 +18134,9 @@
         return `
           <tr>
             <td>${item.id}</td>
+            <td>
+              ${item.site_url ? `<a href="${escapeHtml(item.site_url)}" target="_blank" class="table-link" style="max-width: 150px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${escapeHtml(item.site_url)}</a>` : '-'}
+            </td>
             <td>${escapeHtml(item.recipient_email)}</td>
             <td>${escapeHtml(item.subject || '(No subject)')}</td>
             <td><span class="status-badge ${color}">${icon} ${item.status}</span></td>
@@ -17921,7 +18187,7 @@
     async function updateHistoryCounts() {
       try {
         // Get counts for each status
-        const statuses = ['sent', 'failed', 'queued'];
+        const statuses = ['sent', 'failed', 'queued', 'cancelled'];
         for (const status of statuses) {
           const res = await fetch(`${API_BASE}/email/queue/items?status=${status}`);
           const json = await res.json();

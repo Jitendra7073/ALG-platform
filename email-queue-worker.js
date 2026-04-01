@@ -212,13 +212,26 @@ class EmailQueueWorker {
         });
       }
 
+      // Final variable replacement for sender-specific variables
+      let subject = emailData.subject;
+      let html = emailData.html_content;
+      let text = emailData.text_content || "";
+
+      const senderName = sender.name || "";
+      [subject, html, text] = [subject, html, text].map(content => {
+        if (!content) return content;
+        return content
+          .split('{{sender_name}}').join(senderName)
+          .split('{{receiver_name}}').join(senderName); // Alias as requested by user
+      });
+
       // Send email
       const mailOptions = {
         from: sender.email,
         to: emailData.recipient_email,
-        subject: emailData.subject,
-        html: emailData.html_content,
-        text: emailData.text_content,
+        subject: subject,
+        html: html,
+        text: text,
       };
 
       const info = await transporter.sendMail(mailOptions);
@@ -284,6 +297,23 @@ class EmailQueueWorker {
       `,
         [sender.id, email.id],
       );
+
+      // 🔔 Added: Update contact send log history
+      if (email.contact_id && email.campaign_id) {
+          try {
+              // Convert sequence_position (1, 2, 3...) to send_type (main, followup_1, followup_2...)
+              const sequencePos = email.sequence_position || 1;
+              const sendType = sequencePos === 1 ? 'main' : `followup_${sequencePos - 1}`;
+              
+              db.run(`
+                  UPDATE email_send_log 
+                  SET status = 'sent', sent_at = CURRENT_TIMESTAMP 
+                  WHERE contact_id = ? AND campaign_id = ? AND send_type = ?
+              `, [email.contact_id, email.campaign_id, sendType]);
+          } catch (logError) {
+              console.warn("⚠️  Could not update email_send_log history:", logError.message);
+          }
+      }
 
       // Update sender counter
       db.run(

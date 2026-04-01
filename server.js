@@ -332,6 +332,21 @@ app.put("/api/ignored-tags/:id", (req, res) => {
   }
 });
 
+
+// Delete all ignored tags
+app.delete("/api/ignored-tags", (req, res) => {
+  try {
+    const deletedCount = db.deleteAllIgnoredTags();
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} ignored tags successfully`,
+      count: deletedCount
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Delete ignored tag
 app.delete("/api/ignored-tags/:id", (req, res) => {
   try {
@@ -346,12 +361,39 @@ app.delete("/api/ignored-tags/:id", (req, res) => {
   }
 });
 
+
+// Bulk delete ignored tags
+app.post("/api/ignored-tags-bulk", (req, res) => {
+  try {
+    const { ids } = req.body;
+    console.log(`🗑️  Bulk delete triggered for ${ids?.length || 0} tags:`, ids);
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      console.error("❌ Bulk delete failed: No IDs provided");
+      return res.status(400).json({ success: false, error: "IDs must be a non-empty array" });
+    }
+    const deletedCount = db.bulkDeleteIgnoredTags(ids);
+    console.log(`✅ Bulk delete successful: ${deletedCount} tags removed`);
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} ignored tags successfully`,
+      count: deletedCount
+    });
+  } catch (error) {
+    console.error("❌ Bulk delete error:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Get all keywords
 app.get("/api/keywords", (req, res) => {
   try {
+    console.log("GET /api/keywords - Fetching all keywords");
     const keywords = db.getAllKeywords();
+    console.log("Found keywords:", keywords.length);
     res.json({ success: true, data: keywords });
   } catch (error) {
+    console.error("Error fetching keywords:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -359,8 +401,10 @@ app.get("/api/keywords", (req, res) => {
 // Add keyword
 app.post("/api/keywords", (req, res) => {
   try {
+    console.log("POST /api/keywords - Received request:", req.body);
     const { keyword, max_sites } = req.body;
     if (!keyword || keyword.trim() === "") {
+      console.log("Keyword validation failed - empty keyword");
       return res
         .status(400)
         .json({ success: false, error: "Keyword is required" });
@@ -375,9 +419,12 @@ app.post("/api/keywords", (req, res) => {
     } else {
       limit = 20; // Default
     }
+    console.log("Adding keyword:", { keyword, limit });
     const result = db.addKeyword(keyword, limit);
+    console.log("Keyword added successfully:", result);
     res.json({ success: true, data: result });
   } catch (error) {
+    console.error("Error adding keyword:", error);
     if (error.message.includes("UNIQUE")) {
       res.status(400).json({ success: false, error: "Keyword already exists" });
     } else {

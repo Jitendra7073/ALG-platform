@@ -7,9 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a **lead generation and outreach automation system** that:
 1. Searches Google for keywords and detects WordPress sites
 2. Extracts contact information (emails, phones, LinkedIn) from websites
-3. Scrapes LinkedIn company pages for executive information
-4. Uses AI to verify content relevance and generate summaries
+3. Scrapes LinkedIn company pages for executive information (Founder 1-3, CEO, CTO)
+4. Uses AI (OpenRouter) to verify WordPress detection and content relevance
 5. Provides an email queue system with templates for automated outreach
+6. Supports LinkedIn credentials management via admin panel
 
 All data is stored in a SQLite database (`wordpress-detector.db`) and managed via a web admin panel.
 
@@ -99,6 +100,9 @@ node reset-db.js        # Clear and reset database
 node migrate-ai-fields.js # Migrate database for AI fields
 node queue-pending-ai.js # Manually queue sites for AI processing
 
+# LinkedIn credentials setup
+node setup-linkedin-credentials.js  # Initialize LinkedIn credentials table
+
 # Email system setup
 node setup-email-system.js # Initialize email tables
 ```
@@ -125,8 +129,9 @@ node setup-email-system.js # Initialize email tables
 
 4. **`ai-client.js`** - OpenRouter-based AI client
    - Single integration point for AI operations
-   - Verifies WordPress detection and checks content relevance
+   - Performs TWO tasks: (1) WordPress verification, (2) Content relevance check
    - Uses `OPENROUTER_API_KEY` from `.env`
+   - Default model: `openai/gpt-4o-mini` (configurable via `OPENROUTER_MODEL`)
 
 5. **`ai-processor.js`** - Background worker for AI processing
    - Auto-polls every 30 seconds for pending sites
@@ -146,14 +151,32 @@ node setup-email-system.js # Initialize email tables
 
 ### Database Tables
 
-- **`searches`** - Tracks each search run (query, counts, timestamp)
+- **`searches`** - Tracks each search run (query, country, counts, timestamp)
 - **`sites`** - Individual site checks (WordPress detection, contacts, AI analysis)
+- **`keywords`** - Keyword management (status, max_sites setting)
+- **`contacts`** - Unified contact storage (email, phone, LinkedIn types)
+- **`company_executives`** - LinkedIn scraped executives (name, headline, role_category)
+- **`excluded_domains`** - Domain-level blocking rules
+- **`ignored_tags`** - Tag-based filtering (match_type, scope)
+- **`linkedin_credentials`** - LinkedIn accounts for scraper (single-active)
 - **`email_senders`** - Email accounts for sending
 - **`email_templates`** - Email templates with HTML content
 - **`email_campaigns`** - Email campaigns targeting sites
 - **`email_queue`** - Queued emails with status tracking
+- **`email_send_log`** - Email sending history
 
 ## Key Implementation Details
+
+### Database Access Patterns
+- **Singleton Pattern**: `database.js` exports `getSharedDb()` for persistent connection
+- Email modules (`email-queue-worker.js`, `email-senders-templates-api.js`) use direct wrapper functions: `run()`, `all()`, `get()`, `prepare()`
+- Most other modules use `initDatabase()` which opens a new connection (remember to close!)
+- Foreign keys are temporarily disabled during bulk operations (`PRAGMA foreign_keys = OFF`)
+
+### URL Normalization & Duplicate Detection
+- URLs are normalized before storage to detect duplicates
+- Normalization removes: protocol, www, trailing slash, hash fragments, tracking params (utm_*, gclid, etc.)
+- Use `urlExists()` or `getAllExistingUrls()` before adding new sites
 
 ### WordPress Detection
 Checks for these indicators in page HTML:
@@ -172,6 +195,25 @@ Checks for these indicators in page HTML:
 2. AI processor polls for pending sites every 30 seconds
 3. For each site, runs AI analysis for content relevance
 4. Updates site with: `ai_status`, `ai_content_relevant`, `ai_actual_category`, `ai_content_summary`
+
+### LinkedIn Credentials Management
+- Credentials stored in `linkedin_credentials` table
+- Single-active enforcement (only one credential active at a time)
+- UI toggle switches for easy account switching
+- Automatic login in scraper using active credential
+- Tracks `last_used` timestamp for each credential
+- First-time setup: Add credentials via admin panel at `http://localhost:8080` → LinkedIn tab
+
+### Filtering System
+- **Excluded Domains**: Domain-level blocking (e.g., `youtube.com` blocks all subdomains)
+- **Ignored Tags**: Tag-based filtering with match types (contains, exact, regex)
+- Both can be managed via admin panel UI
+
+### Company Executives Structure
+- LinkedIn scraper extracts executives grouped into fixed slots:
+  - Founder 1, Founder 2, Founder 3 (founder > co-founder > owner priority)
+  - CEO, CTO
+- Stored in `company_executives` table with role categories
 
 ### Email Queue Worker
 - Checks for queued emails every 30 seconds
@@ -192,6 +234,8 @@ GMAIL_USER=your@gmail.com
 GMAIL_APP_PASSWORD=your_app_password
 ```
 
+**Note**: The AI system uses OpenRouter as a single provider. The `ai-client.js` module handles all AI operations including WordPress verification and content relevance checking.
+
 ## Frontend
 
 Admin panel served from `public/` directory:
@@ -206,7 +250,8 @@ Admin panel served from `public/` directory:
 - Always check if page/context is still valid before scraping (handles browser crashes)
 - AI processor only processes sites where `text_content` is not empty
 - Email worker uses `getSharedDb()` which keeps a persistent connection
-- Database migrations may be needed after code updates (see `migrate-ai-fields.js`)
+- Database migrations are handled automatically in `database.js` (columns added if missing)
+- Country code defaults to `'in'` for searches (stored in searches/sites tables)
 
 ### When Adding Features
 - Check if similar functionality already exists before creating new code
@@ -219,6 +264,8 @@ Admin panel served from `public/` directory:
 - Add delays between requests to avoid rate limiting
 - Handle popups, cookie banners, and dynamic content
 - Log useful info for debugging (URLs, selectors found, errors)
+- **LinkedIn scraper**: Requires active credential in database (see LinkedIn Credentials Management above)
+- **LinkedIn scraper**: Handles 2FA/checkpoints by showing error with manual login instructions
 
 ### When Working with Database
 - Use prepared statements (already pattern in codebase)
@@ -228,6 +275,14 @@ Admin panel served from `public/` directory:
 
 ### When Updating AI Features
 - AI processor runs as background worker - changes affect running process
-- Prompt engineering matters - test prompts with real data
-- Track token usage and costs
+- `ai-client.js` uses OpenRouter API with JSON response format
+- Two main AI tasks: (1) WordPress verification, (2) Content relevance check
+- Predefined categories are enforced in the prompt
+- Track token usage and costs via `aiClient.getStats()`
 - Handle AI failures gracefully (retry, fallback, mark as failed)
+
+### AI Prompt Engineering
+- Prompts are defined in `ai-client.js` in the `analyzeSite()` method
+- STRICT relevance rules: blog posts about a topic ≠ service providers for that topic
+- Examples in prompt help guide AI decisions
+- JSON schema is enforced via OpenRouter's response_format

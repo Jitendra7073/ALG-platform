@@ -1804,6 +1804,8 @@ Available template variables (use these where appropriate):
 - {{domain}} - Their domain name
 - {{date}} - Today's date
 - {{year}} - Current year
+- {{sender_name}} - Your sender's name (from account settings)
+- {{receiver_name}} - Alias for your sender's name
 
 Return JSON:
 {
@@ -2818,11 +2820,19 @@ router.get("/send-log", (req, res) => {
              esl.sent_at as last_sent, et.name as template_name
       FROM email_send_log esl
       LEFT JOIN email_templates et ON esl.template_id = et.id
-      INNER JOIN (
-        SELECT contact_id, MAX(rowid) as max_rowid
-        FROM email_send_log
-        GROUP BY contact_id
-      ) latest ON esl.contact_id = latest.contact_id AND esl.rowid = latest.max_rowid
+      WHERE esl.rowid IN (
+        SELECT id FROM (
+          SELECT rowid as id, contact_id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY contact_id 
+                   ORDER BY 
+                     CASE WHEN status = 'sent' THEN 0 ELSE 1 END ASC, -- Sent is priority
+                     CASE WHEN status = 'sent' THEN rowid END DESC,   -- Latest sent
+                     rowid ASC                                        -- Or earliest queued
+                 ) as rank
+          FROM email_send_log
+        ) WHERE rank = 1
+      )
       ORDER BY esl.sent_at DESC
     `);
     // Convert to a map for quick lookup
@@ -2873,6 +2883,18 @@ router.get("/queue/items", (req, res) => {
         LEFT JOIN email_senders es ON eq.sender_id = es.id
         LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
         WHERE eq.status = 'failed'
+        ORDER BY eq.created_at DESC
+      `;
+    } else if (status === "cancelled") {
+      sql = `
+        SELECT eq.id, eq.recipient_email, eq.subject, eq.status, eq.attempts,
+               eq.error_message, eq.sent_at, eq.created_at,
+               es.name as sender_name, es.email as sender_email,
+               ec.name as campaign_name
+        FROM email_queue eq
+        LEFT JOIN email_senders es ON eq.sender_id = es.id
+        LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+        WHERE eq.status = 'cancelled'
         ORDER BY eq.created_at DESC
       `;
     } else if (status === "scheduled") {
@@ -3148,10 +3170,13 @@ router.get("/queue/history", (req, res) => {
       SELECT eq.id, eq.recipient_email, eq.subject, eq.status, eq.attempts,
              eq.error_message, eq.sent_at, eq.created_at, eq.scheduled_at,
              es.name as sender_name, es.email as sender_email,
-             ec.name as campaign_name
+             ec.name as campaign_name,
+             s.url as site_url
       FROM email_queue eq
       LEFT JOIN email_senders es ON eq.sender_id = es.id
       LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+      LEFT JOIN contacts c ON c.id = eq.contact_id OR (eq.contact_id IS NULL AND c.value = eq.recipient_email AND c.type = 'email')
+      LEFT JOIN sites s ON c.site_id = s.id
       WHERE 1=1
     `;
     const params = [];
@@ -3159,17 +3184,31 @@ router.get("/queue/history", (req, res) => {
 
     // Status filter
     if (status && status !== 'all') {
-      conditions.push('eq.status = ?');
-      params.push(status);
+      if (status === 'scheduled') {
+        conditions.push("(eq.scheduled_at > CURRENT_TIMESTAMP AND eq.status IN ('queued', 'paused', 'sending'))");
+      } else if (status === 'queued') {
+        // For regular queued, exclude future scheduled items
+        conditions.push("(eq.status = 'queued' AND (eq.scheduled_at IS NULL OR eq.scheduled_at <= CURRENT_TIMESTAMP))");
+      } else {
+        conditions.push('eq.status = ?');
+        params.push(status);
+      }
     }
 
     // Date range filter
+    let dateColumn = 'eq.created_at';
+    if (status === 'sent') {
+      dateColumn = 'eq.sent_at';
+    } else if (status === 'scheduled') {
+      dateColumn = 'eq.scheduled_at';
+    }
+
     if (startDate) {
-      conditions.push('date(eq.created_at) >= date(?)');
+      conditions.push(`date(${dateColumn}) >= date(?)`);
       params.push(startDate);
     }
     if (endDate) {
-      conditions.push('date(eq.created_at) <= date(?)');
+      conditions.push(`date(${dateColumn}) <= date(?)`);
       params.push(endDate);
     }
 
@@ -3177,7 +3216,16 @@ router.get("/queue/history", (req, res) => {
       sql += ' AND ' + conditions.join(' AND ');
     }
 
-    sql += ' ORDER BY eq.created_at DESC LIMIT ? OFFSET ?';
+    let orderClause = 'ORDER BY eq.created_at DESC';
+    if (status === 'sent') {
+      orderClause = 'ORDER BY eq.sent_at DESC';
+    } else if (status === 'scheduled') {
+      orderClause = 'ORDER BY eq.scheduled_at ASC';
+    } else if (status === 'all') {
+      orderClause = 'ORDER BY COALESCE(eq.sent_at, eq.created_at) DESC';
+    }
+
+    sql += ' ' + orderClause + ' LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
     const items = db.all(sql, params);
