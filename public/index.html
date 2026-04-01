@@ -5081,6 +5081,234 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* Email Period Filter Buttons */
+    .email-period-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .email-period-btn:hover {
+      background: var(--bg-tertiary);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .email-period-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    /* Status Breakdown Items */
+    .status-breakdown-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border-radius: 8px;
+      gap: 8px;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .status-indicator.sent {
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+    }
+
+    .status-indicator.sending {
+      background: #3b82f6;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .status-indicator.queued {
+      background: #eab308;
+      box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.1);
+    }
+
+    .status-indicator.paused {
+      background: #9ca3af;
+      box-shadow: 0 0 0 4px rgba(156, 163, 175, 0.1);
+    }
+
+    .status-indicator.failed {
+      background: #ef4444;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+    }
+
+    .status-indicator.cancelled {
+      background: #6b7280;
+      box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.1);
+    }
+
+    .status-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: capitalize;
+    }
+
+    .status-count {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    /* Timezone Status Cards */
+    .timezone-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.2s ease;
+    }
+
+    .timezone-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .timezone-card.ready-to-send {
+      border-color: #22c55e;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.05), rgba(34, 197, 94, 0.02));
+    }
+
+    .timezone-card.outside-hours {
+      border-color: var(--border-default);
+      opacity: 0.8;
+    }
+
+    .timezone-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .timezone-country {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timezone-flag {
+      font-size: 24px;
+    }
+
+    .timezone-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .timezone-status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge-open {
+      background: rgba(34, 197, 94, 0.1);
+      color: #22c55e;
+    }
+
+    .status-badge-closed {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    .status-badge-weekend {
+      background: rgba(234, 179, 8, 0.1);
+      color: #eab308;
+    }
+
+    .timezone-time {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .timezone-date {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .timezone-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .timezone-info-item {
+      background: var(--bg-tertiary);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .timezone-info-label {
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+
+    .timezone-info-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .timezone-summary {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .summary-stat {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .summary-icon {
+      font-size: 20px;
+    }
+
+    .summary-text {
+      font-size: 13px;
+    }
+
+    .summary-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .summary-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 
@@ -5581,7 +5809,7 @@
         <div class="insight-card">
           <div class="insight-header">
             <h3 class="insight-title">Contact Extraction</h3>
-            <span class="insight-icon">📊</span>
+            <span class="insight-icon"></span>
           </div>
           <div class="insight-body">
             <div class="contact-stats">
@@ -5628,55 +5856,174 @@
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div class="quick-actions-section">
-        <h3 class="section-title">Quick Actions</h3>
-        <div class="quick-actions-grid">
-          <button class="quick-action-btn" onclick="switchTab('keywords')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <!-- Email Statistics Section -->
+      <div style="margin-top: 40px; border-top: 2px solid var(--border-color); padding-top: 30px;">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="dashboard-title" style="font-size: 24px;">📧 Email Statistics</h2>
+            <p class="dashboard-subtitle">Track your email campaign performance and sending history</p>
+          </div>
+          <button class="refresh-btn" onclick="loadEmailDashboardStats()" title="Refresh Email Stats">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
-            <span>New Search</span>
+            Refresh
           </button>
-          <button class="quick-action-btn" onclick="switchTab('sites')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-            <span>Browse Sites</span>
+        </div>
+
+        <!-- Time Period Filter -->
+        <div style="margin-bottom: 24px; display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="email-period-btn active" data-period="today" onclick="filterEmailPeriod('today')">
+            Today
           </button>
-          <button class="quick-action-btn" onclick="switchTab('emails')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-              <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>
-            <span>View Emails</span>
+          <button class="email-period-btn" data-period="yesterday" onclick="filterEmailPeriod('yesterday')">
+            Yesterday
           </button>
-          <button class="quick-action-btn" onclick="switchTab('executives')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span>Executives</span>
+          <button class="email-period-btn" data-period="7days" onclick="filterEmailPeriod('7days')">
+            Last 7 Days
           </button>
-          <button class="quick-action-btn" onclick="switchTab('campaigns')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-            <span>Campaigns</span>
+          <button class="email-period-btn" data-period="15days" onclick="filterEmailPeriod('15days')">
+            Last 15 Days
           </button>
-          <button class="quick-action-btn" onclick="switchTab('ai-status')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
-              <path d="M12 12L2.5 17.5"></path>
-              <path d="M12 12V22"></path>
-            </svg>
-            <span>AI Status</span>
+          <button class="email-period-btn" data-period="30days" onclick="filterEmailPeriod('30days')">
+            Last 30 Days
           </button>
+          <button class="email-period-btn" data-period="all" onclick="filterEmailPeriod('all')">
+            All Time
+          </button>
+        </div>
+
+        <!-- Email Stats Cards -->
+        <div class="metrics-grid" style="margin-bottom: 24px;">
+          <div class="metric-card success">
+            <div class="metric-header">
+              <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <span class="metric-badge">Sent</span>
+            </div>
+            <div class="metric-value" id="email-sent-count">-</div>
+            <div class="metric-label" id="email-sent-label">Sent Today</div>
+          </div>
+
+          <div class="metric-card primary">
+            <div class="metric-header">
+              <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+              </div>
+              <span class="metric-badge">Total</span>
+            </div>
+            <div class="metric-value" id="email-total-count">-</div>
+            <div class="metric-label">Total Emails</div>
+          </div>
+
+          <div class="metric-card warning">
+            <div class="metric-header">
+              <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <span class="metric-badge">Queued</span>
+            </div>
+            <div class="metric-value" id="email-queued-count">-</div>
+            <div class="metric-label">Queued Emails</div>
+          </div>
+
+          <div class="metric-card secondary">
+            <div class="metric-header">
+              <div class="metric-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+              </div>
+              <span class="metric-badge">Failed</span>
+            </div>
+            <div class="metric-value" id="email-failed-count">-</div>
+            <div class="metric-label">Failed Emails</div>
+          </div>
+        </div>
+
+        <!-- Status-wise Breakdown -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+          <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 16px 0;">📊 Status-wise Breakdown</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+            <div class="status-breakdown-item">
+              <div class="status-indicator sent"></div>
+              <div class="status-label">Sent</div>
+              <div class="status-count" id="status-sent">0</div>
+            </div>
+            <div class="status-breakdown-item">
+              <div class="status-indicator sending"></div>
+              <div class="status-label">Sending</div>
+              <div class="status-count" id="status-sending">0</div>
+            </div>
+            <div class="status-breakdown-item">
+              <div class="status-indicator queued"></div>
+              <div class="status-label">Queued</div>
+              <div class="status-count" id="status-queued">0</div>
+            </div>
+            <div class="status-breakdown-item">
+              <div class="status-indicator paused"></div>
+              <div class="status-label">Paused</div>
+              <div class="status-count" id="status-paused">0</div>
+            </div>
+            <div class="status-breakdown-item">
+              <div class="status-indicator failed"></div>
+              <div class="status-label">Failed</div>
+              <div class="status-count" id="status-failed">0</div>
+            </div>
+            <div class="status-breakdown-item">
+              <div class="status-indicator cancelled"></div>
+              <div class="status-label">Cancelled</div>
+              <div class="status-count" id="status-cancelled">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Email History Table -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; overflow: hidden;">
+          <div style="padding: 20px; border-bottom: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="font-size: 16px; font-weight: 600; margin: 0;">📨 Recent Email Activity</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); margin: 5px 0 0 0;">Latest email sending history</p>
+            </div>
+            <button class="btn-primary" onclick="switchTab('emails')" style="padding: 8px 16px; border-radius: 6px; font-size: 13px;">
+              View All
+            </button>
+          </div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <thead>
+                <tr style="background: var(--bg-tertiary);">
+                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Status</th>
+                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Recipient</th>
+                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Subject</th>
+                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Sender</th>
+                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Sent At</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-email-history-table">
+                <tr>
+                  <td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                    <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+                    Loading...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -6030,6 +6377,54 @@
         </div>
       </div>
 
+      <!-- Timezone Status Dashboard -->
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h2 style="font-size: 18px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px;">
+               Global Timezone Status
+            </h2>
+            <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">
+              Current local times and email sending availability by country
+            </p>
+          </div>
+          <button class="btn-primary" onclick="loadTimezoneStatus()" style="padding: 8px 16px; border-radius: 6px; font-size: 13px;">
+            Refresh
+          </button>
+        </div>
+
+        <!-- Platform Rules Info -->
+        <div style="background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: start; gap: 12px;">
+            <span style="font-size: 16px;"></span>
+            <div>
+              <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Platform Sending Rules:</div>
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                • Emails are sent during recipient's <strong>business hours (9 AM - 5 PM local time)</strong><br>
+                • <strong>Weekends are automatically avoided</strong> (Saturday/Sunday for most countries)<br>
+                • System calculates optimal send time based on recipient's country/timezone<br>
+                • Respects cultural differences (e.g., UAE weekends: Friday-Saturday)<br>
+                • Maximum <strong>10-15 emails per hour</strong> per country to avoid spam filters
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timezone Grid -->
+        <div id="timezone-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+          <!-- Timezone cards will be loaded here -->
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);">
+            <div style="font-size: 24px; margin-bottom: 8px;"></div>
+            Loading timezone status...
+          </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div id="timezone-summary" style="margin-top: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
+          <!-- Will be populated by JavaScript -->
+        </div>
+      </div>
+
       <!-- Queue Stats Cards -->
       <div class="email-queue-stats" id="email-queue-stats-panel">
         <div class="queue-stat-card">
@@ -6308,15 +6703,81 @@
         </div>
 
         <!-- History Filters -->
-        <div class="filters-bar" style="margin-bottom: 15px;">
+        <div class="filters-bar" style="margin-bottom: 15px; flex-wrap: wrap;">
+          <!-- Date Type Filter -->
           <div class="filter-group">
-            <select class="filter-select" id="history-date-filter" onchange="loadEmailHistory()">
-              <option value="today">Today</option>
+            <select class="filter-select" id="history-date-type-filter" onchange="handleDateTypeChange()">
+              <option value="sent">Sent Date</option>
+              <option value="queue">Queue Date</option>
+              <option value="scheduled">Scheduled Date</option>
+              <option value="gap">Processing Gap</option>
+            </select>
+          </div>
+
+          <!-- Quick Date Filters -->
+          <div class="filter-group" id="quick-date-filters">
+            <select class="filter-select" id="history-date-filter" onchange="handleQuickDateFilter()">
+              <option value="custom">Custom Range</option>
+              <option value="today" selected>Today</option>
+              <option value="yesterday">Yesterday</option>
               <option value="week">Last 7 Days</option>
               <option value="month">Last 30 Days</option>
               <option value="all">All Time</option>
             </select>
           </div>
+
+          <!-- Gap-Based Filters (shown when gap is selected) -->
+          <div class="filter-group" id="gap-filters" style="display: none;">
+            <select class="filter-select" id="history-gap-filter" onchange="handleGapFilter()">
+              <option value="custom">Custom Range</option>
+              <option value="quick" selected>Quick Send (&lt;1 hour)</option>
+              <option value="same-day">Same Day (&lt;24 hours)</option>
+              <option value="delayed">Delayed (&gt;24 hours)</option>
+              <option value="very-delayed">Very Delayed (&gt;3 days)</option>
+              <option value="all">All Times</option>
+            </select>
+          </div>
+
+          <!-- Custom Date Range Picker -->
+          <div class="filter-group" id="custom-date-range" style="display: none; gap: 8px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">From:</label>
+              <input type="datetime-local" class="filter-select" id="history-start-datetime"
+                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">To:</label>
+              <input type="datetime-local" class="filter-select" id="history-end-datetime"
+                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
+            </div>
+            <button class="btn-primary" onclick="applyCustomDateRange()"
+                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              Apply
+            </button>
+            <button class="btn-secondary" onclick="clearCustomDateRange()"
+                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              Clear
+            </button>
+          </div>
+
+          <!-- Custom Gap Range Picker (shown when gap custom is selected) -->
+          <div class="filter-group" id="custom-gap-range" style="display: none; gap: 8px; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">Min (hours):</label>
+              <input type="number" class="filter-select" id="gap-min-hours" min="0" max="720" value="0"
+                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">Max (hours):</label>
+              <input type="number" class="filter-select" id="gap-max-hours" min="0" max="720" value="24"
+                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
+            </div>
+            <button class="btn-primary" onclick="applyCustomGapRange()"
+                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              Apply
+            </button>
+          </div>
+
           <div class="search-box">
             <input type="search" id="history-search" placeholder="Search history..." oninput="handleHistorySearch()">
           </div>
@@ -6327,20 +6788,21 @@
           <table>
             <thead>
               <tr>
-                <th style="width: 5%;">ID</th>
-                <th style="width: 15%;">Site</th>
-                <th style="width: 15%;">Recipient</th>
-                <th style="width: 20%;">Subject</th>
-                <th style="width: 10%;">Status</th>
-                <th style="width: 10%;">Sender</th>
-                <th style="width: 12%;">Date</th>
-                <th style="width: 8%;">Attempts</th>
-                <th style="width: 5%; text-align: center;">Actions</th>
+                <th style="width: 4%;">ID</th>
+                <th style="width: 14%;">Site</th>
+                <th style="width: 14%;">Recipient</th>
+                <th style="width: 18%;">Subject</th>
+                <th style="width: 9%;">Status</th>
+                <th style="width: 9%;">Sender</th>
+                <th style="width: 11%;">Date</th>
+                <th style="width: 10%;">Processing</th>
+                <th style="width: 7%;">Attempts</th>
+                <th style="width: 4%; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="email-history-table">
               <tr>
-                <td colspan="9" class="empty-state">
+                <td colspan="10" class="empty-state">
                   <div class="empty-state-icon">📨</div>
                   Select a tab to view email history
                 </td>
@@ -7482,7 +7944,7 @@
                 align-items: center;
                 gap: 8px;
               ">
-            🚀 Create New Campaign
+             Create New Campaign
           </div>
         </div>
         <form id="campaign-form" onsubmit="saveCampaign(event)" style="padding: 24px">
@@ -7575,7 +8037,7 @@
                 justify-content: flex-end;
               ">
             <button type="submit" class="btn btn-primary">
-              🚀 Create Campaign
+               Create Campaign
             </button>
           </div>
         </form>
@@ -7601,7 +8063,7 @@
                 align-items: center;
                 gap: 8px;
               ">
-            📊 Email Queue Status
+             Email Queue Status
           </div>
         </div>
         <div style="padding: 20px">
@@ -8105,7 +8567,7 @@
           </h3>
           <button onclick="loadAIHistory()" class="action-btn btn-secondary"
             style="padding: 6px 12px; font-size: 12px;">
-            🔄 Refresh
+             Refresh
           </button>
         </div>
         <div style="overflow-x: auto">
@@ -8738,15 +9200,15 @@
       <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
         <select id="console-type-filter" onchange="filterConsoleLogs()" style="flex: 1; min-width: 200px;">
           <option value="all">All Types</option>
-          <option value="info">ℹ️ Info</option>
-          <option value="success">✅ Success</option>
+          <option value="info"> Info</option>
+          <option value="success"> Success</option>
           <option value="warning">⚠️ Warning</option>
-          <option value="error">❌ Error</option>
+          <option value="error"> Error</option>
           <option value="ai">🤖 AI</option>
           <option value="scraper">🔍 Scraper</option>
           <option value="email">📧 Email</option>
           <option value="linkedin">💼 LinkedIn</option>
-          <option value="retry">🔄 Retry</option>
+          <option value="retry"> Retry</option>
           <option value="system">⚙️ System</option>
         </select>
         <input type="text" id="console-search" placeholder="Search logs..." onkeyup="searchConsoleLogs()"
@@ -8901,7 +9363,6 @@
                     font-size: 14px;
                   ">
                 <option value="gmail">Gmail</option>
-                <option value="outlook">Outlook/Hotmail</option>
                 <option value="custom">Custom SMTP</option>
               </select>
             </div>
@@ -8955,6 +9416,28 @@
                     border-radius: var(--radius-md);
                     font-size: 14px;
                   " />
+            </div>
+            <div id="smtp-user-group" style="display: none">
+              <label style="
+                    display: block;
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: var(--text-secondary);
+                    margin-bottom: 6px;
+                  ">SMTP Username (if different from email)</label>
+              <input type="text" name="smtp_user" placeholder="mainaccount@gmail.com" style="
+                    width: 100%;
+                    padding: 10px 12px;
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-medium);
+                    border-radius: var(--radius-md);
+                    font-size: 14px;
+                  " />
+              <small style="
+                    color: var(--text-muted);
+                    display: block;
+                    margin-top: 4px;
+                  ">For Gmail sub-emails: use main account email. Leave blank to use the same as sender email.</small>
             </div>
           </div>
         </div>
@@ -10309,7 +10792,7 @@
             justify-content: space-between;
             align-items: center;
           ">
-        <h3 style="font-size: 18px; font-weight: 600">🌍 Select Target Country</h3>
+        <h3 style="font-size: 18px; font-weight: 600"> Select Target Country</h3>
         <button onclick="closeCountryModal()" style="
               background: none;
               border: none;
@@ -10381,7 +10864,7 @@
               border-radius: 6px;
             "></div>
           <div style="font-size: 10px; opacity: 0.8; margin-top: 8px;">
-            💡 This is the actual Google search URL that will be used for scraping
+             This is the actual Google search URL that will be used for scraping
           </div>
         </div>
 
@@ -10401,7 +10884,7 @@
 
         <div style="display: flex; gap: 12px; justify-content: flex-end;">
           <button onclick="closeCountryModal()" class="btn btn-secondary" style="padding: 10px 20px;">Cancel</button>
-          <button onclick="confirmCountryAndStart()" class="btn btn-primary" style="padding: 10px 20px;">🚀 Start
+          <button onclick="confirmCountryAndStart()" class="btn btn-primary" style="padding: 10px 20px;"> Start
             Scraping</button>
         </div>
       </div>
@@ -10900,7 +11383,7 @@
         </button>
         <button class="action-btn btn-primary" onclick="submitScheduleQueue()"
           style="padding: 8px 16px; border-radius: 8px">
-          ✅ Confirm Schedule
+           Confirm Schedule
         </button>
       </div>
     </div>
@@ -11015,7 +11498,7 @@
     function switchTab(tab, updateUrl = true) {
       currentTab = tab;
 
-      // ✅ Update URL to preserve tab state across refreshes
+      //  Update URL to preserve tab state across refreshes
       // Skip URL update if handling browser back/forward button
       if (updateUrl) {
         const url = new URL(window.location);
@@ -11040,6 +11523,11 @@
         .forEach((content) => content.classList.remove("active"));
       document.getElementById(`tab-${tab}`).classList.add("active");
 
+      // Stop timezone auto-refresh when leaving emails tab
+      if (currentTab === 'emails' && tab !== 'emails') {
+        stopTimezoneAutoRefresh();
+      }
+
       if (tab === "dashboard") loadDashboard();
       else if (tab === "keywords") loadKeywords();
       else if (tab === "excluded") loadExcludedDomains();
@@ -11053,6 +11541,7 @@
         refreshEmailQueueStats();
         loadQueueSettings();
         loadEmailHistory();
+        loadTimezoneStatus();
       } else if (tab === "phones") loadPhones();
       else if (tab === "linkedin") loadLinkedin();
       else if (tab === "linkedin-credentials") loadLinkedInCredentials();
@@ -11216,9 +11705,188 @@
           renderRecentSearches(recent.data);
         }
 
+        // Load Email Statistics
+        loadEmailDashboardStats();
+
       } catch (error) {
         console.error("Error loading dashboard:", error);
       }
+    }
+
+    // Email period filter state
+    let currentEmailPeriod = 'today';
+
+    // Filter email statistics by period
+    function filterEmailPeriod(period) {
+      currentEmailPeriod = period;
+
+      // Update active button
+      document.querySelectorAll('.email-period-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`.email-period-btn[data-period="${period}"]`).classList.add('active');
+
+      // Reload stats with new period
+      loadEmailDashboardStats();
+    }
+
+    // Calculate date range for period
+    function getDateRangeForPeriod(period) {
+      const today = new Date();
+      const startDate = new Date();
+      const endDate = new Date();
+
+      switch (period) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'yesterday':
+          startDate.setDate(today.getDate() - 1);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setDate(today.getDate() - 1);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case '7days':
+          startDate.setDate(today.getDate() - 7);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case '15days':
+          startDate.setDate(today.getDate() - 15);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case '30days':
+          startDate.setDate(today.getDate() - 30);
+          startDate.setHours(0, 0, 0, 0);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case 'all':
+          return null; // No date filter
+      }
+
+      return {
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0]
+      };
+    }
+
+    // Get period label
+    function getPeriodLabel(period) {
+      const labels = {
+        today: 'Sent Today',
+        yesterday: 'Sent Yesterday',
+        '7days': 'Sent (Last 7 Days)',
+        '15days': 'Sent (Last 15 Days)',
+        '30days': 'Sent (Last 30 Days)',
+        all: 'Total Sent'
+      };
+      return labels[period] || 'Sent';
+    }
+
+    // Load email statistics for dashboard
+    async function loadEmailDashboardStats() {
+      try {
+        // Get date range for current period
+        const dateRange = getDateRangeForPeriod(currentEmailPeriod);
+
+        // Build URL params for date filtering
+        let historyParams = `limit=10&offset=0`;
+        if (dateRange) {
+          historyParams += `&startDate=${dateRange.start}&endDate=${dateRange.end}`;
+        }
+
+        // Fetch detailed stats and history in parallel
+        const [detailedStatsRes, historyRes] = await Promise.all([
+          fetch(`${API_BASE}/email/queue/detailed-stats?period=${currentEmailPeriod}`),
+          fetch(`${API_BASE}/email/queue/history?${historyParams}`)
+        ]);
+
+        const detailedStats = await detailedStatsRes.json();
+        const historyJson = await historyRes.json();
+
+        // Update stats cards with detailed stats
+        if (detailedStats.success) {
+          const stats = detailedStats.data;
+          document.getElementById('email-sent-count').textContent = stats.sent || 0;
+          document.getElementById('email-sent-label').textContent = getPeriodLabel(currentEmailPeriod);
+          document.getElementById('email-total-count').textContent = stats.total || 0;
+          document.getElementById('email-queued-count').textContent = stats.queued || 0;
+          document.getElementById('email-failed-count').textContent = stats.failed || 0;
+
+          // Update status breakdown
+          document.getElementById('status-sent').textContent = stats.sent || 0;
+          document.getElementById('status-sending').textContent = stats.sending || 0;
+          document.getElementById('status-queued').textContent = stats.queued || 0;
+          document.getElementById('status-paused').textContent = stats.paused || 0;
+          document.getElementById('status-failed').textContent = stats.failed || 0;
+          document.getElementById('status-cancelled').textContent = stats.cancelled || 0;
+        }
+
+        // Update history table
+        if (historyJson.success && historyJson.data.length > 0) {
+          renderDashboardEmailHistory(historyJson.data);
+        } else {
+          document.getElementById('dashboard-email-history-table').innerHTML = `
+            <tr>
+              <td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                <div style="font-size: 24px; margin-bottom: 8px;">📭</div>
+                No email history for this period
+              </td>
+            </tr>
+          `;
+        }
+      } catch (error) {
+        console.error("Error loading email dashboard stats:", error);
+      }
+    }
+
+    // Render dashboard email history table
+    function renderDashboardEmailHistory(emails) {
+      const tableBody = document.getElementById('dashboard-email-history-table');
+
+      if (!emails || emails.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+              <div style="font-size: 24px; margin-bottom: 8px;">📭</div>
+              No email history yet
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tableBody.innerHTML = emails.map(email => {
+        const statusBadge = getStatusBadge(email.status);
+        const sentAt = email.sent_at ? new Date(email.sent_at).toLocaleString() : '-';
+        const subject = email.subject ? (email.subject.length > 40 ? email.subject.substring(0, 40) + '...' : email.subject) : '-';
+        const sender = email.sender_name || email.sender_email || '-';
+
+        return `
+          <tr style="border-bottom: 1px solid var(--border-default); &:hover { background: var(--bg-tertiary); }">
+            <td style="padding: 12px 16px;">${statusBadge}</td>
+            <td style="padding: 12px 16px;">${email.recipient_email}</td>
+            <td style="padding: 12px 16px;">${subject}</td>
+            <td style="padding: 12px 16px;">${sender}</td>
+            <td style="padding: 12px 16px; color: var(--text-secondary); font-size: 12px;">${sentAt}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Get status badge HTML
+    function getStatusBadge(status) {
+      const badges = {
+        sent: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(34, 197, 94, 0.1); color: #22c55e;">✓ Sent</span>',
+        failed: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(239, 68, 68, 0.1); color: #ef4444;">✗ Failed</span>',
+        queued: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(234, 179, 8, 0.1); color: #eab308;">⏳ Queued</span>',
+        sending: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(59, 130, 246, 0.1); color: #3b82f6;">🔄 Sending</span>',
+        paused: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(156, 163, 175, 0.1); color: #9ca3af;">⏸ Paused</span>',
+        cancelled: '<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: rgba(156, 163, 175, 0.1); color: #9ca3af;">🚫 Cancelled</span>'
+      };
+      return badges[status] || `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--bg-tertiary); color: var(--text-secondary);">${status}</span>`;
     }
 
     // Load content categories from AI analysis
@@ -11310,10 +11978,8 @@
 
     async function loadKeywords() {
       try {
-        console.log("Loading keywords from:", `${API_BASE}/keywords`);
         const res = await fetch(`${API_BASE}/keywords`);
         const json = await res.json();
-        console.log("Keywords response:", json);
 
         if (json.success) {
           renderKeywords(json.data);
@@ -11442,7 +12108,7 @@
     });
 
     async function loadSites() {
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilter = urlParams.get('filter');
       const urlPage = urlParams.get('page');
@@ -11857,7 +12523,7 @@
     let selectedLinkedinIds = new Set();
 
     async function loadEmails() {
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilter = urlParams.get('filter');
       const urlPage = urlParams.get('page');
@@ -12565,7 +13231,7 @@
     }
 
     async function loadPhones() {
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilter = urlParams.get('filter');
       const urlPage = urlParams.get('page');
@@ -12613,7 +13279,7 @@
     }
 
     async function loadLinkedin() {
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilter = urlParams.get('filter');
       const urlPage = urlParams.get('page');
@@ -12662,7 +13328,7 @@
     }
 
     async function loadExecutives() {
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlFilter = urlParams.get('filter');
       const urlPage = urlParams.get('page');
@@ -12816,7 +13482,7 @@
       }, 500);
     }
 
-    // ✅ Update URL with current executives filter/page/search state
+    //  Update URL with current executives filter/page/search state
     function updateUrlForExecutives() {
       const url = new URL(window.location);
       const search = document.getElementById("executives-search")?.value || "";
@@ -12833,7 +13499,7 @@
       window.history.replaceState({ tab: 'executives' }, '', url.toString());
     }
 
-    // ✅ Update URL for structured executives view
+    //  Update URL for structured executives view
     function updateUrlForStructuredExecutives() {
       const url = new URL(window.location);
       const search = document.getElementById("structured-executives-search")?.value || "";
@@ -12857,7 +13523,7 @@
       document.getElementById('executives-structured-view').style.display = mode === 'structured' ? '' : 'none';
       document.getElementById('executives-flat-view').style.display = mode === 'flat' ? '' : 'none';
 
-      // ✅ Update URL to preserve view mode
+      //  Update URL to preserve view mode
       const url = new URL(window.location);
       url.searchParams.set('tab', 'executives');
       url.searchParams.set('view', mode);
@@ -12872,7 +13538,7 @@
     async function loadStructuredExecutives() {
       const tbody = document.getElementById('structured-executives-table');
 
-      // ✅ Read state from URL first (for page refresh/back button support)
+      //  Read state from URL first (for page refresh/back button support)
       const urlParams = new URLSearchParams(window.location.search);
       const urlPage = urlParams.get('page');
       const urlSearch = urlParams.get('search');
@@ -13161,7 +13827,7 @@
       loadSites();
     }
 
-    // ✅ Update URL with current sites filter/page/search state
+    //  Update URL with current sites filter/page/search state
     function updateUrlForSites() {
       const url = new URL(window.location);
       const search = document.getElementById("sites-search")?.value || "";
@@ -13222,7 +13888,7 @@
       loadEmails();
     }
 
-    // ✅ Update URL with current emails filter/page/search state
+    //  Update URL with current emails filter/page/search state
     function updateUrlForEmails() {
       const url = new URL(window.location);
       const search = document.getElementById("emails-search")?.value || "";
@@ -13257,7 +13923,7 @@
       loadPhones();
     }
 
-    // ✅ Update URL with current phones filter/page/search state
+    //  Update URL with current phones filter/page/search state
     function updateUrlForPhones() {
       const url = new URL(window.location);
       const search = document.getElementById("phones-search")?.value || "";
@@ -13289,7 +13955,7 @@
       loadLinkedin();
     }
 
-    // ✅ Update URL with current linkedin filter/page/search state
+    //  Update URL with current linkedin filter/page/search state
     function updateUrlForLinkedin() {
       const url = new URL(window.location);
       const search = document.getElementById("linkedin-search")?.value || "";
@@ -13322,7 +13988,7 @@
     function prevPage(type) {
       if (pageState[type].page > 1) {
         pageState[type].page--;
-        // ✅ Update URL for pagination
+        //  Update URL for pagination
         if (type === "sites") updateUrlForSites();
         else if (type === "emails") updateUrlForEmails();
         else if (type === "phones") updateUrlForPhones();
@@ -13342,7 +14008,7 @@
     function nextPage(type) {
       if (pageState[type].page < pageState[type].totalPages) {
         pageState[type].page++;
-        // ✅ Update URL for pagination
+        //  Update URL for pagination
         if (type === "sites") updateUrlForSites();
         else if (type === "emails") updateUrlForEmails();
         else if (type === "phones") updateUrlForPhones();
@@ -13401,16 +14067,13 @@
       const limitInput = document.getElementById("keyword-limit");
 
       try {
-        console.log("Submitting keyword:", { keyword, max_sites, API_BASE });
         const res = await fetch(`${API_BASE}/keywords`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keyword, max_sites }),
         });
 
-        console.log("Response status:", res.status, res.statusText);
         const json = await res.json();
-        console.log("Response JSON:", json);
 
         if (json.success) {
           input.value = "";
@@ -13430,10 +14093,8 @@
     async function deleteKeyword(id) {
       if (!confirm("Delete this keyword?")) return;
       try {
-        console.log("Deleting keyword:", id);
         const res = await fetch(`${API_BASE}/keywords/${id}`, { method: "DELETE" });
         const json = await res.json();
-        console.log("Delete response:", json);
 
         if (json.success || res.ok) {
           await loadKeywords();
@@ -13635,7 +14296,7 @@
         const json = await res.json();
         if (json.success) {
           loadExcludedDomains();
-          showToast(`✅ ${json.data.domain} added`, 'success');
+          showToast(` ${json.data.domain} added`, 'success');
         } else {
           showToast(json.error || 'Already excluded', 'error');
         }
@@ -13947,7 +14608,7 @@
         const json = await res.json();
         if (json.success) {
           loadIgnoredTags();
-          showToast(`✅ ${json.data.tag} added`, 'success');
+          showToast(` ${json.data.tag} added`, 'success');
         } else {
           showToast(json.error || 'Already exists', 'error');
         }
@@ -14219,7 +14880,7 @@
             statusEl.className = "status-badge status-idle";
             progressEl.textContent =
               status.progress > 0
-                ? `✅ Completed ${status.progress} companies`
+                ? ` Completed ${status.progress} companies`
                 : "0/0 companies";
             btn.innerHTML = `
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -14408,7 +15069,7 @@
       customCountries.forEach(country => {
         const option = document.createElement('option');
         option.value = country.code;
-        option.textContent = `🌍 ${country.name}`;
+        option.textContent = ` ${country.name}`;
         option.setAttribute('data-custom', 'true');
         select.appendChild(option);
       });
@@ -14580,7 +15241,7 @@
         if (json.success) {
           const counts = json.data;
           const total = Object.values(counts).reduce((a, b) => a + b, 0);
-          showToast(`✅ Deleted ${total} records across all tables`, "success");
+          showToast(` Deleted ${total} records across all tables`, "success");
           // Refresh current view
           loadDashboard();
           if (currentTab === "keywords") loadKeywords();
@@ -14595,10 +15256,10 @@
           else if (currentTab === "senders") loadSenders();
           else if (currentTab === "templates") loadTemplates();
         } else {
-          showToast("❌ " + (json.error || "Failed to delete data"), "error");
+          showToast(" " + (json.error || "Failed to delete data"), "error");
         }
       } catch (error) {
-        showToast("❌ Error deleting all data", "error");
+        showToast(" Error deleting all data", "error");
       }
     }
 
@@ -14626,7 +15287,7 @@
       checkExecutivesScraperStatus();
     }, 5000);
 
-    // ✅ Restore tab from URL on page load (persists across refresh)
+    //  Restore tab from URL on page load (persists across refresh)
     function initializeTab() {
       const urlParams = new URLSearchParams(window.location.search);
       const tabFromUrl = urlParams.get('tab');
@@ -14845,12 +15506,14 @@
         const res = await fetch(`${API_BASE}/email/senders/${id}/test`, {
           method: "POST",
         });
+        console.log("[Email]",res)
         const json = await res.json();
+        console.log("[Email]",json)
 
         if (json.success) {
-          showToast("✅ Connection test successful!", "success");
+          showToast("Connection test successful!", "success");
         } else {
-          showToast("❌ Connection failed: " + json.error, "error");
+          showToast("Connection failed: " + json.error, "error");
         }
       } catch (error) {
         showToast("Error testing connection", "error");
@@ -14867,6 +15530,9 @@
             ? "block"
             : "none";
           document.getElementById("smtp-port-group").style.display = isCustom
+            ? "block"
+            : "none";
+          document.getElementById("smtp-user-group").style.display = isCustom
             ? "block"
             : "none";
         });
@@ -15434,15 +16100,15 @@
         document.getElementById('test-email-cancel-btn').disabled = false;
 
         if (json.success) {
-          showTestEmailMessage('✅ Test email sent successfully to ' + recipientEmail, 'success');
+          showTestEmailMessage(' Test email sent successfully to ' + recipientEmail, 'success');
         } else {
-          showTestEmailMessage('❌ ' + (json.error || 'Failed to send test email'), 'error');
+          showTestEmailMessage(' ' + (json.error || 'Failed to send test email'), 'error');
         }
       } catch (error) {
         document.getElementById('test-email-loading').style.display = 'none';
         document.getElementById('test-email-send-btn').disabled = false;
         document.getElementById('test-email-cancel-btn').disabled = false;
-        showTestEmailMessage('❌ Error: ' + error.message, 'error');
+        showTestEmailMessage(' Error: ' + error.message, 'error');
       }
     }
 
@@ -16902,7 +17568,7 @@
           const scheduledCount = s.status?.scheduledItemsCount || 0;
 
           if (statusEl)
-            statusEl.textContent = isProcessing ? "🟢 Processing" : "💤 Idle";
+            statusEl.textContent = isProcessing ? " Processing" : " Idle";
           if (queuedEl) queuedEl.textContent = s.queue.total;
           if (scheduledEl) scheduledEl.textContent = scheduledCount;
           if (sentEl) sentEl.textContent = s.sent.today;
@@ -16934,7 +17600,7 @@
             if (progressContainer) progressContainer.style.display = "block";
             if (progressBar) progressBar.style.width = "100%";
             if (progressText)
-              progressText.textContent = `${completed} / ${totalInPipeline} (100%) ✅`;
+              progressText.textContent = `${completed} / ${totalInPipeline} (100%) `;
           }
 
           // Also update old campaign tab elements if they exist
@@ -16959,8 +17625,8 @@
             if (isPaused) statusEl.textContent = "⏸ Paused";
             else if (scheduledCount > 0)
               statusEl.textContent = `📅 ${scheduledCount} Scheduled`;
-            else if (isProcessing) statusEl.textContent = "🟢 Processing";
-            else statusEl.textContent = "💤 Idle";
+            else if (isProcessing) statusEl.textContent = " Processing";
+            else statusEl.textContent = " Idle";
           }
 
           // Update round-robin if element exists
@@ -17236,7 +17902,7 @@
         const json = await res.json();
 
         if (!json.success) {
-          bodyEl.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 40px;">❌ ${json.error}</div>`;
+          bodyEl.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 40px;"> ${json.error}</div>`;
           return;
         }
 
@@ -17244,10 +17910,10 @@
 
         // Render summary bar
         const summaryItems = [
-          { label: "Sent", value: summary.sent, color: "var(--success)", icon: "✅" },
+          { label: "Sent", value: summary.sent, color: "var(--success)", icon: "" },
           { label: "Queued", value: summary.queued, color: "#0ea5e9", icon: "📤" },
           { label: "Scheduled", value: summary.scheduled, color: "#f59e0b", icon: "📅" },
-          { label: "Failed", value: summary.failed, color: "#b91c1c", icon: "❌" },
+          { label: "Failed", value: summary.failed, color: "#b91c1c", icon: "" },
         ];
         summaryBar.innerHTML = summaryItems
           .map(s => `
@@ -17275,12 +17941,12 @@
           let statusIcon, statusColor, statusLabel, dateStr, actionHtml = "";
 
           if (item.status === "sent") {
-            statusIcon = "✅";
+            statusIcon = "";
             statusColor = "var(--success)";
             statusLabel = "Sent";
             dateStr = item.sentAt ? new Date(item.sentAt).toLocaleString() : "—";
           } else if (item.status === "failed") {
-            statusIcon = "❌";
+            statusIcon = "";
             statusColor = "#b91c1c";
             statusLabel = "Failed";
             dateStr = item.sentAt ? new Date(item.sentAt).toLocaleString() : "—";
@@ -17363,7 +18029,7 @@
         if (footerEl) footerEl.style.display = hasActionable ? 'flex' : 'none';
 
       } catch (e) {
-        bodyEl.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 40px;">❌ Error loading history</div>`;
+        bodyEl.innerHTML = `<div style="text-align: center; color: #b91c1c; padding: 40px;"> Error loading history</div>`;
         console.error("Error loading contact history:", e);
       }
     }
@@ -17434,10 +18100,10 @@
           titleEl.textContent = "📅 Scheduled Items";
         } else if (type === "sent") {
           url = `${API_BASE}/email/queue/items?status=sent&today=true`;
-          titleEl.textContent = "✅ Sent Today";
+          titleEl.textContent = " Sent Today";
         } else if (type === "failed") {
           url = `${API_BASE}/email/queue/items?status=failed`;
-          titleEl.textContent = "❌ Failed Emails";
+          titleEl.textContent = " Failed Emails";
         }
 
         const res = await fetch(url);
@@ -17547,7 +18213,7 @@
       const statusColors = {
         queued: { bg: "rgba(102,126,234,0.1)", color: "#a855f7", icon: "⏳" },
         sending: { bg: "rgba(5,150,105,0.1)", color: "var(--success)", icon: "📤" },
-        paused: { bg: "rgba(217,119,6,0.1)", color: "#d97706", icon: "⏸️" },
+        paused: { bg: "rgba(217,119,6,0.1)", color: "#d97706", icon: "" },
       };
 
       container.innerHTML = `
@@ -17661,7 +18327,7 @@
                   justify-content: center;
                   font-size: 16px;
                   flex-shrink: 0;
-                ">✅</div>
+                "></div>
                 <div style="flex: 1; min-width: 0;">
                   <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     ${escapeHtml(item.recipient_email)}
@@ -17707,7 +18373,7 @@
                 background: rgba(220,38,38,0.02);
               ">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                  <span style="font-size: 16px;">❌</span>
+                  <span style="font-size: 16px;"></span>
                   <div style="flex: 1; min-width: 0;">
                     <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                       ${escapeHtml(item.recipient_email)}
@@ -17739,7 +18405,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast("⏸️ Email paused", "success");
+          showToast(" Email paused", "success");
           refreshEmailQueueStats();
           loadEmailHistory(); // Refresh history table
         } else {
@@ -17796,7 +18462,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast("🔄 Email queued for retry", "success");
+          showToast(" Email queued for retry", "success");
           refreshEmailQueueStats();
           loadEmailHistory(); // Refresh history table
         } else {
@@ -17837,7 +18503,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast("🚀 Queue started processing immediately!", "success");
+          showToast(" Queue started processing immediately!", "success");
           refreshEmailQueueStats();
         } else {
           showToast(json.error || "Failed to start queue", "error");
@@ -17894,7 +18560,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast(`⏸️ Paused ${json.count} emails`, "success");
+          showToast(` Paused ${json.count} emails`, "success");
           refreshEmailQueueStats();
           if (currentHistoryTab) loadEmailHistory();
         } else {
@@ -17934,7 +18600,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast(`❌ Cancelled ${json.count} emails`, "success");
+          showToast(` Cancelled ${json.count} emails`, "success");
           refreshEmailQueueStats();
           if (currentHistoryTab) loadEmailHistory();
         } else {
@@ -17952,7 +18618,7 @@
         });
         const json = await res.json();
         if (json.success) {
-          showToast(`🔄 Retrying ${json.count} failed emails`, "success");
+          showToast(` Retrying ${json.count} failed emails`, "success");
           refreshEmailQueueStats();
           if (currentHistoryTab === 'failed') loadEmailHistory();
         } else {
@@ -17971,6 +18637,9 @@
     let historyCurrentPage = 0;
     let historyPageSize = 20;
     let historyTotalItems = 0;
+    let customDateRange = null; // Store custom date range {start, end}
+    let currentFilterType = 'sent'; // 'sent', 'queue', 'scheduled', 'gap'
+    let customGapRange = null; // Store custom gap range {minHours, maxHours}
 
     function switchEmailHistoryTab(tab) {
       currentHistoryTab = tab;
@@ -17987,6 +18656,150 @@
       loadEmailHistory();
     }
 
+    // Handle date type filter change
+    function handleDateTypeChange() {
+      const dateType = document.getElementById('history-date-type-filter').value;
+      currentFilterType = dateType;
+
+      // Hide all filter groups first
+      document.getElementById('quick-date-filters').style.display = 'none';
+      document.getElementById('gap-filters').style.display = 'none';
+      document.getElementById('custom-date-range').style.display = 'none';
+      document.getElementById('custom-gap-range').style.display = 'none';
+
+      // Show appropriate filter based on date type
+      if (dateType === 'gap') {
+        document.getElementById('gap-filters').style.display = 'block';
+      } else {
+        document.getElementById('quick-date-filters').style.display = 'block';
+      }
+
+      // Reset custom ranges
+      customDateRange = null;
+      customGapRange = null;
+
+      // Reload history with new filter type
+      loadEmailHistory();
+    }
+
+    // Handle gap filter selection
+    function handleGapFilter() {
+      const gapFilter = document.getElementById('history-gap-filter').value;
+      const customGapRange = document.getElementById('custom-gap-range');
+
+      if (gapFilter === 'custom') {
+        // Show custom gap range picker
+        customGapRange.style.display = 'flex';
+        // Set default values
+        document.getElementById('gap-min-hours').value = 0;
+        document.getElementById('gap-max-hours').value = 24;
+      } else {
+        // Hide custom gap range picker
+        customGapRange.style.display = 'none';
+        customGapRange = null;
+        loadEmailHistory();
+      }
+    }
+
+    // Apply custom gap range
+    function applyCustomGapRange() {
+      const minHours = parseInt(document.getElementById('gap-min-hours').value);
+      const maxHours = parseInt(document.getElementById('gap-max-hours').value);
+
+      if (isNaN(minHours) || isNaN(maxHours)) {
+        showToast('Please enter valid hour values', 'warning');
+        return;
+      }
+
+      if (minHours < 0 || maxHours < 0) {
+        showToast('Hours must be positive numbers', 'error');
+        return;
+      }
+
+      if (minHours > maxHours) {
+        showToast('Minimum hours must be less than maximum hours', 'error');
+        return;
+      }
+
+      customGapRange = { minHours, maxHours };
+      showToast(`Filtering emails sent between ${minHours}h and ${maxHours}h after queuing`, 'success');
+      loadEmailHistory();
+    }
+
+    // Handle quick date filter selection
+    function handleQuickDateFilter() {
+      const filter = document.getElementById('history-date-filter').value;
+      const customRangeDiv = document.getElementById('custom-date-range');
+
+      if (filter === 'custom') {
+        // Show custom date range picker
+        customRangeDiv.style.display = 'flex';
+        // Set default values (start of today to now)
+        const now = new Date();
+        const startOfDay = new Date(now);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        document.getElementById('history-start-datetime').value = formatDateTimeLocal(startOfDay);
+        document.getElementById('history-end-datetime').value = formatDateTimeLocal(now);
+      } else {
+        // Hide custom date range picker and clear custom range
+        customRangeDiv.style.display = 'none';
+        customDateRange = null;
+        loadEmailHistory();
+      }
+    }
+
+    // Format date for datetime-local input
+    function formatDateTimeLocal(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
+    // Apply custom date range
+    function applyCustomDateRange() {
+      const startValue = document.getElementById('history-start-datetime').value;
+      const endValue = document.getElementById('history-end-datetime').value;
+
+      if (!startValue || !endValue) {
+        showToast('Please select both start and end date/time', 'warning');
+        return;
+      }
+
+      const startDate = new Date(startValue);
+      const endDate = new Date(endValue);
+
+      if (startDate > endDate) {
+        showToast('Start date must be before end date', 'error');
+        return;
+      }
+
+      // Store custom range
+      customDateRange = {
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+      };
+
+      showToast(`Filtering: ${startDate.toLocaleString()} to ${endDate.toLocaleString()}`, 'success');
+      loadEmailHistory();
+    }
+
+    // Clear custom date range
+    function clearCustomDateRange() {
+      document.getElementById('history-start-datetime').value = '';
+      document.getElementById('history-end-datetime').value = '';
+      customDateRange = null;
+
+      // Reset to today
+      document.getElementById('history-date-filter').value = 'today';
+      document.getElementById('custom-date-range').style.display = 'none';
+
+      loadEmailHistory();
+    }
+
     async function loadEmailHistory() {
       const tableBody = document.getElementById('email-history-table');
       tableBody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">⏳</div>Loading...</td></tr>';
@@ -17994,36 +18807,77 @@
       try {
         let status = currentHistoryTab === 'all' ? '' : currentHistoryTab;
         let dateFilter = document.getElementById('history-date-filter')?.value || 'today';
+        let gapFilter = document.getElementById('history-gap-filter')?.value || 'quick';
         let searchQuery = document.getElementById('history-search')?.value || '';
 
         // Calculate date range
         let startDate = null;
         let endDate = null;
+        let startDateTime = null;
+        let endDateTime = null;
         const today = new Date();
 
-        if (dateFilter === 'today') {
-          startDate = today.toISOString().split('T')[0];
-          endDate = today.toISOString().split('T')[0];
-        } else if (dateFilter === 'week') {
-          const weekAgo = new Date(today);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          startDate = weekAgo.toISOString().split('T')[0];
-          endDate = today.toISOString().split('T')[0];
-        } else if (dateFilter === 'month') {
-          const monthAgo = new Date(today);
-          monthAgo.setDate(monthAgo.getDate() - 30);
-          startDate = monthAgo.toISOString().split('T')[0];
-          endDate = today.toISOString().split('T')[0];
+        // Only apply date filters if not using gap filter
+        if (currentFilterType !== 'gap') {
+          // Use custom date range if set, otherwise use quick filter
+          if (customDateRange) {
+            // Use full datetime for custom range
+            startDateTime = customDateRange.start;
+            endDateTime = customDateRange.end;
+          } else if (dateFilter === 'today') {
+            startDate = today.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+          } else if (dateFilter === 'yesterday') {
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startDate = yesterday.toISOString().split('T')[0];
+            endDate = yesterday.toISOString().split('T')[0];
+          } else if (dateFilter === 'week') {
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            startDate = weekAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+          } else if (dateFilter === 'month') {
+            const monthAgo = new Date(today);
+            monthAgo.setDate(monthAgo.getDate() - 30);
+            startDate = monthAgo.toISOString().split('T')[0];
+            endDate = today.toISOString().split('T')[0];
+          }
         }
 
         // Build URL params
         let url = `${API_BASE}/email/queue/history?limit=${historyPageSize}&offset=${historyCurrentPage * historyPageSize}`;
         if (status) url += `&status=${status}`;
 
-        // Don't apply date filters for scheduled tab - we want to see the whole future queue
+        // Add date type filter
+        url += `&dateType=${currentFilterType}`;
+
+        // Don't apply date filters for scheduled tab when viewing scheduled items
         if (status !== 'scheduled') {
-          if (startDate) url += `&startDate=${startDate}`;
-          if (endDate) url += `&endDate=${endDate}`;
+          if (currentFilterType === 'gap' && customGapRange) {
+            // Custom gap range
+            url += `&minGapHours=${customGapRange.minHours}&maxGapHours=${customGapRange.maxHours}`;
+          } else if (currentFilterType === 'gap' && gapFilter !== 'custom' && gapFilter !== 'all') {
+            // Predefined gap filters
+            const gapRanges = {
+              'quick': { min: 0, max: 1 },
+              'same-day': { min: 0, max: 24 },
+              'delayed': { min: 24, max: Infinity },
+              'very-delayed': { min: 72, max: Infinity }
+            };
+            const range = gapRanges[gapFilter];
+            if (range) {
+              url += `&minGapHours=${range.min}&maxGapHours=${range.max === Infinity ? 720 : range.max}`;
+            }
+          } else if (currentFilterType !== 'gap') {
+            // Date-based filters
+            if (startDateTime && endDateTime) {
+              url += `&startDateTime=${startDateTime}&endDateTime=${endDateTime}`;
+            } else {
+              if (startDate) url += `&startDate=${startDate}`;
+              if (endDate) url += `&endDate=${endDate}`;
+            }
+          }
         }
 
         const res = await fetch(url);
@@ -18035,10 +18889,10 @@
           updateHistoryPagination();
           updateHistoryCounts();
         } else {
-          tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">❌</div>${json.error || 'Failed to load history'}</td></tr>`;
+          tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon"></div>${json.error || 'Failed to load history'}</td></tr>`;
         }
       } catch (e) {
-        tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">❌</div>Error loading history</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon"></div>Error loading history</td></tr>`;
       }
     }
 
@@ -18046,7 +18900,7 @@
       const tableBody = document.getElementById('email-history-table');
 
       if (!items || items.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon">📭</div>No emails found</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="10" class="empty-state"><div class="empty-state-icon">📭</div>No emails found</td></tr>`;
         return;
       }
 
@@ -18061,11 +18915,11 @@
         };
 
         const statusIcon = {
-          sent: '✅',
-          failed: '❌',
+          sent: '',
+          failed: '',
           queued: '⏳',
           sending: '📤',
-          paused: '⏸️',
+          paused: '',
           cancelled: '🚫'
         };
 
@@ -18074,6 +18928,45 @@
 
         const date = item.sent_at || item.created_at;
         const formattedDate = new Date(date).toLocaleString();
+
+        // Calculate and format processing time
+        let processingTime = '-';
+        if (item.status === 'sent' && item.sent_at && item.created_at) {
+          const created = new Date(item.created_at);
+          const sent = new Date(item.sent_at);
+          const diffMs = sent - created;
+          const diffHours = diffMs / (1000 * 60 * 60);
+
+          if (diffHours < 1) {
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            processingTime = `${diffMins}m`;
+          } else if (diffHours < 24) {
+            const hours = Math.floor(diffHours);
+            const mins = Math.floor((diffHours % 1) * 60);
+            processingTime = mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+          } else {
+            const days = Math.floor(diffHours / 24);
+            const hours = Math.floor(diffHours % 24);
+            processingTime = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+          }
+        } else if (item.status === 'queued' || item.status === 'sending' || item.status === 'paused') {
+          const created = new Date(item.created_at);
+          const now = new Date();
+          const diffMs = now - created;
+          const diffHours = diffMs / (1000 * 60 * 60);
+
+          if (diffHours < 1) {
+            const diffMins = Math.floor(diffMs / (1000 * 60));
+            processingTime = `${diffMins}m`;
+          } else if (diffHours < 24) {
+            const hours = Math.floor(diffHours);
+            processingTime = `${hours}h`;
+          } else {
+            const days = Math.floor(diffHours / 24);
+            processingTime = `${days}d`;
+          }
+          processingTime += ' (waiting)';
+        }
 
         // Generate action buttons based on status
         let actionButtons = '';
@@ -18142,6 +19035,7 @@
             <td><span class="status-badge ${color}">${icon} ${item.status}</span></td>
             <td>${escapeHtml(item.sender_name || item.sender_email || 'N/A')}</td>
             <td>${formattedDate}</td>
+            <td style="font-size: 12px; color: var(--text-secondary);">${processingTime}</td>
             <td>${item.attempts || 0}</td>
             <td style="text-align: center;">
               ${actionButtons}
@@ -18209,6 +19103,207 @@
       }
     }
 
+    // ============================================
+    // TIMEZONE STATUS FUNCTIONS
+    // ============================================
+
+    let timezoneRefreshInterval = null;
+
+    async function loadTimezoneStatus() {
+      try {
+        const gridEl = document.getElementById('timezone-status-grid');
+        const summaryEl = document.getElementById('timezone-summary');
+
+        gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div class="loading-spinner"></div>Loading timezone data...</div>';
+
+        // Fetch timezone statistics
+        const statsRes = await fetch(`${API_BASE}/email/timezone/stats`);
+        const statsData = await statsRes.json();
+
+        if (!statsData.success) {
+          throw new Error(statsData.error || 'Failed to load timezone data');
+        }
+
+        const distribution = statsData.data.distribution || [];
+
+        if (distribution.length === 0) {
+          gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div style="font-size: 24px; margin-bottom: 8px;"></div>No timezone data available yet</div>';
+          summaryEl.innerHTML = '';
+          return;
+        }
+
+        // Render timezone cards
+        renderTimezoneCards(distribution);
+
+        // Render summary statistics
+        renderTimezoneSummary(statsData.data);
+
+        // Start auto-refresh every 30 seconds
+        startTimezoneAutoRefresh();
+
+      } catch (error) {
+        console.error('Error loading timezone status:', error);
+        const gridEl = document.getElementById('timezone-status-grid');
+        gridEl.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #ef4444;"><div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>Error loading timezone data</div>`;
+      }
+    }
+
+    function renderTimezoneCards(countries) {
+      const gridEl = document.getElementById('timezone-status-grid');
+
+      const countryFlags = {
+        'in': '🇮🇳',
+        'us': '🇺🇸',
+        'uk': '🇬🇧',
+        'ca': '🇨🇦',
+        'au': '🇦🇺',
+        'de': '🇩🇪',
+        'fr': '🇫🇷',
+        'jp': '🇯🇵',
+        'sg': '🇸🇬',
+        'ae': '🇦🇪'
+      };
+
+      const countryNames = {
+        'in': 'India',
+        'us': 'United States',
+        'uk': 'United Kingdom',
+        'ca': 'Canada',
+        'au': 'Australia',
+        'de': 'Germany',
+        'fr': 'France',
+        'jp': 'Japan',
+        'sg': 'Singapore',
+        'ae': 'UAE'
+      };
+
+      gridEl.innerHTML = countries.map(country => {
+        const flag = countryFlags[country.country_code.toLowerCase()] || '';
+        const isInBusiness = country.in_business_hours;
+        const countryName = countryNames[country.country_code.toLowerCase()] || country.country_code.toUpperCase();
+
+        // Parse local time safely
+        let localTime;
+        try {
+          localTime = new Date(country.local_time);
+        } catch (e) {
+          localTime = new Date();
+        }
+
+        const localHour = localTime.getUTCHours();
+        const nextBusinessHour = isInBusiness ? localHour :
+                                (localHour < 9 ? 9 : localHour >= 17 ? 9 : localHour + 1);
+
+        let statusBadge = '';
+        if (isInBusiness) {
+          statusBadge = '<span class="timezone-status-badge status-badge-open"> Open Now</span>';
+        } else if (localHour === 0 || localHour >= 17) {
+          statusBadge = '<span class="timezone-status-badge status-badge-closed">🔴 Closed</span>';
+        } else {
+          statusBadge = '<span class="timezone-status-badge status-badge-closed"> Outside Hours</span>';
+        }
+
+        const cardClass = isInBusiness ? 'timezone-card ready-to-send' : 'timezone-card outside-hours';
+
+        return `
+          <div class="${cardClass}">
+            <div class="timezone-card-header">
+              <div class="timezone-country">
+                <span class="timezone-flag">${flag}</span>
+                <div class="timezone-name">${countryName}</div>
+              </div>
+              ${statusBadge}
+            </div>
+
+            <div class="timezone-time">${localTime.getUTCHours().toString().padStart(2, '0')}:${localTime.getUTCMinutes().toString().padStart(2, '0')}</div>
+            <div class="timezone-date">${localTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+
+            <div class="timezone-info-grid">
+              <div class="timezone-info-item">
+                <div class="timezone-info-label">Timezone</div>
+                <div class="timezone-info-value" style="font-size: 10px;">${country.timezone_name}</div>
+              </div>
+              <div class="timezone-info-item">
+                <div class="timezone-info-label">Contacts</div>
+                <div class="timezone-info-value">${country.contact_count}</div>
+              </div>
+              <div class="timezone-info-item">
+                <div class="timezone-info-label">Status</div>
+                <div class="timezone-info-value" style="color: ${isInBusiness ? '#22c55e' : '#ef4444'};">${isInBusiness ? '✅ Ready' : ' Wait'}</div>
+              </div>
+              <div class="timezone-info-item">
+                <div class="timezone-info-label">Next Send</div>
+                <div class="timezone-info-value">${isInBusiness ? 'Now' : nextBusinessHour + ':00'}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTimezoneSummary(data) {
+      const summaryEl = document.getElementById('timezone-summary');
+
+      const readyCountries = data.currently_in_business?.countries || [];
+      const outsideCountries = data.outside_business_hours?.countries || [];
+      const totalCountries = data.total_countries || 0;
+
+      summaryEl.innerHTML = `
+        <div class="summary-stat">
+          <span class="summary-icon"></span>
+          <div>
+            <div class="summary-value">${totalCountries}</div>
+            <div class="summary-label">Countries</div>
+          </div>
+        </div>
+
+        <div class="summary-stat">
+          <span class="summary-icon"></span>
+          <div>
+            <div class="summary-value">${readyCountries.length}</div>
+            <div class="summary-label">Ready to Send</div>
+          </div>
+        </div>
+
+        <div class="summary-stat">
+          <span class="summary-icon"></span>
+          <div>
+            <div class="summary-value">${outsideCountries.length}</div>
+            <div class="summary-label">Outside Hours</div>
+          </div>
+        </div>
+
+        <div class="summary-stat" style="${data.recommended_action.includes('Ready') ? 'background: rgba(34, 197, 94, 0.1); border-color: #22c55e;' : ''}">
+          <span class="summary-icon"></span>
+          <div>
+            <div class="summary-text" style="font-size: 12px; max-width: 200px;">${data.recommended_action}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function startTimezoneAutoRefresh() {
+      // Clear existing interval
+      if (timezoneRefreshInterval) {
+        clearInterval(timezoneRefreshInterval);
+      }
+
+      // Auto-refresh every 30 seconds
+      timezoneRefreshInterval = setInterval(() => {
+        // Only refresh if still on emails tab
+        if (currentTab === 'emails') {
+          loadTimezoneStatus();
+        }
+      }, 30000);
+    }
+
+    function stopTimezoneAutoRefresh() {
+      if (timezoneRefreshInterval) {
+        clearInterval(timezoneRefreshInterval);
+        timezoneRefreshInterval = null;
+      }
+    }
+
     function handleHistorySearch() {
       historyCurrentPage = 0;
       loadEmailHistory();
@@ -18232,12 +19327,12 @@
           if (json.success && json.data) {
             renderEmailHistoryDetail(json.data);
           } else {
-            bodyEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">❌ Email not found</div>';
+            bodyEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;"> Email not found</div>';
           }
         })
         .catch(err => {
           console.error('Error loading email details:', err);
-          bodyEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">❌ Error loading email details</div>';
+          bodyEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;"> Error loading email details</div>';
         });
     }
 
@@ -18257,11 +19352,11 @@
       };
 
       const statusIcon = {
-        sent: '✅',
-        failed: '❌',
+        sent: '',
+        failed: '',
         queued: '⏳',
         sending: '📤',
-        paused: '⏸️',
+        paused: '',
         cancelled: '🚫'
       };
 
@@ -18276,7 +19371,7 @@
       if (item.status === 'queued' || item.status === 'sending') {
         actionButtons = `
           <button class="btn-warning" onclick="pauseHistoryQueueItem(${item.id}); closeEmailHistoryDetailModal();" style="padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;">
-            ⏸️ Pause
+             Pause
           </button>
           <button class="btn-danger" onclick="cancelHistoryQueueItem(${item.id}); closeEmailHistoryDetailModal();" style="padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;">
             🚫 Cancel
@@ -18294,7 +19389,7 @@
       } else if (item.status === 'failed') {
         actionButtons = `
           <button class="btn-success" onclick="retryHistoryQueueItem(${item.id}); closeEmailHistoryDetailModal();" style="padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer;">
-            🔄 Retry
+             Retry
           </button>
         `;
       }
@@ -18630,7 +19725,7 @@
             <!-- Old AI Fields (if present) -->
             ${site.classification || site.relevance_score || site.value_proposition ? `
             <div style="background: var(--bg-secondary); border-radius: 12px; padding: 16px; opacity: 0.8;">
-              <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📊 Additional Analysis</div>
+              <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;"> Additional Analysis</div>
               <div style="display: flex; flex-direction: column; gap: 12px;">
                 ${site.classification ? `
                 <div>
@@ -18930,17 +20025,16 @@
       const isSuccess = type === "success";
       Object.assign(toast.style, {
         position: "fixed",
-        bottom: "28px",
-        right: "28px",
-        padding: "14px 22px",
-        borderRadius: "12px",
+        bottom: "30px",
+        right: "30px",
+        padding: "10px 15px",
+        borderRadius: "8px",
         background: isSuccess
           ? "linear-gradient(135deg, var(--success), #10b981)"
           : "linear-gradient(135deg, #b91c1c, #ef4444)",
         color: "#fff",
-        fontFamily: "'Inter', sans-serif",
-        fontSize: "14px",
-        fontWeight: "600",
+        fontSize: "13px",
+        fontWeight: "400",
         boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
         zIndex: "99999",
         opacity: "0",

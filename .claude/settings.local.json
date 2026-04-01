@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv setup-*.js src/scripts/setup/)",
+      "Bash(mv check-*.js src/scripts/maintenance/)",
+      "Bash(node -c src/api/server.js)",
+      "Bash(node -c src/scrapers/wordpress-detector.js)",
+      "Bash(node -c src/services/ai/ai-processor.js)",
+      "Bash(npm run:*)",
+      "Bash(grep -E \"\\(package\\\\.json|README|CLAUDE|\\\\.md$\\)\")",
+      "Bash(curl -s http://localhost:8080/api/email/queue/stats)",
+      "Bash(curl -s \"http://localhost:8080/api/email/queue/items?status=sent\")",
+      "Bash(curl -I http://localhost:8080/index.html)",
+      "Bash(taskkill:*)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s http://localhost:8080/api/email/timezone/stats)"
+    ]
+  }
+}
