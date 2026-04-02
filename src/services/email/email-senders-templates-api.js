@@ -11,11 +11,11 @@ const aiWorker = require("../ai/ai-processor");
 /**
  * Initialize database tables for email system
  */
-async function initializeEmailTables() {
+function initializeEmailTables() {
   // Email Senders Table
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_senders (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
@@ -27,16 +27,16 @@ async function initializeEmailTables() {
       is_active INTEGER DEFAULT 1,
       sent_today INTEGER DEFAULT 0,
       last_reset_date TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // Migration: Add smtp_user column if not exists
   try {
-    const tableInfo = await db.prepare("SELECT column_name FROM information_schema.columns WHERE table_name = 'email_senders'").all();
-    if (!tableInfo.some((c) => c.column_name === "smtp_user")) {
-      await db.run("ALTER TABLE email_senders ADD COLUMN smtp_user TEXT");
+    const tableInfo = db.prepare("PRAGMA table_info(email_senders)").all();
+    if (!tableInfo.some((c) => c.name === "smtp_user")) {
+      db.run("ALTER TABLE email_senders ADD COLUMN smtp_user TEXT");
       console.log(" Added smtp_user column to email_senders table");
     }
   } catch (e) {
@@ -44,9 +44,9 @@ async function initializeEmailTables() {
   }
 
   // Email Templates Table
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_templates (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       subject TEXT NOT NULL,
       html_content TEXT NOT NULL,
@@ -54,15 +54,15 @@ async function initializeEmailTables() {
       description TEXT,
       category TEXT DEFAULT 'general',
       is_active INTEGER DEFAULT 1,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // Email Campaigns Table
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_campaigns (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       template_id INTEGER,
       target_type TEXT DEFAULT 'all',
@@ -70,17 +70,17 @@ async function initializeEmailTables() {
       total_recipients INTEGER DEFAULT 0,
       sent_count INTEGER DEFAULT 0,
       failed_count INTEGER DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      started_at TIMESTAMP,
-      completed_at TIMESTAMP,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      started_at TEXT,
+      completed_at TEXT,
       FOREIGN KEY (template_id) REFERENCES email_templates(id)
     )
   `);
 
   // Email Queue Table
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_queue (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       campaign_id INTEGER,
       sender_id INTEGER,
       recipient_email TEXT NOT NULL,
@@ -91,9 +91,9 @@ async function initializeEmailTables() {
       status TEXT DEFAULT 'queued',
       attempts INTEGER DEFAULT 0,
       error_message TEXT,
-      sent_at TIMESTAMP,
-      scheduled_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      sent_at TEXT,
+      scheduled_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (campaign_id) REFERENCES email_campaigns(id),
       FOREIGN KEY (sender_id) REFERENCES email_senders(id)
     )
@@ -101,9 +101,9 @@ async function initializeEmailTables() {
 
   // Migrate email_queue to include scheduled_at if missing
   try {
-    const queueCols = await db.prepare("SELECT column_name FROM information_schema.columns WHERE table_name = 'email_queue'").all();
-    if (!queueCols.some((c) => c.column_name === "scheduled_at")) {
-      await db.run("ALTER TABLE email_queue ADD COLUMN scheduled_at TIMESTAMP");
+    const queueCols = db.prepare("PRAGMA table_info(email_queue)").all();
+    if (!queueCols.some((c) => c.name === "scheduled_at")) {
+      db.run("ALTER TABLE email_queue ADD COLUMN scheduled_at TEXT");
       console.log(" Added scheduled_at column to email_queue table");
     }
   } catch (e) {
@@ -111,27 +111,27 @@ async function initializeEmailTables() {
   }
 
   // Email Settings Table (key-value store for configurable intervals)
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
       label TEXT,
       description TEXT,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // Email Send Log Table (tracks what was sent to each contact)
-  await db.run(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS email_send_log (
-      id SERIAL PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       contact_id INTEGER NOT NULL,
       contact_email TEXT NOT NULL,
       template_id INTEGER,
       campaign_id INTEGER,
       send_type TEXT DEFAULT 'main',
       status TEXT DEFAULT 'sent',
-      sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (contact_id) REFERENCES contacts(id),
       FOREIGN KEY (template_id) REFERENCES email_templates(id)
     )
@@ -185,33 +185,33 @@ async function initializeEmailTables() {
     },
   ];
   const insertSetting = db.prepare(
-    "INSERT INTO email_settings (key, value, label, description) VALUES ($1, $2, $3, $4) ON CONFLICT (key) DO NOTHING",
+    "INSERT OR IGNORE INTO email_settings (key, value, label, description) VALUES (?, ?, ?, ?)",
   );
   for (const s of defaults) {
-    await insertSetting.run([s.key, s.value, s.label, s.description]);
+    insertSetting.run(s.key, s.value, s.label, s.description);
   }
 
   // Add tags column if not exists (migration)
   try {
-    await db.run(`ALTER TABLE email_templates ADD COLUMN tags TEXT DEFAULT ''`);
+    db.run(`ALTER TABLE email_templates ADD COLUMN tags TEXT DEFAULT ''`);
   } catch (e) {
-    // Column already exists - ignore
+    // Column already exists
   }
 
   // Add sequence_number column if not exists (migration)
   try {
-    await db.run(
+    db.run(
       `ALTER TABLE email_templates ADD COLUMN sequence_number INTEGER DEFAULT 0`,
     );
   } catch (e) {
-    // Column already exists - ignore
+    // Column already exists
   }
 
   // Add contact_id column to email_queue if not exists (for tracking sequence sends)
   try {
-    await db.run(`ALTER TABLE email_queue ADD COLUMN contact_id INTEGER`);
+    db.run(`ALTER TABLE email_queue ADD COLUMN contact_id INTEGER`);
   } catch (e) {
-    // Column already exists - ignore
+    // Column already exists
   }
 
   // Add tag column to email_queue if not exists (for tracking tag-based sends)
@@ -229,7 +229,7 @@ async function initializeEmailTables() {
   }
 
   // Sync follow-up gap settings based on current template counts
-  await syncFollowupGapSettings();
+  syncFollowupGapSettings();
 
   console.log(" Email system tables initialized");
 }
@@ -238,8 +238,8 @@ async function initializeEmailTables() {
  * Get max template count across all tag groups
  * @returns {number} The maximum number of templates in any single tag group
  */
-async function getMaxSequenceCount() {
-  const templates = await db.all(
+function getMaxSequenceCount() {
+  const templates = db.all(
     `SELECT tags FROM email_templates WHERE tags IS NOT NULL AND tags != ''`,
   );
   const tagCounts = {};
@@ -261,13 +261,13 @@ async function getMaxSequenceCount() {
  * Sync follow-up gap settings in DB to match current max template sequence count.
  * Creates missing gap settings and removes excess ones.
  */
-async function syncFollowupGapSettings() {
-  const maxSeq = await getMaxSequenceCount();
+function syncFollowupGapSettings() {
+  const maxSeq = getMaxSequenceCount();
   const neededGaps = Math.max(maxSeq - 1, 0); // N templates need N-1 gaps
 
   // Insert any missing gap settings
   const insertStmt = db.prepare(
-    "INSERT INTO email_settings (key, value, label, description) VALUES ($1, $2, $3, $4) ON CONFLICT (key) DO NOTHING",
+    "INSERT OR IGNORE INTO email_settings (key, value, label, description) VALUES (?, ?, ?, ?)",
   );
   for (let i = 1; i <= neededGaps; i++) {
     const key = `followup_gap_${i}`;
@@ -279,20 +279,18 @@ async function syncFollowupGapSettings() {
       i === 1
         ? "Days to wait after main email before sending follow-up 1"
         : `Days to wait after follow-up ${i - 1} before sending follow-up ${i}`;
-    await insertStmt.run([key, i === 1 ? "2" : "5", label, desc]);
+    insertStmt.run(key, i === 1 ? "2" : "5", label, desc);
   }
 
   // Remove excess gap settings that are beyond current max
-  await db.run(
-    `DELETE FROM email_settings WHERE key LIKE 'followup_gap_%' AND CAST(REPLACE(key, 'followup_gap_', '') AS INTEGER) > $1`,
+  db.run(
+    `DELETE FROM email_settings WHERE key LIKE 'followup_gap_%' AND CAST(REPLACE(key, 'followup_gap_', '') AS INTEGER) > ?`,
     [neededGaps],
   );
 }
 
 // Initialize tables on load
-(async () => {
-  await initializeEmailTables();
-})();
+initializeEmailTables();
 
 // ============================================
 // TEMPLATE VARIABLE REPLACEMENT

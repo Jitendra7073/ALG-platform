@@ -13,8 +13,7 @@
       "Bash(curl -I http://localhost:8080/index.html)",
       "Bash(taskkill:*)",
       "Bash(netstat -ano)",
-      "Bash(curl -s http://localhost:8080/api/email/timezone/stats)",
-      "Bash(grep -n \"database\\\\\\\\.close\\\\\\\\|db\\\\\\\\.initDatabase\" ai-processor.js)"
+      "Bash(curl -s http://localhost:8080/api/email/timezone/stats)"
     ]
   }
 }
