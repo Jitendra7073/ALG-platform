@@ -19,7 +19,7 @@ const userDataDir = "C:\\automation_chrome";
 
 // Start background workers
 logger.system("Starting server...");
-aiWorker.start();
+aiWorker.start().catch(err => console.error('AI Worker start error:', err));
 aiRetryManager.start(); // Start AI retry manager
 
 // Intercept console to capture all logs
@@ -3225,8 +3225,33 @@ app.get("/api/logs/types", (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`\n Admin Panel running at http://localhost:${PORT}`);
-  console.log(` Use the web interface to manage keywords and run scrapers\n`);
-});
+// Initialize Supabase connection before starting server
+async function startServer() {
+  try {
+    console.log('\n🔌 Connecting to Supabase...');
+    const isConnected = await db.testConnection();
+
+    if (!isConnected) {
+      console.error('❌ Failed to connect to Supabase. Server cannot start.');
+      process.exit(1);
+    }
+
+    console.log('✅ Supabase connection established successfully');
+
+    // Initialize database tables
+    await db.initDatabase();
+    console.log('✅ Database tables initialized');
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`\n✅ Admin Panel running at http://localhost:${PORT}`);
+      console.log(`📋 Use the web interface to manage keywords and run scrapers\n`);
+    });
+  } catch (error) {
+    console.error('❌ Error starting server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();

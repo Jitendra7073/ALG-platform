@@ -314,76 +314,38 @@ async function initDatabase() {
 
 /**
  * Low-level wrappers (sqlite3-style API for compatibility)
- * These return promises that can be awaited
- * For backward compatibility, they also support .then() chaining
  */
-function run(sql, params = []) {
+async function run(sql, params = []) {
   const pool = getPool();
-  const promise = pool.query(sql, params).then(result => ({
+  const result = await pool.query(sql, params);
+  return {
     lastInsertRowid: result.rows[0]?.id,
     changes: result.rowCount || 0,
-  }));
-  return promise;
-}
-
-function all(sql, params = []) {
-  const pool = getPool();
-  const promise = pool.query(sql, params).then(result => result.rows);
-  return promise;
-}
-
-function get(sql, params = []) {
-  const pool = getPool();
-  const promise = pool.query(sql, params).then(result => result.rows[0] || null);
-  return promise;
-}
-
-function prepare(sql) {
-  const pool = getPool();
-
-  // Return an object with methods that can be used with await
-  const statement = {
-    _sql: sql,
-    _pool: pool,
-
-    // Async methods (preferred)
-    all: async function(params = []) {
-      const result = await this._pool.query(this._sql, params);
-      return result.rows;
-    },
-
-    get: async function(params = []) {
-      const result = await this._pool.query(this._sql, params);
-      return result.rows[0] || null;
-    },
-
-    run: async function(params = []) {
-      const result = await this._pool.query(this._sql, params);
-      return {
-        lastInsertRowid: result.rows[0]?.id,
-        changes: result.rowCount || 0,
-      };
-    },
-
-    // Synchronous-style methods for backward compatibility
-    // These return promises that can be awaited
-    allSync: function(params = []) {
-      return this._pool.query(this._sql, params).then(r => r.rows);
-    },
-
-    getSync: function(params = []) {
-      return this._pool.query(this._sql, params).then(r => r.rows[0] || null);
-    },
-
-    runSync: function(params = []) {
-      return this._pool.query(this._sql, params).then(r => ({
-        lastInsertRowid: r.rows[0]?.id,
-        changes: r.rowCount || 0,
-      }));
-    },
   };
+}
 
-  return statement;
+async function all(sql, params = []) {
+  const pool = getPool();
+  const result = await pool.query(sql, params);
+  return result.rows;
+}
+
+async function get(sql, params = []) {
+  const pool = getPool();
+  const result = await pool.query(sql, params);
+  return result.rows[0] || null;
+}
+
+async function prepare(sql) {
+  const pool = getPool();
+  return {
+    all: (params) => pool.query(sql, params).then(r => r.rows),
+    get: (params) => pool.query(sql, params).then(r => r.rows[0] || null),
+    run: (params) => pool.query(sql, params).then(r => ({
+      lastInsertRowid: r.rows[0]?.id,
+      changes: r.rowCount || 0,
+    })),
+  };
 }
 
 /**

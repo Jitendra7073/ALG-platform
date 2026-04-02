@@ -19,25 +19,31 @@ const db = require("../database/database.js");
 /**
  * Initialize LinkedIn credentials table
  */
-function initializeLinkedInCredentialsTable() {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS linkedin_credentials (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT,
-      password TEXT,
-      is_active INTEGER DEFAULT 1,
-      last_used DATETIME,
-      notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-  console.log(" LinkedIn credentials table initialized");
+async function initializeLinkedInCredentialsTable() {
+  try {
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS linkedin_credentials (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT,
+        password TEXT,
+        is_active INTEGER DEFAULT 1,
+        last_used TIMESTAMP,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log(" LinkedIn credentials table initialized");
+  } catch (error) {
+    console.error('Error initializing LinkedIn credentials table:', error);
+  }
 }
 
 // Initialize table on module load
-initializeLinkedInCredentialsTable();
+(async () => {
+  await initializeLinkedInCredentialsTable();
+})();
 
 /**
  * GET /api/linkedin/credentials

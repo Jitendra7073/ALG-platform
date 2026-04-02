@@ -103,8 +103,8 @@ class EmailQueueWorker {
   /**
    * Get active sender accounts
    */
-  getActiveSenders() {
-    const senders = db.all(`
+  async getActiveSenders() {
+    const senders = await db.all(`
       SELECT * FROM email_senders
       WHERE is_active = 1
       ORDER BY created_at ASC
@@ -115,34 +115,35 @@ class EmailQueueWorker {
   /**
    * Reset daily counters if needed
    */
-  checkDailyReset() {
+  async checkDailyReset() {
     const today = new Date().toDateString();
 
-    db.all("SELECT * FROM email_senders").forEach((sender) => {
+    const senders = await db.all("SELECT * FROM email_senders");
+    for (const sender of senders) {
       if (sender.last_reset_date !== today) {
-        db.run(
+        await db.run(
           `
           UPDATE email_senders
           SET sent_today = 0,
-              last_reset_date = ?
-          WHERE id = ?
+              last_reset_date = $1
+          WHERE id = $2
         `,
           [today, sender.id],
         );
         console.log(` Reset daily counter for: ${sender.name}`);
       }
-    });
+    }
   }
 
   /**
    * Get next email from queue
    */
-  getNextEmail() {
-    return db.get(
+  async getNextEmail() {
+    return await db.get(
       `
       SELECT * FROM email_queue
       WHERE status = 'queued'
-        AND (scheduled_at IS NULL OR scheduled_at <= ?)
+        AND (scheduled_at IS NULL OR scheduled_at <= $1)
       ORDER BY created_at ASC
       LIMIT 1
     `,
@@ -258,10 +259,10 @@ class EmailQueueWorker {
     if (!this.isProcessing) return;
 
     // Check daily reset
-    this.checkDailyReset();
+    await this.checkDailyReset();
 
     // Get next email
-    const email = this.getNextEmail();
+    const email = await this.getNextEmail();
 
     if (!email) {
       // No emails to process (or no scheduled ones ready)
@@ -289,14 +290,14 @@ class EmailQueueWorker {
 
     if (result.success) {
       // Update queue item
-      db.run(
+      await db.run(
         `
         UPDATE email_queue
         SET status = 'sent',
-            sender_id = ?,
+            sender_id = $1,
             sent_at = CURRENT_TIMESTAMP,
             attempts = attempts + 1
-        WHERE id = ?
+        WHERE id = $2
       `,
         [sender.id, email.id],
       );
@@ -309,11 +310,11 @@ class EmailQueueWorker {
           const sendType =
             sequencePos === 1 ? "main" : `followup_${sequencePos - 1}`;
 
-          db.run(
+          await db.run(
             `
-                  UPDATE email_send_log 
-                  SET status = 'sent', sent_at = CURRENT_TIMESTAMP 
-                  WHERE contact_id = ? AND campaign_id = ? AND send_type = ?
+                  UPDATE email_send_log
+                  SET status = 'sent', sent_at = CURRENT_TIMESTAMP
+                  WHERE contact_id = $1 AND campaign_id = $2 AND send_type = $3
               `,
             [email.contact_id, email.campaign_id, sendType],
           );
@@ -326,22 +327,22 @@ class EmailQueueWorker {
       }
 
       // Update sender counter
-      db.run(
+      await db.run(
         `
         UPDATE email_senders
         SET sent_today = sent_today + 1
-        WHERE id = ?
+        WHERE id = $1
       `,
         [sender.id],
       );
 
       // Update campaign counter
       if (email.campaign_id) {
-        db.run(
+        await db.run(
           `
           UPDATE email_campaigns
           SET sent_count = sent_count + 1
-          WHERE id = ?
+          WHERE id = $1
         `,
           [email.campaign_id],
         );
@@ -354,24 +355,24 @@ class EmailQueueWorker {
       const newAttempts = (email.attempts || 0) + 1;
 
       if (newAttempts >= 3) {
-        db.run(
+        await db.run(
           `
           UPDATE email_queue
           SET status = 'failed',
-              error_message = ?,
-              attempts = ?
-          WHERE id = ?
+              error_message = $1,
+              attempts = $2
+          WHERE id = $3
         `,
           [result.error, newAttempts, email.id],
         );
 
         // Update campaign counter
         if (email.campaign_id) {
-          db.run(
+          await db.run(
             `
             UPDATE email_campaigns
             SET failed_count = failed_count + 1
-            WHERE id = ?
+            WHERE id = $1
           `,
             [email.campaign_id],
           );
@@ -381,13 +382,13 @@ class EmailQueueWorker {
       } else {
         const rescheduleTime = new Date();
         rescheduleTime.setMinutes(rescheduleTime.getMinutes() + 15);
-        db.run(
+        await db.run(
           `
           UPDATE email_queue
-          SET attempts = ?,
-              error_message = ?,
-              scheduled_at = ?
-          WHERE id = ?
+          SET attempts = $1,
+              error_message = $2,
+              scheduled_at = $3
+          WHERE id = $4
         `,
           [newAttempts, result.error, rescheduleTime.toISOString(), email.id],
         );
