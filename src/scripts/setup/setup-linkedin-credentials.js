@@ -22,10 +22,10 @@ try {
       email TEXT,
       password TEXT,
       is_active INTEGER DEFAULT 1,
-      last_used DATETIME,
+      last_used TIMESTAMP,
       notes TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -54,7 +54,6 @@ try {
 
   console.log("\n LinkedIn Credentials Management System setup complete!\n");
 
-  database.close();
 } catch (error) {
   console.error(" Error setting up LinkedIn credentials:", error.message);
   process.exit(1);

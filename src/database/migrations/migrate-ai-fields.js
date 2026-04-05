@@ -25,10 +25,8 @@
  *   node migrate-ai-fields.js --status  # Show migration status
  */
 
-const Database = require("better-sqlite3");
-const path = require("path");
-
-const DB_PATH = path.join(__dirname, "wordpress-detector.db");
+const { run, get, all, query, healthCheck, initializePool } = require("../db-adapter.js");
+require("dotenv").config();
 
 // Colors for terminal output
 const colors = {
@@ -47,7 +45,7 @@ function log(message, color = "reset") {
 /**
  * Add new AI columns to sites table
  */
-function addNewColumns(db) {
+async function addNewColumns() {
   const newColumns = [
     { name: "ai_verified_wp", type: "INTEGER DEFAULT NULL" },
     { name: "ai_wp_confidence", type: "TEXT" },
@@ -57,7 +55,7 @@ function addNewColumns(db) {
     { name: "ai_content_summary", type: "TEXT" },
     { name: "ai_mismatch_reason", type: "TEXT" },
     { name: "ai_error", type: "TEXT" },
-    { name: "ai_processed_at", type: "DATETIME" },
+    { name: "ai_processed_at", type: "TIMESTAMP" },
   ];
 
   let added = 0;
@@ -65,11 +63,11 @@ function addNewColumns(db) {
 
   for (const col of newColumns) {
     try {
-      db.exec(`ALTER TABLE sites ADD COLUMN ${col.name} ${col.type}`);
+      await query(`ALTER TABLE sites ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
       log(`    Added column: ${col.name}`, "green");
       added++;
     } catch (e) {
-      if (e.message.includes("duplicate column")) {
+      if (e.message.includes("duplicate column") || e.code === "42701") {
         skipped++;
       } else {
         log(`    Failed to add ${col.name}: ${e.message}`, "red");
@@ -86,7 +84,7 @@ function addNewColumns(db) {
 /**
  * Create index for faster AI queries
  */
-function createIndexes(db) {
+async function createIndexes() {
   const indexes = [
     "CREATE INDEX IF NOT EXISTS idx_sites_ai_status ON sites(ai_status)",
     "CREATE INDEX IF NOT EXISTS idx_sites_ai_verified_wp ON sites(ai_verified_wp)",
@@ -95,7 +93,7 @@ function createIndexes(db) {
 
   for (const sql of indexes) {
     try {
-      db.exec(sql);
+      await query(sql);
     } catch (e) {
       // Index may already exist
     }
@@ -106,12 +104,11 @@ function createIndexes(db) {
 /**
  * Reset WordPress sites for AI re-processing
  */
-function resetForReprocessing(db) {
-  const result = db
-    .prepare(
-      `
-    UPDATE sites 
-    SET 
+async function resetForReprocessing() {
+  const result = await run(
+    `
+    UPDATE sites
+    SET
       ai_status = 'pending',
       ai_verified_wp = NULL,
       ai_wp_confidence = NULL,
@@ -122,12 +119,11 @@ function resetForReprocessing(db) {
       ai_mismatch_reason = NULL,
       ai_error = NULL,
       ai_processed_at = NULL
-    WHERE is_wordpress = 1 
-      AND text_content IS NOT NULL 
+    WHERE is_wordpress = 1
+      AND text_content IS NOT NULL
       AND text_content != ''
   `,
-    )
-    .run();
+  );
 
   log(
     `\n Reset ${result.changes} WordPress sites for AI re-processing`,
@@ -138,20 +134,16 @@ function resetForReprocessing(db) {
 /**
  * Show current status
  */
-function showStatus(db) {
+async function showStatus() {
   log("\n AI Processing Status:", "cyan");
   log("═".repeat(50), "cyan");
 
   // Total sites
-  const total = db.prepare("SELECT COUNT(*) as count FROM sites").get().count;
-  const wordpress = db
-    .prepare("SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1")
-    .get().count;
-  const withContent = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND text_content IS NOT NULL AND text_content != ''",
-    )
-    .get().count;
+  const total = (await get("SELECT COUNT(*) as count FROM sites")).count;
+  const wordpress = (await get("SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1")).count;
+  const withContent = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND text_content IS NOT NULL AND text_content != ''",
+  )).count;
 
   log(`\n   Total sites: ${total}`, "reset");
   log(`   WordPress sites: ${wordpress}`, "reset");
@@ -160,21 +152,15 @@ function showStatus(db) {
   // AI status breakdown
   log("\n   AI Processing Status:", "blue");
 
-  const pending = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND (ai_status = 'pending' OR ai_status IS NULL)",
-    )
-    .get().count;
-  const completed = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND ai_status = 'completed'",
-    )
-    .get().count;
-  const failed = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND ai_status = 'failed'",
-    )
-    .get().count;
+  const pending = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND (ai_status = 'pending' OR ai_status IS NULL)",
+  )).count;
+  const completed = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND ai_status = 'completed'",
+  )).count;
+  const failed = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE is_wordpress = 1 AND ai_status = 'failed'",
+  )).count;
 
   log(`   • Pending: ${pending}`, "yellow");
   log(`   • Completed: ${completed}`, "green");
@@ -183,22 +169,14 @@ function showStatus(db) {
   // New AI fields status
   log("\n   AI Verification Results:", "blue");
 
-  const verifiedWP = db
-    .prepare("SELECT COUNT(*) as count FROM sites WHERE ai_verified_wp = 1")
-    .get().count;
-  const notWP = db
-    .prepare("SELECT COUNT(*) as count FROM sites WHERE ai_verified_wp = 0")
-    .get().count;
-  const relevant = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE ai_content_relevant = 1",
-    )
-    .get().count;
-  const notRelevant = db
-    .prepare(
-      "SELECT COUNT(*) as count FROM sites WHERE ai_content_relevant = 0",
-    )
-    .get().count;
+  const verifiedWP = (await get("SELECT COUNT(*) as count FROM sites WHERE ai_verified_wp = 1")).count;
+  const notWP = (await get("SELECT COUNT(*) as count FROM sites WHERE ai_verified_wp = 0")).count;
+  const relevant = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE ai_content_relevant = 1",
+  )).count;
+  const notRelevant = (await get(
+    "SELECT COUNT(*) as count FROM sites WHERE ai_content_relevant = 0",
+  )).count;
 
   log(`   • AI Verified WordPress: ${verifiedWP}`, "green");
   log(`   • AI Says Not WordPress: ${notWP}`, "red");
@@ -211,20 +189,21 @@ function showStatus(db) {
 /**
  * Main migration function
  */
-function migrate() {
+async function migrate() {
   log("\n AI Fields Migration", "cyan");
   log("═".repeat(50), "cyan");
 
-  const db = new Database(DB_PATH);
+  // Initialize PostgreSQL pool
+  await initializePool();
 
   try {
     log("\n📦 Adding new AI columns...", "blue");
-    addNewColumns(db);
+    await addNewColumns();
 
     log("\n📇 Creating indexes...", "blue");
-    createIndexes(db);
+    await createIndexes();
 
-    showStatus(db);
+    await showStatus();
 
     log("\n Migration complete!", "green");
     log("\n Next steps:", "cyan");
@@ -234,28 +213,25 @@ function migrate() {
     );
     log("   2. Start server: npm run admin", "reset");
     log("   3. AI processor will automatically process pending sites", "reset");
-  } finally {
-    db.close();
   }
 }
 
 /**
  * Main entry point
  */
-function main() {
+async function main() {
   const args = process.argv.slice(2);
 
+  // Initialize pool for all commands
+  await initializePool();
+
   if (args.includes("--status")) {
-    const db = new Database(DB_PATH);
-    showStatus(db);
-    db.close();
+    await showStatus();
   } else if (args.includes("--reset")) {
-    const db = new Database(DB_PATH);
-    addNewColumns(db);
-    createIndexes(db);
-    resetForReprocessing(db);
-    showStatus(db);
-    db.close();
+    await addNewColumns();
+    await createIndexes();
+    await resetForReprocessing();
+    await showStatus();
   } else if (args.includes("--help") || args.includes("-h")) {
     log(
       `
@@ -279,8 +255,8 @@ New AI Fields:
       "reset",
     );
   } else {
-    migrate();
+    await migrate();
   }
 }
 
-main();
+main().catch(console.error);

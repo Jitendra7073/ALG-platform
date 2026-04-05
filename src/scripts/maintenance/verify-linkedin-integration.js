@@ -3,91 +3,94 @@
  *
  * This script verifies that the LinkedIn credentials system is properly integrated
  * and working correctly.
+ *
+ * PostgreSQL-compatible version
  */
 
 const db = require("../../database/database.js");
 
-console.log("========================================");
-console.log("LINKEDIN CREDENTIALS VERIFICATION");
-console.log("========================================\n");
+async function verifyLinkedInIntegration() {
+  console.log("========================================");
+  console.log("LINKEDIN CREDENTIALS VERIFICATION");
+  console.log("========================================\n");
 
-try {
-  const database = db.initDatabase();
+  try {
+    const database = db.initDatabase();
 
-  // 1. Check if table exists
-  console.log("1. Checking database table...");
-  const tableCheck = database
-    .prepare(
+    // 1. Check if table exists
+    console.log("1. Checking database table...");
+    const tableCheck = await database.get(
       `
-    SELECT name FROM sqlite_master
-    WHERE type='table' AND name='linkedin_credentials'
-  `,
-    )
-    .get();
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'linkedin_credentials'
+    `
+    );
 
-  if (tableCheck) {
-    console.log("    linkedin_credentials table exists\n");
-  } else {
-    console.log("    linkedin_credentials table NOT found");
-    console.log("    Run: node setup-linkedin-credentials.js\n");
-    process.exit(1);
-  }
+    if (tableCheck) {
+      console.log("    linkedin_credentials table exists\n");
+    } else {
+      console.log("    linkedin_credentials table NOT found");
+      console.log("    Run: node setup-linkedin-credentials.js\n");
+      process.exit(1);
+    }
 
-  // 2. Check table structure
-  console.log("2. Checking table structure...");
-  const columns = database
-    .prepare("PRAGMA table_info(linkedin_credentials)")
-    .all();
-  const requiredColumns = [
-    "id",
-    "name",
-    "email",
-    "password",
-    "is_active",
-    "last_used",
-    "notes",
-    "created_at",
-    "updated_at",
-  ];
-  const columnNames = columns.map((c) => c.name);
-
-  const missingColumns = requiredColumns.filter(
-    (col) => !columnNames.includes(col),
-  );
-  if (missingColumns.length === 0) {
-    console.log("    All required columns present\n");
-  } else {
-    console.log(`    Missing columns: ${missingColumns.join(", ")}\n`);
-  }
-
-  // 3. Count credentials
-  console.log("3. Checking credentials...");
-  const totalCount = database
-    .prepare("SELECT COUNT(*) as count FROM linkedin_credentials")
-    .get();
-  console.log(`   Total credentials: ${totalCount.count}`);
-
-  const activeCount = database
-    .prepare(
-      "SELECT COUNT(*) as count FROM linkedin_credentials WHERE is_active = 1",
-    )
-    .get();
-  console.log(`   Active credentials: ${activeCount.count}`);
-
-  const inactiveCount = totalCount.count - activeCount.count;
-  console.log(`   Inactive credentials: ${inactiveCount}\n`);
-
-  // 4. Show all credentials (masked)
-  console.log("4. Listing credentials...");
-  const credentials = database
-    .prepare(
+    // 2. Check table structure
+    console.log("2. Checking table structure...");
+    const columns = await database.all(
       `
-    SELECT id, name, email, is_active, last_used, notes, created_at
-    FROM linkedin_credentials
-    ORDER BY is_active DESC, created_at DESC
-  `,
-    )
-    .all();
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'linkedin_credentials'
+      ORDER BY ordinal_position
+    `
+    );
+    const requiredColumns = [
+      "id",
+      "name",
+      "email",
+      "password",
+      "is_active",
+      "last_used",
+      "notes",
+      "created_at",
+      "updated_at",
+    ];
+    const columnNames = columns.map((c) => c.column_name);
+
+    const missingColumns = requiredColumns.filter(
+      (col) => !columnNames.includes(col),
+    );
+    if (missingColumns.length === 0) {
+      console.log("    All required columns present\n");
+    } else {
+      console.log(`    Missing columns: ${missingColumns.join(", ")}\n`);
+    }
+
+    // 3. Count credentials
+    console.log("3. Checking credentials...");
+    const totalCount = await database.get(
+      "SELECT COUNT(*) as count FROM linkedin_credentials"
+    );
+    console.log(`   Total credentials: ${totalCount.count}`);
+
+    const activeCount = await database.get(
+      "SELECT COUNT(*) as count FROM linkedin_credentials WHERE is_active = 1"
+    );
+    console.log(`   Active credentials: ${activeCount.count}`);
+
+    const inactiveCount = totalCount.count - activeCount.count;
+    console.log(`   Inactive credentials: ${inactiveCount}\n`);
+
+    // 4. Show all credentials (masked)
+    console.log("4. Listing credentials...");
+    const credentials = await database.all(
+      `
+      SELECT id, name, email, is_active, last_used, notes, created_at
+      FROM linkedin_credentials
+      ORDER BY is_active DESC, created_at DESC
+    `
+    );
 
   if (credentials.length === 0) {
     console.log("   📋 No credentials found\n");
@@ -161,39 +164,41 @@ try {
     console.log("    No hardcoded credentials found in scraper\n");
   }
 
-  // 7. Summary
-  console.log("========================================");
-  console.log("VERIFICATION SUMMARY");
-  console.log("========================================\n");
+    // 7. Summary
+    console.log("========================================");
+    console.log("VERIFICATION SUMMARY");
+    console.log("========================================\n");
 
-  console.log(" Database structure: OK");
-  console.log(
-    ` Credentials: ${totalCount.count} total, ${activeCount.count} active`,
-  );
-  console.log("🔒 Security: No hardcoded credentials");
-  console.log(
-    "🎯 Single-active: " + (activeCount.count <= 1 ? "OK" : "WARNING"),
-  );
+    console.log(" Database structure: OK");
+    console.log(
+      ` Credentials: ${totalCount.count} total, ${activeCount.count} active`,
+    );
+    console.log(" Security: No hardcoded credentials");
+    console.log(
+      " Single-active: " + (activeCount.count <= 1 ? "OK" : "WARNING"),
+    );
 
-  if (totalCount.count === 0) {
-    console.log("\n📝 Next Steps:");
-    console.log("   1. Start the server: npm run admin");
-    console.log("   2. Open http://localhost:8080");
-    console.log('   3. Go to "LinkedIn" tab');
-    console.log("   4. Add your first credential");
-    console.log("   5. Test the scraper: node run-executives-scraper.js");
-  } else {
-    console.log("\n📝 System Ready!");
-    console.log("   - UI: http://localhost:8080 (LinkedIn tab)");
-    console.log("   - Scraper: node run-executives-scraper.js");
-    console.log("   - Toggle switches work in UI");
-    console.log("   - Only one credential active at a time");
+    if (totalCount.count === 0) {
+      console.log("\n Next Steps:");
+      console.log("   1. Start the server: npm run admin");
+      console.log("   2. Open http://localhost:8080");
+      console.log('   3. Go to "LinkedIn" tab');
+      console.log("   4. Add your first credential");
+      console.log("   5. Test the scraper: node run-executives-scraper.js");
+    } else {
+      console.log("\n System Ready!");
+      console.log("   - UI: http://localhost:8080 (LinkedIn tab)");
+      console.log("   - Scraper: node run-executives-scraper.js");
+      console.log("   - Toggle switches work in UI");
+      console.log("   - Only one credential active at a time");
+    }
+
+    console.log("\n Verification complete!\n");
+  } catch (error) {
+    console.error(" Error during verification:", error.message);
+    process.exit(1);
   }
-
-  database.close();
-
-  console.log("\n Verification complete!\n");
-} catch (error) {
-  console.error(" Error during verification:", error.message);
-  process.exit(1);
 }
+
+// Run the verification
+verifyLinkedInIntegration();

@@ -33,7 +33,7 @@ class LinkedInCompanyScraper {
     console.log("🔐 Initializing browser for LinkedIn company scraping...");
 
     // Get active credential from database
-    const activeCredential = this.getActiveCredential();
+    const activeCredential = await this.getActiveCredential();
 
     if (
       !activeCredential ||
@@ -112,24 +112,17 @@ class LinkedInCompanyScraper {
   /**
    * Get active LinkedIn credential from database
    */
-  getActiveCredential() {
-    const database = db.initDatabase();
-    try {
-      const credential = database
-        .prepare(
-          `
-        SELECT * FROM linkedin_credentials
-        WHERE is_active = 1
-        ORDER BY last_used DESC
-        LIMIT 1
-      `,
-        )
-        .get();
+  async getActiveCredential() {
+    const credential = await db.get(
+      `
+      SELECT * FROM linkedin_credentials
+      WHERE is_active = 1
+      ORDER BY last_used DESC
+      LIMIT 1
+    `
+    );
 
-      return credential || null;
-    } finally {
-      database.close();
-    }
+    return credential || null;
   }
 
   /**
@@ -558,21 +551,15 @@ class LinkedInCompanyScraper {
   async markCredentialAsUsed() {
     if (!this.currentCredential) return;
 
-    const database = db.initDatabase();
-    try {
-      database
-        .prepare(
-          `
-        UPDATE linkedin_credentials
-        SET last_used = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-        )
-        .run(this.currentCredential.id);
-      console.log(" Credential marked as used");
-    } finally {
-      database.close();
-    }
+    await db.run(
+      `
+      UPDATE linkedin_credentials
+      SET last_used = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `,
+      [this.currentCredential.id]
+    );
+    console.log(" Credential marked as used");
   }
 
   async close() {
@@ -1088,84 +1075,73 @@ class LinkedInCompanyScraper {
    * Process all LinkedIn company URLs from the database
    */
   async processAllCompanyUrls() {
-    const db = require("../database/database.js.js");
-    const database = db.initDatabase();
-
-    try {
-      // Get all LinkedIn URLs from contacts table, excluding those that already have executives
-      const companyUrls = database
-        .prepare(
-          `
-        SELECT DISTINCT
-          c.value as linkedin_url,
-          c.site_id,
-          s.url as site_url
-        FROM contacts c
-        INNER JOIN sites s ON c.site_id = s.id
-        WHERE c.type = 'linkedin'
-          AND NOT EXISTS (
-            SELECT 1 FROM company_executives ce
-            WHERE ce.company_url = c.value
-          )
-      `,
+    // Get all LinkedIn URLs from contacts table, excluding those that already have executives
+    const companyUrls = await db.all(
+      `
+      SELECT DISTINCT
+        c.value as linkedin_url,
+        c.site_id,
+        s.url as site_url
+      FROM contacts c
+      INNER JOIN sites s ON c.site_id = s.id
+      WHERE c.type = 'linkedin'
+        AND NOT EXISTS (
+          SELECT 1 FROM company_executives ce
+          WHERE ce.company_url = c.value
         )
-        .all();
+    `
+    );
 
-      database.close();
+    console.log(
+      `\n Found ${companyUrls.length} LinkedIn company URLs to process (skipping companies with existing executives)`,
+    );
 
-      console.log(
-        `\n Found ${companyUrls.length} LinkedIn company URLs to process (skipping companies with existing executives)`,
-      );
-
-      if (companyUrls.length === 0) {
-        console.log(` All companies already have executives scraped!`);
-        return [];
-      }
-
-      const results = [];
-
-      for (let i = 0; i < companyUrls.length; i++) {
-        const company = companyUrls[i];
-        console.log(`\n${"=".repeat(70)}`);
-        console.log(
-          `[${i + 1}/${companyUrls.length}] Processing: ${company.linkedin_url}`,
-        );
-        console.log(`   From site: ${company.site_url}`);
-
-        const result = await this.scrapeCompanyPage(
-          company.linkedin_url,
-          company.site_id,
-        );
-        results.push({
-          ...result,
-          siteUrl: company.site_url,
-        });
-
-        // Delay between companies
-        if (i < companyUrls.length - 1) {
-          const delay = randomDelay(5000, 8000);
-          console.log(`⏱️  Waiting ${delay}ms before next company...`);
-          await this.page.waitForTimeout(delay);
-        }
-      }
-
-      // Summary
-      console.log(`\n${"=".repeat(70)}`);
-      console.log(" SUMMARY:");
-      console.log(`   Total companies processed: ${companyUrls.length}`);
-      console.log(`   Successful: ${results.filter((r) => r.success).length}`);
-      console.log(`   Failed: ${results.filter((r) => !r.success).length}`);
-
-      const totalExecutives = results
-        .filter((r) => r.success)
-        .reduce((sum, r) => sum + (r.executivesFound || 0), 0);
-
-      console.log(`   Total executives found: ${totalExecutives}`);
-
-      return results;
-    } finally {
-      database.close();
+    if (companyUrls.length === 0) {
+      console.log(` All companies already have executives scraped!`);
+      return [];
     }
+
+    const results = [];
+
+    for (let i = 0; i < companyUrls.length; i++) {
+      const company = companyUrls[i];
+      console.log(`\n${"=".repeat(70)}`);
+      console.log(
+        `[${i + 1}/${companyUrls.length}] Processing: ${company.linkedin_url}`,
+      );
+      console.log(`   From site: ${company.site_url}`);
+
+      const result = await this.scrapeCompanyPage(
+        company.linkedin_url,
+        company.site_id,
+      );
+      results.push({
+        ...result,
+        siteUrl: company.site_url,
+      });
+
+      // Delay between companies
+      if (i < companyUrls.length - 1) {
+        const delay = randomDelay(5000, 8000);
+        console.log(`⏱️  Waiting ${delay}ms before next company...`);
+        await this.page.waitForTimeout(delay);
+      }
+    }
+
+    // Summary
+    console.log(`\n${"=".repeat(70)}`);
+    console.log(" SUMMARY:");
+    console.log(`   Total companies processed: ${companyUrls.length}`);
+    console.log(`   Successful: ${results.filter((r) => r.success).length}`);
+    console.log(`   Failed: ${results.filter((r) => !r.success).length}`);
+
+    const totalExecutives = results
+      .filter((r) => r.success)
+      .reduce((sum, r) => sum + (r.executivesFound || 0), 0);
+
+    console.log(`   Total executives found: ${totalExecutives}`);
+
+    return results;
   }
 }
 

@@ -24,7 +24,7 @@ try {
       business_end INTEGER DEFAULT 17,
       weekend_days TEXT DEFAULT '0,6',
       preferred_send_times TEXT DEFAULT '["09:00","10:00","14:00","15:00"]',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -57,8 +57,8 @@ try {
       avoid_weekends INTEGER DEFAULT 1,
       max_emails_per_hour INTEGER DEFAULT 10,
       cooldown_minutes INTEGER DEFAULT 30,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -77,7 +77,7 @@ try {
       was_business_hours INTEGER,
       day_of_week INTEGER,
       status TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 

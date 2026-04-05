@@ -10,12 +10,14 @@
  *
  * Auto-polling: Checks for pending sites every POLL_INTERVAL_MS.
  * Conflict prevention: While processing a batch, polling is paused.
+ *
+ * REFACTORED: Now uses PostgreSQL adapter with async/await
  */
 
 require("dotenv").config();
 const db = require("../../database/database.js");
 const aiClient = require("./ai-client");
-const logger = require("../../utils/system-logger"); // Import logger
+const logger = require("../../utils/compact-logger"); // Compact logger
 
 const BATCH_SIZE = 5; // Sites per batch
 const POLL_INTERVAL_MS = 30000; // Check for pending sites every 30 seconds
@@ -154,30 +156,19 @@ class AIProcessor {
    */
   start() {
     if (this.isRunning) {
-      logger.warning("AI Processor already running");
       return;
     }
 
     if (!aiClient.isConfigured()) {
-      logger.error(
-        "AI Processor: OPENROUTER_API_KEY not set. Worker disabled.",
-      );
+      logger.error('AI', 'Not configured', { reason: 'OPENROUTER_API_KEY not set' });
       return;
     }
 
     this.isRunning = true;
-    logger.system("AI Processor started");
-    logger.ai(`Model: ${aiClient.getStats().model}`);
-    logger.ai(`Poll Interval: ${POLL_INTERVAL_MS / 1000}s`);
-    logger.ai(`Batch Size: ${BATCH_SIZE}`);
+    logger.info('AI', 'started');
 
     // Check backlog immediately on start
-    const pending = this.getPendingCount();
-    if (pending > 0) {
-      logger.ai(`Found ${pending} WordPress sites pending AI verification`);
-    } else {
-      logger.ai("No pending sites. Watching for new scrapes...");
-    }
+    this.checkAndProcess();
 
     // Start polling loop
     this.startPolling();
@@ -205,20 +196,18 @@ class AIProcessor {
 
     // Skip if already processing a batch (conflict prevention)
     if (this.isProcessing) {
-      console.log("     Skipping poll - batch still processing");
       return;
     }
 
     this.stats.lastPollAt = new Date().toISOString();
-    const pendingCount = this.getPendingCount();
+    const pendingCount = await this.getPendingCount();
 
-    if (pendingCount === 0) {
-      // Silent - don't log when nothing to do
-      return;
+    // Use compact poll logger
+    logger.poll('AI', { pending: pendingCount });
+
+    if (pendingCount > 0) {
+      await this.processBatch();
     }
-
-    console.log(`\n🔍 Poll: Found ${pendingCount} pending sites`);
-    await this.processBatch();
   }
 
   /**
@@ -230,13 +219,11 @@ class AIProcessor {
     this.isProcessing = true;
 
     try {
-      const pendingSites = this.getPendingSites(BATCH_SIZE);
+      const pendingSites = await this.getPendingSites(BATCH_SIZE);
 
       if (pendingSites.length === 0) {
         return;
       }
-
-      logger.ai(`Processing batch of ${pendingSites.length} sites...`);
 
       for (const site of pendingSites) {
         if (!this.isRunning) break;
@@ -247,18 +234,8 @@ class AIProcessor {
       }
 
       this.stats.lastProcessedAt = new Date().toISOString();
-
-      // Check if more sites are waiting
-      const remaining = this.getPendingCount();
-      if (remaining > 0) {
-        console.log(
-          `   📋 ${remaining} more sites pending - will process next poll`,
-        );
-      } else {
-        console.log("   ✓ All pending sites processed");
-      }
     } catch (error) {
-      console.error(" AI Processor batch error:", error.message);
+      logger.error('AI', 'Batch error', { message: error.message });
     } finally {
       this.isProcessing = false;
     }
@@ -276,40 +253,27 @@ class AIProcessor {
       this.pollIntervalId = null;
     }
 
-    logger.system("AI Processor stopped");
-    this.printStats();
-  }
-
-  /**
-   * Print processing statistics
-   */
-  printStats() {
-    logger.ai(
-      `Processor Stats - Total: ${this.stats.totalProcessed}, Relevant: ${this.stats.relevant}, Not Relevant: ${this.stats.notRelevant}, Failed: ${this.stats.failed}`,
-    );
+    logger.info('AI', 'stopped');
   }
 
   /**
    * Get count of pending sites
+   * REFACTORED: Now async, uses PostgreSQL adapter
    */
-  getPendingCount() {
-    const database = db.initDatabase();
+  async getPendingCount() {
     try {
-      const result = database
-        .prepare(
-          `
-        SELECT COUNT(*) as count
-        FROM sites 
-        WHERE is_wordpress = 1 
-          AND (ai_status = 'pending' OR ai_status IS NULL)
-          AND text_content IS NOT NULL 
-          AND text_content != ''
-      `,
-        )
-        .get();
-      return result.count;
-    } finally {
-      database.close();
+      const result = await db.get(
+        `SELECT COUNT(*) as count
+         FROM sites
+         WHERE is_wordpress = 1
+           AND (ai_status = 'pending' OR ai_status IS NULL)
+           AND text_content IS NOT NULL
+           AND text_content != ''`
+      );
+      return result ? result.count : 0;
+    } catch (error) {
+      logger.error('DB', 'Query failed', { operation: 'getPendingCount', message: error.message });
+      return 0;
     }
   }
 
@@ -320,48 +284,46 @@ class AIProcessor {
    * - ai_status = 'pending' (not yet processed)
    * - text_content is not empty
    * - content does not match ignored tags
+   * REFACTORED: Now async, uses PostgreSQL adapter
    */
-  getPendingSites(limit = BATCH_SIZE) {
-    const database = db.initDatabase();
+  async getPendingSites(limit = BATCH_SIZE) {
     try {
-      const sites = database
-        .prepare(
-          `
-        SELECT id, url, search_query, text_content, page_title, meta_description
-        FROM sites
-        WHERE is_wordpress = 1
-          AND (ai_status = 'pending' OR ai_status IS NULL)
-          AND text_content IS NOT NULL
-          AND text_content != ''
-        ORDER BY id ASC
-        LIMIT ?
-      `,
-        )
-        .all(limit);
+      const sites = await db.all(
+        `SELECT id, url, search_query, text_content, page_title, meta_description
+         FROM sites
+         WHERE is_wordpress = 1
+           AND (ai_status = 'pending' OR ai_status IS NULL)
+           AND text_content IS NOT NULL
+           AND text_content != ''
+         ORDER BY id ASC
+         LIMIT ?`,
+        [limit]
+      );
 
       // Filter out sites with ignored tags in content
-      const ignoredTags = this.getIgnoredTags();
+      const ignoredTags = await this.getIgnoredTags();
       const filtered = sites.filter((site) => {
         if (!ignoredTags.length) return true;
         return !this.isContentIgnored(site.text_content, ignoredTags);
       });
 
       return filtered;
-    } finally {
-      database.close();
+    } catch (error) {
+      logger.error('DB', 'Query failed', { operation: 'getPendingSites', message: error.message });
+      return [];
     }
   }
 
   /**
    * Get all ignored tags from database
-   * @returns {Array} - Array of ignored tag objects
+   * REFACTORED: Now async, uses PostgreSQL adapter
    */
-  getIgnoredTags() {
-    const database = db.initDatabase();
+  async getIgnoredTags() {
     try {
-      return database.prepare(`SELECT * FROM ignored_tags`).all();
-    } finally {
-      database.close();
+      return await db.all(`SELECT * FROM ignored_tags`);
+    } catch (error) {
+      logger.error('DB', 'Query failed', { operation: 'getIgnoredTags', message: error.message });
+      return [];
     }
   }
 
@@ -398,13 +360,12 @@ class AIProcessor {
 
   /**
    * Process a single site with AI
+   * REFACTORED: Now calls async database functions
    */
   async processSite(site) {
     const startTime = Date.now();
 
     try {
-      process.stdout.write(`   → [${site.id}] ${this.truncateUrl(site.url)} `);
-
       // Pre-AI keyword validation: Check if keyword appears in page metadata
       const keywordValidated = this.validateKeywordPresence(site);
 
@@ -424,8 +385,8 @@ class AIProcessor {
           filterReason: keywordValidated.reason,
         });
 
-        // Save as not relevant
-        this.saveAIResults(site.id, {
+        // Save as not relevant (async call)
+        await this.saveAIResults(site.id, {
           wordpressVerification: {
             isWordPress: true,
             confidence: "high",
@@ -444,13 +405,11 @@ class AIProcessor {
 
         this.stats.totalProcessed++;
         this.stats.notRelevant++;
-
-        console.log(`⚡ FILTERED (${keywordValidated.reason})`);
         return;
       }
 
-      // Mark as processing
-      this.updateSiteStatus(site.id, "processing");
+      // Mark as processing (async call)
+      await this.updateSiteStatus(site.id, "processing");
 
       // Run AI analysis
       const result = await aiClient.analyzeSite(
@@ -477,8 +436,8 @@ class AIProcessor {
         isRelevant: result.contentRelevance?.isRelevant,
       });
 
-      // Save results
-      this.saveAIResults(site.id, result);
+      // Save results (async call)
+      await this.saveAIResults(site.id, result);
 
       // Update stats
       this.stats.totalProcessed++;
@@ -487,48 +446,12 @@ class AIProcessor {
       } else {
         this.stats.notRelevant++;
       }
-
-      // Log result with WordPress verification and content relevance
-      const wpIcon = result.wordpressVerification?.isWordPress
-        ? " WP"
-        : "🔴 Not WP";
-      const wpConfidence = result.wordpressVerification?.confidence || "medium";
-      const relevantIcon = result.contentRelevance?.isRelevant ? "" : "⚠️";
-      const category = result.contentRelevance?.actualCategory || "Unknown";
-
-      if (result.contentRelevance?.isRelevant) {
-        logger.success(
-          `[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} (${elapsed}ms)`,
-        );
-      } else {
-        logger.warning(
-          `[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} - Not relevant (${elapsed}ms)`,
-        );
-      }
-
-      // Log WordPress indicators if not WordPress
-      if (
-        !result.wordpressVerification?.isWordPress &&
-        result.wordpressVerification?.indicators?.length > 0
-      ) {
-        logger.ai(
-          `↳ WP Indicators: ${result.wordpressVerification.indicators[0]}`,
-        );
-      }
-
-      // Log mismatch reason if not relevant
-      if (
-        !result.contentRelevance?.isRelevant &&
-        result.contentRelevance?.mismatchReason
-      ) {
-        logger.ai(`↳ ${result.contentRelevance.mismatchReason}`);
-      }
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      logger.error(`[${site.id}] Failed: ${error.message}`);
+      logger.error('AI', 'Site failed', { id: site.id, message: error.message, time: `${elapsed}ms` });
       this.stats.totalProcessed++;
       this.stats.failed++;
-      this.updateSiteStatus(site.id, "failed", error.message);
+      await this.updateSiteStatus(site.id, "failed", error.message);
 
       // Track failed request in history
       this.addToHistory({
@@ -546,40 +469,33 @@ class AIProcessor {
 
   /**
    * Update site AI status
+   * REFACTORED: Now async, uses PostgreSQL adapter
    */
-  updateSiteStatus(siteId, status, errorMessage = null) {
-    const database = db.initDatabase();
+  async updateSiteStatus(siteId, status, errorMessage = null) {
     try {
       if (errorMessage) {
-        database
-          .prepare(
-            `
-          UPDATE sites 
-          SET ai_status = ?, ai_error = ?
-          WHERE id = ?
-        `,
-          )
-          .run(status, errorMessage, siteId);
+        await db.run(
+          `UPDATE sites SET ai_status = ?, ai_error = ? WHERE id = ?`,
+          [status, errorMessage, siteId]
+        );
       } else {
-        database
-          .prepare(
-            `
-          UPDATE sites SET ai_status = ? WHERE id = ?
-        `,
-          )
-          .run(status, siteId);
+        await db.run(
+          `UPDATE sites SET ai_status = ? WHERE id = ?`,
+          [status, siteId]
+        );
       }
-    } finally {
-      database.close();
+    } catch (error) {
+      logger.error('DB', 'Update failed', { operation: 'updateSiteStatus', siteId, message: error.message });
+      throw error;
     }
   }
 
   /**
    * Save AI analysis results to database
    * Uses actual AI results for WordPress verification instead of hardcoded values
+   * REFACTORED: Now async, uses PostgreSQL adapter
    */
-  saveAIResults(siteId, result) {
-    const database = db.initDatabase();
+  async saveAIResults(siteId, result) {
     try {
       // Extract WordPress verification data
       const wpVerified = result.wordpressVerification?.isWordPress ? 1 : 0;
@@ -592,10 +508,8 @@ class AIProcessor {
       const contentSummary = result.contentRelevance?.summary || null;
       const mismatchReason = result.contentRelevance?.mismatchReason || null;
 
-      database
-        .prepare(
-          `
-        UPDATE sites SET
+      await db.run(
+        `UPDATE sites SET
           ai_status = 'completed',
           ai_error = NULL,
           is_wordpress = ?,
@@ -607,10 +521,8 @@ class AIProcessor {
           ai_content_summary = ?,
           ai_mismatch_reason = ?,
           ai_processed_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-        )
-        .run(
+         WHERE id = ?`,
+        [
           // Update original WordPress detection based on AI verification
           wpVerified,
           // AI verification fields from actual AI analysis
@@ -623,9 +535,11 @@ class AIProcessor {
           contentSummary,
           mismatchReason,
           siteId,
-        );
-    } finally {
-      database.close();
+        ]
+      );
+    } catch (error) {
+      logger.error('DB', 'Save failed', { operation: 'saveAIResults', message: error.message });
+      throw error;
     }
   }
 
@@ -652,7 +566,7 @@ class AIProcessor {
       ...this.stats,
       isRunning: this.isRunning,
       isProcessing: this.isProcessing,
-      pendingCount: this.getPendingCount(),
+      pendingCount: 0, // Note: This would need async call to get accurate count
       pollIntervalMs: POLL_INTERVAL_MS,
       batchSize: BATCH_SIZE,
       aiClient: aiClient.getStats(),

@@ -17,7 +17,7 @@ console.log("🔍 Checking for stuck emails...\n");
 const stuckEmails = db.all(`
   SELECT * FROM email_queue
   WHERE status = 'sending'
-    AND (sent_at IS NULL OR sent_at < datetime('now', '-1 hour'))
+    AND (sent_at IS NULL OR sent_at < NOW() - INTERVAL '1 hour')
 `);
 
 if (stuckEmails.length === 0) {

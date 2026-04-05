@@ -400,8 +400,8 @@ app.delete("/api/ignored-tags/:id", async (req, res) => {
 });
 
 // Bulk delete ignored tags
-app.post("/api/ignored-tags-bulk", async (req, res) => {
-    try {
+app.post("/api/ignored-tags-bulk", (req, res) => {
+  try {
     const { ids } = req.body;
 
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -410,7 +410,7 @@ app.post("/api/ignored-tags-bulk", async (req, res) => {
         .status(400)
         .json({ success: false, error: "IDs must be a non-empty array" });
     }
-    const deletedCount = await db.bulkDeleteIgnoredTags(ids);
+    const deletedCount = db.bulkDeleteIgnoredTags(ids);
     res.json({
       success: true,
       message: `Deleted ${deletedCount} ignored tags successfully`,
@@ -423,9 +423,9 @@ app.post("/api/ignored-tags-bulk", async (req, res) => {
 });
 
 // Get all keywords
-app.get("/api/keywords", async (req, res) => {
+app.get("/api/keywords", (req, res) => {
   try {
-    const keywords = await db.getAllKeywords();
+    const keywords = db.getAllKeywords();
     res.json({ success: true, data: keywords });
   } catch (error) {
     console.error("Error fetching keywords:", error);
@@ -434,7 +434,7 @@ app.get("/api/keywords", async (req, res) => {
 });
 
 // Add keyword
-app.post("/api/keywords", async (req, res) => {
+app.post("/api/keywords", (req, res) => {
   try {
     const { keyword, max_sites } = req.body;
     if (!keyword || keyword.trim() === "") {
@@ -452,10 +452,10 @@ app.post("/api/keywords", async (req, res) => {
     } else {
       limit = 20; // Default
     }
-    const result = await db.addKeyword(keyword, limit);
+    const result = db.addKeyword(keyword, limit);
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE")) {
       res.status(400).json({ success: false, error: "Keyword already exists" });
     } else {
       res.status(500).json({ success: false, error: error.message });
@@ -464,7 +464,7 @@ app.post("/api/keywords", async (req, res) => {
 });
 
 // Update keyword
-app.put("/api/keywords/:id", async (req, res) => {
+app.put("/api/keywords/:id", (req, res) => {
   try {
     const { id } = req.params;
     const { keyword } = req.body;
@@ -473,7 +473,7 @@ app.put("/api/keywords/:id", async (req, res) => {
         .status(400)
         .json({ success: false, error: "Keyword is required" });
     }
-    const result = await db.updateKeyword(parseInt(id), keyword);
+    const result = db.updateKeyword(parseInt(id), keyword);
     if (!result) {
       return res
         .status(404)
@@ -486,10 +486,10 @@ app.put("/api/keywords/:id", async (req, res) => {
 });
 
 // Delete keyword
-app.delete("/api/keywords/:id", async (req, res) => {
+app.delete("/api/keywords/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.deleteKeyword(parseInt(id));
+    const result = db.deleteKeyword(parseInt(id));
     res.json({ success: true, data: { deleted: result } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -497,9 +497,9 @@ app.delete("/api/keywords/:id", async (req, res) => {
 });
 
 // Get statistics
-app.get("/api/stats", async (req, res) => {
+app.get("/api/stats", (req, res) => {
   try {
-    const stats = await db.getStatistics();
+    const stats = db.getStatistics();
     res.json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -795,12 +795,12 @@ app.post("/api/ai/retry/check-now", (req, res) => {
 // =====================================================
 
 // Get WordPress sites
-app.get("/api/sites/wordpress", async (req, res) => {
+app.get("/api/sites/wordpress", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const searchQuery = req.query.search || null;
-    const result = await db.getSitesByWordpressStatus(true, page, limit, searchQuery);
+    const result = db.getSitesByWordpressStatus(true, page, limit, searchQuery);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -808,12 +808,12 @@ app.get("/api/sites/wordpress", async (req, res) => {
 });
 
 // Get non-WordPress sites
-app.get("/api/sites/non-wordpress", async (req, res) => {
+app.get("/api/sites/non-wordpress", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const searchQuery = req.query.search || null;
-    const result = await db.getSitesByWordpressStatus(
+    const result = db.getSitesByWordpressStatus(
       false,
       page,
       limit,
@@ -826,9 +826,9 @@ app.get("/api/sites/non-wordpress", async (req, res) => {
 });
 
 // Get distinct AI categories
-app.get("/api/sites/categories", async (req, res) => {
+app.get("/api/sites/categories", (req, res) => {
   try {
-    const categories = await db.getDistinctCategories();
+    const categories = db.getDistinctCategories();
     res.json({ success: true, data: categories });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -836,14 +836,14 @@ app.get("/api/sites/categories", async (req, res) => {
 });
 
 // Get all sites with optional search filter and dynamic category filter
-app.get("/api/sites/all", async (req, res) => {
+app.get("/api/sites/all", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const searchQuery = req.query.search || null;
     const filter = req.query.filter || "all";
     const category = req.query.category || null;
-    const result = await db.getAllSites(page, limit, searchQuery, filter, category);
+    const result = db.getAllSites(page, limit, searchQuery, filter, category);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -851,10 +851,10 @@ app.get("/api/sites/all", async (req, res) => {
 });
 
 // Get single site by ID
-app.get("/api/sites/:id", async (req, res) => {
+app.get("/api/sites/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const site = await db.getSiteById(parseInt(id));
+    const site = db.getSiteById(parseInt(id));
     if (!site) {
       return res.status(404).json({ success: false, error: "Site not found" });
     }
@@ -884,7 +884,7 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
     const { keywordId } = req.params;
     const { country, customCountrySettings } = req.body; // New: optional country and custom settings
     const parsedKeywordId = parseInt(keywordId);
-    const keyword = await db.getKeywordById(parsedKeywordId);
+    const keyword = db.getKeywordById(parsedKeywordId);
 
     if (!keyword) {
       return res
@@ -1289,13 +1289,13 @@ app.get("/api/contacts/phones/:id", async (req, res) => {
 });
 
 // Get all contacts with filtering
-app.get("/api/contacts/all", async (req, res) => {
+app.get("/api/contacts/all", (req, res) => {
   try {
     const type = req.query.type || "all";
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || null;
-    const result = await db.getAllContacts(type, page, limit, search);
+    const result = db.getAllContacts(type, page, limit, search);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1303,12 +1303,12 @@ app.get("/api/contacts/all", async (req, res) => {
 });
 
 // Get LinkedIn profiles with pagination
-app.get("/api/contacts/linkedin", async (req, res) => {
+app.get("/api/contacts/linkedin", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || null;
-    const result = await db.getLinkedinProfiles(page, limit, search);
+    const result = db.getLinkedinProfiles(page, limit, search);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1316,10 +1316,10 @@ app.get("/api/contacts/linkedin", async (req, res) => {
 });
 
 // Get single LinkedIn profile by ID
-app.get("/api/contacts/linkedin/:id", async (req, res) => {
+app.get("/api/contacts/linkedin/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const linkedin = await db.getLinkedinById(parseInt(id));
+    const linkedin = db.getLinkedinById(parseInt(id));
     if (!linkedin) {
       return res
         .status(404)
@@ -1332,7 +1332,7 @@ app.get("/api/contacts/linkedin/:id", async (req, res) => {
 });
 
 // Update contact
-app.put("/api/contacts/:id", async (req, res) => {
+app.put("/api/contacts/:id", (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
@@ -1341,7 +1341,7 @@ app.put("/api/contacts/:id", async (req, res) => {
         .status(400)
         .json({ success: false, error: "Value is required" });
     }
-    const result = await db.updateContact(parseInt(id), data);
+    const result = db.updateContact(parseInt(id), data);
     if (!result) {
       return res
         .status(404)
@@ -1354,10 +1354,10 @@ app.put("/api/contacts/:id", async (req, res) => {
 });
 
 // Delete contact
-app.delete("/api/contacts/:id", async (req, res) => {
+app.delete("/api/contacts/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.deleteContact(parseInt(id));
+    const result = db.deleteContact(parseInt(id));
     if (!result) {
       return res
         .status(404)
@@ -1372,9 +1372,9 @@ app.delete("/api/contacts/:id", async (req, res) => {
 // ============ COMPANY EXECUTIVES ROUTES ============
 
 // Get executives statistics
-app.get("/api/executives/stats", async (req, res) => {
+app.get("/api/executives/stats", (req, res) => {
   try {
-    const stats = await db.getExecutivesStats();
+    const stats = db.getExecutivesStats();
     res.json({ success: true, data: stats });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1382,13 +1382,13 @@ app.get("/api/executives/stats", async (req, res) => {
 });
 
 // Get company executives with pagination and filtering
-app.get("/api/executives", async (req, res) => {
+app.get("/api/executives", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || null;
     const role = req.query.role || "all";
-    const result = await db.getCompanyExecutives(page, limit, search, role);
+    const result = db.getCompanyExecutives(page, limit, search, role);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1396,12 +1396,12 @@ app.get("/api/executives", async (req, res) => {
 });
 
 // Get structured executives grouped by company (Founder 1,2,3 + CEO + CTO)
-app.get("/api/executives/structured", async (req, res) => {
+app.get("/api/executives/structured", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const search = req.query.search || null;
-    const result = await db.getStructuredExecutives(page, limit, search);
+    const result = db.getStructuredExecutives(page, limit, search);
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -1409,11 +1409,11 @@ app.get("/api/executives/structured", async (req, res) => {
 });
 
 // Update executive
-app.put("/api/executives/:id", async (req, res) => {
+app.put("/api/executives/:id", (req, res) => {
   try {
     const { id } = req.params;
     const data = req.body;
-    const result = await db.updateExecutive(parseInt(id), data);
+    const result = db.updateExecutive(parseInt(id), data);
     if (!result) {
       return res
         .status(404)
@@ -1426,10 +1426,10 @@ app.put("/api/executives/:id", async (req, res) => {
 });
 
 // Delete executive
-app.delete("/api/executives/:id", async (req, res) => {
+app.delete("/api/executives/:id", (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.deleteExecutive(parseInt(id));
+    const result = db.deleteExecutive(parseInt(id));
     if (!result) {
       return res
         .status(404)
@@ -1442,7 +1442,7 @@ app.delete("/api/executives/:id", async (req, res) => {
 });
 
 // Bulk delete executives
-app.delete("/api/executives/bulk", async (req, res) => {
+app.delete("/api/executives/bulk", (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -1453,7 +1453,7 @@ app.delete("/api/executives/bulk", async (req, res) => {
 
     let deletedCount = 0;
     for (const id of ids) {
-      const result = await db.deleteExecutive(parseInt(id));
+      const result = db.deleteExecutive(parseInt(id));
       if (result) deletedCount++;
     }
 
@@ -1464,7 +1464,7 @@ app.delete("/api/executives/bulk", async (req, res) => {
 });
 
 // Bulk delete keywords
-app.delete("/api/keywords/bulk", async (req, res) => {
+app.delete("/api/keywords/bulk", (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -1475,7 +1475,7 @@ app.delete("/api/keywords/bulk", async (req, res) => {
 
     let deletedCount = 0;
     for (const id of ids) {
-      const result = await db.deleteKeyword(parseInt(id));
+      const result = db.deleteKeyword(parseInt(id));
       if (result) deletedCount++;
     }
 
@@ -2264,13 +2264,13 @@ async function runScraper(
     }
 
     // Filter out URLs that already exist in the database
-    const existingUrls = await db.getAllExistingUrls();
+    const existingUrls = db.getAllExistingUrls();
 
     // Track duplicates for logging
     const duplicates = [];
     let newUrls = urls.filter((url) => {
       const normalized = db.normalizeUrl(url);
-      if (existingUrls.includes(normalized)) {
+      if (existingUrls.has(normalized)) {
         duplicates.push(url);
         return false;
       }
@@ -2278,7 +2278,7 @@ async function runScraper(
     });
 
     // Filter out URLs from excluded domains
-    const excludedDomains = (await db.getAllExcludedDomains()).map((d) => d.domain);
+    const excludedDomains = db.getAllExcludedDomains().map((d) => d.domain);
     let domainExcludedCount = 0;
     if (excludedDomains.length > 0) {
       const domainExcluded = [];
@@ -2299,7 +2299,7 @@ async function runScraper(
     }
 
     // Filter out URLs with ignored tags
-    const ignoredTags = await db.getAllIgnoredTags();
+    const ignoredTags = db.getAllIgnoredTags();
     let tagIgnoredCount = 0;
     if (ignoredTags.length > 0) {
       const tagIgnored = [];
@@ -2360,10 +2360,10 @@ async function runScraper(
     }
 
     // Save to database
-    await db.saveSearchResults(keyword, results, countryCode);
+    db.saveSearchResults(keyword, results, countryCode);
 
     // Update keyword status
-    await db.updateKeywordStatus(keywordId, "completed");
+    db.updateKeywordStatus(keywordId, "completed");
     scraperData.status = "completed";
 
     // Automatically trigger executive scraping
@@ -2377,7 +2377,7 @@ async function runScraper(
     }, 2000); // Start after 2 seconds
   } catch (error) {
     console.error(`Scraper error for keyword ${keyword}:`, error);
-    await db.updateKeywordStatus(keywordId, "error");
+    db.updateKeywordStatus(keywordId, "error");
     scraperData.status = "error";
   } finally {
     await context.close();

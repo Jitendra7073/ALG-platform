@@ -47,9 +47,9 @@ function normalizeCountryCode(code) {
  * GET /api/email/timezone/countries
  * Get all countries with their timezone configurations
  */
-router.get("/timezone/countries", (req, res) => {
+router.get("/timezone/countries", async (req, res) => {
   try {
-    const countries = db.all(`
+    const countries = await db.all(`
       SELECT ct.country_code, ct.timezone, ct.name, ct.offset_hours,
              ct.business_start, ct.business_end, ct.weekend_days,
              COUNT(DISTINCT s.id) as site_count
@@ -75,7 +75,7 @@ router.get("/timezone/countries", (req, res) => {
  * GET /api/email/timezone/countries/:countryCode
  * Get a specific country's timezone configuration
  */
-router.get("/timezone/countries/:countryCode", (req, res) => {
+router.get("/timezone/countries/:countryCode", async (req, res) => {
   try {
     const { countryCode } = req.params;
     const normalizedCode = countryCode.toLowerCase();
@@ -84,7 +84,7 @@ router.get("/timezone/countries/:countryCode", (req, res) => {
     const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
 
     // Check if there's a custom config in the database
-    const customConfig = db.get(
+    const customConfig = await db.get(
       "SELECT * FROM country_timezones WHERE country_code = ?",
       [normalizedCode]
     );
@@ -122,7 +122,7 @@ router.get("/timezone/countries/:countryCode", (req, res) => {
  * PUT /api/email/timezone/countries/:countryCode
  * Update a country's timezone configuration
  */
-router.put("/timezone/countries/:countryCode", (req, res) => {
+router.put("/timezone/countries/:countryCode", async (req, res) => {
   try {
     const { countryCode } = req.params;
     const { business_start, business_end, weekend_days } = req.body;
@@ -154,14 +154,14 @@ router.put("/timezone/countries/:countryCode", (req, res) => {
     const normalizedCode = countryCode.toLowerCase();
 
     // Check if custom config already exists
-    const existing = db.get(
+    const existing = await db.get(
       "SELECT * FROM country_timezones WHERE country_code = ?",
       [normalizedCode]
     );
 
     if (existing) {
       // Update existing record
-      db.run(
+      await db.run(
         `UPDATE country_timezones
          SET business_start = ?, business_end = ?, weekend_days = ?
          WHERE country_code = ?`,
@@ -170,7 +170,7 @@ router.put("/timezone/countries/:countryCode", (req, res) => {
     } else {
       // Insert new custom config
       const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
-      db.run(
+      await db.run(
         `INSERT INTO country_timezones (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -228,7 +228,7 @@ router.get("/timezone/countries-in-business", (req, res) => {
  * POST /api/email/campaign/timezone-aware
  * Create a campaign with timezone-aware scheduling
  */
-router.post("/campaign/timezone-aware", (req, res) => {
+router.post("/campaign/timezone-aware", async (req, res) => {
   try {
     const {
       name,
@@ -246,7 +246,7 @@ router.post("/campaign/timezone-aware", (req, res) => {
     }
 
     // Get all contacts with their country information
-    const contacts = db.all(
+    const contacts = await db.all(
       `
       SELECT c.id as contact_id, c.value as email, c.type,
              s.country, s.url as site_url, s.id as site_id
@@ -308,7 +308,7 @@ router.post("/campaign/timezone-aware", (req, res) => {
     });
 
     // Create campaign
-    const campaignResult = db.run(
+    const campaignResult = await db.run(
       `
       INSERT INTO email_campaigns (name, template_id, target_type, status, total_recipients)
       VALUES (?, ?, ?, 'queued', ?)
@@ -316,20 +316,20 @@ router.post("/campaign/timezone-aware", (req, res) => {
       [name, template_id, target_type, contacts.length],
     );
 
-    const campaignId = campaignResult.lastInsertRowid;
+    const campaignId = campaignResult.lastInsertId;
 
     // Queue emails with their scheduled times
     let queuedCount = 0;
     const batches = Object.values(timezoneBatches);
 
-    batches.forEach((batch) => {
+    for (const batch of batches) {
       // Calculate delay for this batch based on send time
       const batchSendTime = new Date(batch.send_time);
       const delayMs = batchSendTime.getTime() - now.getTime();
 
       // Queue all contacts - worker will handle scheduling based on country and business rules
-      batch.contacts.forEach((contact) => {
-        db.run(
+      for (const contact of batch.contacts) {
+        await db.run(
           `
           INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, country_code)
           VALUES (?, ?, ?, ?, ?, 'queued', ?)
@@ -345,11 +345,11 @@ router.post("/campaign/timezone-aware", (req, res) => {
           ],
         );
         queuedCount++;
-      });
-    });
+      }
+    }
 
     // Update campaign with actual queued count
-    db.run("UPDATE email_campaigns SET total_recipients = ? WHERE id = ?", [
+    await db.run("UPDATE email_campaigns SET total_recipients = ? WHERE id = ?", [
       queuedCount,
       campaignId,
     ]);
@@ -384,21 +384,20 @@ router.post("/campaign/timezone-aware", (req, res) => {
  * GET /api/email/timezone/optimal-times/:contactId
  * Get optimal send times for a specific contact
  */
-router.get("/timezone/optimal-times/:contactId", (req, res) => {
+router.get("/timezone/optimal-times/:contactId", async (req, res) => {
   try {
     const contactId = parseInt(req.params.contactId);
 
     // Get contact with site information
-    const contact = db
-      .prepare(
-        `
+    const contact = await db.get(
+      `
       SELECT c.id, c.value, c.type, c.site_id, s.country, s.url
       FROM contacts c
       JOIN sites s ON c.site_id = s.id
       WHERE c.id = ?
     `,
-      )
-      .get(contactId);
+      [contactId]
+    );
 
     if (!contact) {
       return res.status(404).json({
@@ -461,7 +460,7 @@ router.get("/timezone/optimal-times/:contactId", (req, res) => {
  * Get comprehensive monitoring data for the dashboard
  * Shows ONLY countries that have emails in the system (fully data-driven)
  */
-router.get("/timezone/monitoring", (req, res) => {
+router.get("/timezone/monitoring", async (req, res) => {
   try {
     const worker = require('./email-queue-worker');
 
@@ -488,7 +487,7 @@ router.get("/timezone/monitoring", (req, res) => {
     let emailStatsByCountry = [];
     try {
       // First, let's see what raw data we have
-      const rawData = db.all(`
+      const rawData = await db.all(`
         SELECT DISTINCT
           -- Get country code from various sources in priority order:
           -- 1. email_queue.country_code (new field, may be NULL for old emails)
@@ -722,7 +721,7 @@ router.get("/timezone/monitoring", (req, res) => {
     // Get upcoming sends (next hour across all countries) with normalized country codes
     let upcomingEmails = [];
     try {
-      const rawUpcoming = db.all(`
+      const rawUpcoming = await db.all(`
         SELECT
           eq.id,
           eq.recipient_email,
@@ -735,8 +734,8 @@ router.get("/timezone/monitoring", (req, res) => {
         LEFT JOIN sites s ON c.site_id = s.id
         WHERE eq.status = 'queued'
           AND eq.scheduled_at IS NOT NULL
-          AND eq.scheduled_at > datetime('now')
-          AND eq.scheduled_at <= datetime('now', '+1 hour')
+          AND eq.scheduled_at > NOW()
+          AND eq.scheduled_at <= NOW() + INTERVAL '1 hour'
         ORDER BY eq.scheduled_at ASC
         LIMIT 20
       `);
@@ -755,7 +754,7 @@ router.get("/timezone/monitoring", (req, res) => {
     // Get recent sends (last hour) with normalized country codes
     let recentSends = [];
     try {
-      const rawRecent = db.all(`
+      const rawRecent = await db.all(`
         SELECT
           eq.id,
           eq.recipient_email,
@@ -766,7 +765,7 @@ router.get("/timezone/monitoring", (req, res) => {
         LEFT JOIN contacts c ON eq.contact_id = c.id
         LEFT JOIN sites s ON c.site_id = s.id
         WHERE eq.status = 'sent'
-          AND eq.sent_at >= datetime('now', '-1 hour')
+          AND eq.sent_at >= NOW() - INTERVAL '1 hour'
         ORDER BY eq.sent_at DESC
         LIMIT 20
       `);
@@ -819,7 +818,7 @@ router.get("/timezone/monitoring", (req, res) => {
  * - limit: max results (default 100)
  * - offset: pagination offset (default 0)
  */
-router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
+router.get("/timezone/monitoring/country/:countryCode", async (req, res) => {
   try {
     const { countryCode } = req.params;
     const {
@@ -850,7 +849,7 @@ router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
 
     // Debug: Check what country codes exist in the database
     try {
-      const countryCodesInDb = db.all(`
+      const countryCodesInDb = await db.all(`
         SELECT DISTINCT
           LOWER(TRIM(eq.country_code)) as queue_country,
           LOWER(TRIM(s.country)) as site_country,
@@ -910,7 +909,7 @@ router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
     // CRITICAL: Use DISTINCT on eq.id to prevent duplication from joins
     let emails = [];
     try {
-      emails = db.all(`
+      emails = await db.all(`
         SELECT DISTINCT
           eq.id,
           eq.campaign_id,
@@ -953,7 +952,7 @@ router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
     // Get total count for pagination
     let totalCount = 0;
     try {
-      const countResult = db.get(`
+      const countResult = await db.get(`
         SELECT COUNT(DISTINCT eq.id) as count
         FROM email_queue eq
         LEFT JOIN contacts c ON eq.contact_id = c.id
@@ -1015,7 +1014,7 @@ router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
     try {
       // Get ALL email records for this country (without pagination)
       // to calculate accurate stats - use DISTINCT to ensure unique emails
-      const allEmails = db.all(`
+      const allEmails = await db.all(`
         SELECT DISTINCT
           eq.id,
           eq.status,
@@ -1111,7 +1110,7 @@ router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
  * Debug endpoint: Compare counts between global monitor and modal logic
  * Use this to verify consistency between the two aggregation methods
  */
-router.get("/timezone/monitoring/debug/compare", (req, res) => {
+router.get("/timezone/monitoring/debug/compare", async (req, res) => {
   try {
     const now = new Date();
     const normalizeCountryCode = (code) => {
@@ -1130,7 +1129,7 @@ router.get("/timezone/monitoring/debug/compare", (req, res) => {
     };
 
     // Method 1: Global monitor aggregation (client-side grouping)
-    const rawData = db.all(`
+    const rawData = await db.all(`
       SELECT DISTINCT
         eq.country_code as queue_country,
         s.country as site_country,
@@ -1199,7 +1198,7 @@ router.get("/timezone/monitoring/debug/compare", (req, res) => {
     const countries = Array.from(globalMonitorStats.keys());
 
     for (const countryCode of countries) {
-      const allEmails = db.all(`
+      const allEmails = await db.all(`
         SELECT DISTINCT
           eq.id,
           eq.status,
@@ -1342,7 +1341,7 @@ router.post("/worker/toggle-parallel", (req, res) => {
  * POST /api/email/timezone/update-country
  * Update business hours settings for a country
  */
-router.post("/timezone/update-country", (req, res) => {
+router.post("/timezone/update-country", async (req, res) => {
   try {
     const { country_code, business_start, business_end, weekend_days } = req.body;
 
@@ -1361,7 +1360,7 @@ router.post("/timezone/update-country", (req, res) => {
     }
 
     // Check if country exists in database
-    const existing = db.get(
+    const existing = await db.get(
       "SELECT * FROM country_timezones WHERE country_code = ?",
       [country_code.toLowerCase()]
     );
@@ -1372,7 +1371,7 @@ router.post("/timezone/update-country", (req, res) => {
 
     if (existing) {
       // Update existing record
-      db.run(
+      await db.run(
         `UPDATE country_timezones
          SET business_start = ?, business_end = ?, weekend_days = ?
          WHERE country_code = ?`,
@@ -1384,7 +1383,7 @@ router.post("/timezone/update-country", (req, res) => {
       const defaultConfig = timezoneScheduler.getTimezoneConfig(country_code) || timezoneScheduler.getTimezoneConfig('us');
 
       // Insert new record
-      db.run(
+      await db.run(
         `INSERT INTO country_timezones (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -1421,10 +1420,10 @@ router.post("/timezone/update-country", (req, res) => {
  * GET /api/email/timezone/stats
  * Get statistics about timezone distribution
  */
-router.get("/timezone/stats", (req, res) => {
+router.get("/timezone/stats", async (req, res) => {
   try {
     // Get contact distribution by country/timezone
-    const distribution = db.all(`
+    const distribution = await db.all(`
       SELECT
         COALESCE(s.country, 'unknown') as country_code,
         COUNT(DISTINCT c.id) as contact_count,
@@ -1440,20 +1439,19 @@ router.get("/timezone/stats", (req, res) => {
     const now = new Date();
     const utcHours = now.getUTCHours();
 
-    const countriesWithStatus = distribution.map((item) => {
+    const countriesWithStatus = await Promise.all(distribution.map(async (item) => {
       const countryCode = item.country_code.toLowerCase();
       const inBusiness = timezoneScheduler.isBusinessHour(now, countryCode);
 
       // Get timezone config from database for accurate offset_hours
-      const tzConfigDb = db
-        .prepare(
-          `
+      const tzConfigDb = await db.get(
+        `
         SELECT timezone, name, offset_hours, business_start, business_end
         FROM country_timezones
         WHERE country_code = ?
       `,
-        )
-        .get(countryCode);
+      [countryCode]
+      );
 
       // Fallback to scheduler config if database doesn't have it
       const tzScheduler = timezoneScheduler.getTimezoneConfig(countryCode);
@@ -1474,7 +1472,7 @@ router.get("/timezone/stats", (req, res) => {
         timezone_name: timezoneName,
         local_time: localTime.toISOString(),
       };
-    });
+    }));
 
     // Helper function to parse offset strings like '+5:30' or '-5:00' to hours
     function parseOffsetString(offsetStr) {

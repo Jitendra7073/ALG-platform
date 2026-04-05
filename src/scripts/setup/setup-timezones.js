@@ -82,9 +82,16 @@ const timezoneData = [
 
 // Insert data using prepared statement for better performance
 const insert = db.prepare(`
-  INSERT OR REPLACE INTO country_timezones
+  INSERT INTO country_timezones
   (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
   VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT (country_code) DO UPDATE SET
+    timezone = EXCLUDED.timezone,
+    name = EXCLUDED.name,
+    offset_hours = EXCLUDED.offset_hours,
+    business_start = EXCLUDED.business_start,
+    business_end = EXCLUDED.business_end,
+    weekend_days = EXCLUDED.weekend_days
 `);
 
 const insertMany = db.transaction((countries) => {

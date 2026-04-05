@@ -8174,18 +8174,17 @@
                 <input type="checkbox" class="select-all-checkbox" id="emails-select-all"
                   onchange="toggleSelectAllEmails()" />
               </th>
-              <th style="width: 22%">Email Address</th>
-              <th style="width: 20%">Site URL</th>
-              <th style="width: 12%">Region</th>
-              <th style="width: 14%">Category</th>
-              <th style="width: 12%">Status</th>
-              <th style="width: 12%">Found Date</th>
+              <th style="width: 25%">Email Address</th>
+              <th style="width: 22%">Site URL</th>
+              <th style="width: 13%">Region</th>
+              <th style="width: 14%">Status</th>
+              <th style="width: 14%">Found Date</th>
               <th style="width: 5%; text-align: center;">Actions</th>
             </tr>
           </thead>
           <tbody id="emails-table">
             <tr>
-              <td colspan="8" class="empty-state">
+              <td colspan="7" class="empty-state">
                 <div class="empty-state-icon">📧</div>
                 Loading...
               </td>
@@ -15239,7 +15238,7 @@
           }
 
           renderEmails(emails);
-          pageState.emails.totalPages = json.data.pagination.totalPages;
+          pageState.emails.totalPages = json.data.totalPages;
           updatePagination("emails");
         }
 
@@ -15370,7 +15369,7 @@
       const tbody = document.getElementById("emails-table");
       if (emails.length === 0) {
         tbody.innerHTML =
-          '<tr><td colspan="8" class="empty-state"><div class="empty-state-icon">📧</div>No emails found yet</td></tr>';
+          '<tr><td colspan="7" class="empty-state"><div class="empty-state-icon">📧</div>No emails found yet</td></tr>';
         document.getElementById("emails-pagination").style.display = "none";
         document.getElementById("emails-bulk-actions").style.display = "none";
         return;
@@ -15411,7 +15410,7 @@
           </td>
           <td>
             <div class="email-cell">
-              <a href="mailto:${escapeHtml(e.email)}" class="email-link">${escapeHtml(e.email)}</a>
+              <a href="mailto:${escapeHtml(e.value)}" class="email-link">${escapeHtml(e.value)}</a>
             </div>
           </td>
           <td>
@@ -15424,9 +15423,6 @@
               <span class="region-flag">${flag}</span>
               <span class="region-name">${countryName}</span>
             </div>
-          </td>
-          <td>
-            ${e.ai_actual_category ? `<span class="site-category-badge">${escapeHtml(e.ai_actual_category)}</span>` : '<span style="color: var(--text-tertiary); font-size: 12px;">-</span>'}
           </td>
           <td>${getSentStatusBadge(e.id)}</td>
           <td>
@@ -15442,7 +15438,7 @@
                 </svg>
               </button>
               <div class="action-menu" id="email-menu-${e.id}">
-                <button class="action-menu-item info" onclick="openContactHistory(${e.id}, '${escapeHtml(e.email)}'); closeEmailActionMenu(${e.id});">
+                <button class="action-menu-item info" onclick="openContactHistory(${e.id}, '${escapeHtml(e.value)}'); closeEmailActionMenu(${e.id});">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="16" x2="12" y2="12"></line>
@@ -15987,7 +15983,7 @@
           }
 
           renderPhones(phones);
-          pageState.phones.totalPages = json.data.pagination.totalPages;
+          pageState.phones.totalPages = json.data.totalPages;
           updatePagination("phones");
         }
       } catch (error) {
@@ -16036,7 +16032,7 @@
           }
 
           renderLinkedin(profiles);
-          pageState.linkedin.totalPages = json.data.pagination.totalPages;
+          pageState.linkedin.totalPages = json.data.totalPages;
           updatePagination("linkedin");
         }
       } catch (error) {
@@ -16076,7 +16072,7 @@
         const json = await res.json();
         if (json.success) {
           renderExecutives(json.data.executives);
-          pageState.executives.totalPages = json.data.pagination.totalPages;
+          pageState.executives.totalPages = json.data.totalPages;
           updatePagination("executives");
         } else {
           document.getElementById("executives-table").innerHTML =
@@ -16278,7 +16274,7 @@
         const json = await res.json();
         if (json.success) {
           renderStructuredExecutives(json.data.companies);
-          pageState['structured-executives'].totalPages = json.data.pagination.totalPages;
+          pageState['structured-executives'].totalPages = json.data.totalPages;
           updatePagination('structured-executives');
         } else {
           tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">👔</div>No executives data available</td></tr>';

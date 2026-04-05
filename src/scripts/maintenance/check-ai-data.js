@@ -187,6 +187,4 @@ try {
   console.log("\n========================================");
   console.log("ANALYSIS COMPLETE");
   console.log("========================================\n");
-} finally {
-  database.close();
 }
