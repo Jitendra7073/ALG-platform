@@ -1934,32 +1934,57 @@ async function runScraper(
 
     // ========== EARLY CAPTCHA DETECTION ==========
     // Check for CAPTCHA immediately after page load
-    const captchaSelectors = [
-      'form[action*="captcha"]',
-      'iframe[src*="captcha"]',
-      'div[class*="captcha"]',
-      '[id*="captcha"]',
-      'textarea[name="captcha"]',
-    ];
-
     let captchaDetected = false;
-    for (const selector of captchaSelectors) {
-      const captcha = await page.$(selector);
-      if (captcha) {
-        captchaDetected = true;
-        break;
-      }
-    }
 
-    // Also check for CAPTCHA in page text
-    if (!captchaDetected) {
-      const pageText = await page.evaluate(() => document.body.innerText);
-      if (
-        pageText.toLowerCase().includes("captcha") ||
-        pageText.toLowerCase().includes("verify you are human") ||
-        pageText.toLowerCase().includes("unusual traffic")
-      ) {
-        captchaDetected = true;
+    // Validate page context before attempting operations
+    try {
+      if (!page || page.isClosed()) {
+        throw new Error("Page is closed or context was destroyed");
+      }
+
+      const captchaSelectors = [
+        'form[action*="captcha"]',
+        'iframe[src*="captcha"]',
+        'div[class*="captcha"]',
+        '[id*="captcha"]',
+        'textarea[name="captcha"]',
+      ];
+
+      for (const selector of captchaSelectors) {
+        // Check if page is still valid before each query
+        if (page.isClosed()) {
+          throw new Error("Page context destroyed during CAPTCHA detection");
+        }
+        const captcha = await page.$(selector);
+        if (captcha) {
+          captchaDetected = true;
+          break;
+        }
+      }
+
+      // Also check for CAPTCHA in page text
+      if (!captchaDetected) {
+        if (page.isClosed()) {
+          throw new Error("Page context destroyed before text evaluation");
+        }
+        const pageText = await page.evaluate(() => document.body.innerText);
+        if (
+          pageText.toLowerCase().includes("captcha") ||
+          pageText.toLowerCase().includes("verify you are human") ||
+          pageText.toLowerCase().includes("unusual traffic")
+        ) {
+          captchaDetected = true;
+        }
+      }
+    } catch (error) {
+      // If context was destroyed, check if page is still accessible
+      if (error.message.includes("context") || error.message.includes("closed")) {
+        console.log("[Scraper] ⚠️  Page context destroyed, attempting to continue...");
+        // Don't throw - continue without CAPTCHA detection if page is unstable
+        captchaDetected = false;
+      } else {
+        // Re-throw other errors
+        throw error;
       }
     }
 
@@ -1975,6 +2000,11 @@ async function runScraper(
       let captchaSolved = false;
       for (let i = 0; i < 30; i++) {
         await page.waitForTimeout(2000);
+
+        // Validate page context before checking CAPTCHA status
+        if (page.isClosed()) {
+          throw new Error("Page context destroyed while waiting for CAPTCHA to be solved");
+        }
 
         // Check if CAPTCHA is gone
         const stillHasCaptcha = await page.evaluate(() => {
@@ -2009,22 +2039,38 @@ async function runScraper(
 
     // Accept cookies if needed
     try {
-      const acceptButton = await page.$(
-        'button:has-text("Accept all"), button:has-text("I agree")',
-      );
-      if (acceptButton) {
-        await acceptButton.click();
-        await page.waitForTimeout(1000);
+      if (!page.isClosed()) {
+        const acceptButton = await page.$(
+          'button:has-text("Accept all"), button:has-text("I agree")',
+        );
+        if (acceptButton) {
+          await acceptButton.click();
+          await page.waitForTimeout(1000);
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      // Silently ignore cookie acceptance failures - not critical
+      if (e.message.includes("context") || e.message.includes("closed")) {
+        console.log("[Scraper] ⚠️  Page context destroyed during cookie acceptance, continuing...");
+      }
+    }
 
     // Check if we're already on search results page (from alternative approach)
+    // Validate page is still accessible before proceeding
+    if (page.isClosed()) {
+      throw new Error("Page context destroyed before URL check");
+    }
     const currentUrl = page.url();
     const isSearchResultsPage =
       currentUrl.includes("/search?") && currentUrl.includes("q=");
 
     // Only type search query if not already on search results
     if (!isSearchResultsPage) {
+      // Check context stability before each operation
+      if (page.isClosed()) {
+        throw new Error("Page context destroyed before search box lookup");
+      }
+
       const searchBox = await page.$('textarea[name="q"], input[name="q"]');
       if (searchBox) {
         // Random delay to appear more human
@@ -2035,13 +2081,22 @@ async function runScraper(
         await page.waitForTimeout(Math.random() * 500 + 200);
         await searchBox.press("Enter");
 
-        await page.waitForSelector("div#search", { timeout: 15000 });
+        // Wait for search results with error handling
+        try {
+          await page.waitForSelector("div#search", { timeout: 15000 });
 
-        // Scroll down to load more results naturally
-        await page.evaluate(() => {
-          window.scrollBy(0, window.innerHeight);
-        });
-        await page.waitForTimeout(1000);
+          // Scroll down to load more results naturally
+          await page.evaluate(() => {
+            window.scrollBy(0, window.innerHeight);
+          });
+          await page.waitForTimeout(1000);
+        } catch (e) {
+          if (e.message.includes("context") || e.message.includes("closed")) {
+            throw new Error("Page context destroyed during search results wait");
+          }
+          // Continue even if scroll fails
+          console.log("[Scraper] ⚠️  Could not wait for search results div:", e.message);
+        }
       } else {
         console.log(
           "[Scraper] ⚠️  Search box not found, may already be on results page",
@@ -2055,6 +2110,9 @@ async function runScraper(
 
     // Wait for search results to be loaded
     try {
+      if (page.isClosed()) {
+        throw new Error("Page context destroyed before results wait");
+      }
       await page.waitForSelector("div#search", { timeout: 5000 });
     } catch (e) {
       console.log(
@@ -2064,12 +2122,17 @@ async function runScraper(
 
     // Scroll down to load more results naturally
     try {
-      await page.evaluate(() => {
-        window.scrollBy(0, window.innerHeight);
-      });
-      await page.waitForTimeout(1000);
+      if (!page.isClosed()) {
+        await page.evaluate(() => {
+          window.scrollBy(0, window.innerHeight);
+        });
+        await page.waitForTimeout(1000);
+      }
     } catch (e) {
-      console.log("[Scraper] ⚠️  Could not scroll page");
+      if (e.message.includes("context") || e.message.includes("closed")) {
+        throw new Error("Page context destroyed during scroll operation");
+      }
+      console.log("[Scraper] ⚠️  Could not scroll page:", e.message);
     }
 
     // Extract URLs from multiple pages

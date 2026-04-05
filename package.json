@@ -12,7 +12,8 @@
     "stats": "node src/scripts/runners/view-results.js stats",
     "export": "node src/scripts/runners/view-results.js export",
     "server": "node src/api/server.js",
-    "admin": "node src/api/server.js"
+    "admin": "node src/api/server.js",
+    "diagnose-email": "node src/scripts/maintenance/diagnose-email-system.js"
   },
   "keywords": [],
   "author": "",

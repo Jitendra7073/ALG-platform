@@ -98,9 +98,37 @@ const countryTimezones = {
 
 /**
  * Get timezone configuration for a country
+ * Checks database first for custom settings, falls back to defaults
  */
 function getTimezoneConfig(countryCode) {
-  return countryTimezones[countryCode.toLowerCase()] || countryTimezones['us'];
+  const code = countryCode.toLowerCase();
+  const defaultConfig = countryTimezones[code] || countryTimezones['us'];
+
+  // Try to get custom settings from database
+  try {
+    const db = require('../../database/database.js');
+    const customConfig = db.get(
+      'SELECT * FROM country_timezones WHERE country_code = ?',
+      [code]
+    );
+
+    if (customConfig) {
+      // Merge custom settings with default config
+      return {
+        ...defaultConfig,
+        businessStart: customConfig.business_start,
+        businessEnd: customConfig.business_end,
+        weekendDays: customConfig.weekend_days
+          ? customConfig.weekend_days.split(',').map(Number)
+          : defaultConfig.weekendDays
+      };
+    }
+  } catch (error) {
+    // If database query fails, use default config
+    console.debug('Could not fetch custom timezone config from database:', error.message);
+  }
+
+  return defaultConfig;
 }
 
 /**
@@ -109,10 +137,36 @@ function getTimezoneConfig(countryCode) {
 function isBusinessHour(date, countryCode) {
   const config = getTimezoneConfig(countryCode);
 
-  // Convert to recipient's timezone
-  const recipientTime = convertToTimezone(date, config.timezone);
-  const hour = recipientTime.getHours();
-  const day = recipientTime.getDay();
+  // Get hour in the recipient's timezone using Intl API with formatToParts
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timezone,
+    hour: 'numeric',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(date);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const hour = hourPart ? parseInt(hourPart.value) : 0;
+
+  // Get day of week by formatting the date in the target timezone
+  // and parsing it to get the day
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timezone,
+    weekday: 'long'
+  });
+  const dayString = dayFormatter.format(date).toLowerCase();
+
+  // Map day names to numbers (0 = Sunday, 1 = Monday, etc.)
+  const dayMap = {
+    'sunday': 0,
+    'monday': 1,
+    'tuesday': 2,
+    'wednesday': 3,
+    'thursday': 4,
+    'friday': 5,
+    'saturday': 6
+  };
+  const day = dayMap[dayString];
 
   // Check if it's a weekend
   if (config.weekendDays.includes(day)) {
@@ -129,64 +183,96 @@ function isBusinessHour(date, countryCode) {
 function calculateOptimalSendTime(countryCode, baseTime = new Date()) {
   const config = getTimezoneConfig(countryCode);
 
+  // Start from the next hour to avoid past times
+  let checkDate = new Date(baseTime.getTime() + 60 * 60 * 1000); // At least 1 hour from now
+
   // Try to find the next optimal time within the next 7 days
   const maxDays = 7;
-  const checkInterval = 30 * 60 * 1000; // Check every 30 minutes
+  const maxAttempts = maxDays * 24; // Check each hour for 7 days
+  const hourIncrement = 60 * 60 * 1000; // 1 hour
 
-  for (let day = 0; day < maxDays; day++) {
-    const checkDate = new Date(baseTime);
-    checkDate.setDate(checkDate.getDate() + day);
+  for (let i = 0; i < maxAttempts; i++) {
+    const testDate = new Date(checkDate.getTime() + i * hourIncrement);
 
-    // Reset to start of day in recipient's timezone
-    const recipientDate = convertToTimezone(checkDate, config.timezone);
-    recipientDate.setHours(config.businessStart, 0, 0, 0);
+    if (isBusinessHour(testDate, countryCode)) {
+      // This is a business hour - check if it's a preferred time
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: config.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
 
-    // Check each preferred time
-    for (const timeStr of config.preferredTimes) {
-      const [hours, minutes] = timeStr.split(':').map(Number);
-      recipientDate.setHours(hours, minutes, 0, 0);
+      const timeString = formatter.format(testDate);
+      let [hours, minutes] = timeString.split(':').map(Number);
+      // Handle midnight (24:xx should be 0:xx)
+      if (hours === 24) hours = 0;
 
-      if (isBusinessHour(recipientDate, countryCode)) {
-        // This is a valid business time
-        // Check if it's in the future (not in the past)
-        if (recipientDate > new Date()) {
-          return recipientDate;
-        }
+      // Check if this is one of the preferred times (or close to it)
+      const isPreferredTime = config.preferredTimes.some(preferred => {
+        const [prefHour, prefMin] = preferred.split(':').map(Number);
+        // Allow within 30 minutes of preferred time
+        return hours === prefHour && Math.abs(minutes - prefMin) <= 30;
+      });
+
+      if (isPreferredTime) {
+        return testDate;
       }
     }
   }
 
-  // Fallback: return next business day morning
-  const fallbackDate = new Date(baseTime);
+  // Fallback: return next business day morning (approximately)
+  let fallbackDate = new Date(baseTime);
   fallbackDate.setDate(fallbackDate.getDate() + 1);
-  const recipientFallback = convertToTimezone(fallbackDate, config.timezone);
-  recipientFallback.setHours(config.businessStart, 0, 0, 0);
 
-  return recipientFallback;
+  // Find the first business hour on the next day
+  for (let hour = 0; hour < 24; hour++) {
+    const testDate = new Date(fallbackDate);
+    testDate.setHours(hour, 0, 0, 0);
+
+    if (isBusinessHour(testDate, countryCode)) {
+      return testDate;
+    }
+  }
+
+  // Ultimate fallback: return 1 day from now at business start time
+  fallbackDate = new Date(baseTime.getTime() + 24 * 60 * 60 * 1000);
+  fallbackDate.setHours(config.businessStart, 0, 0, 0);
+  return fallbackDate;
 }
 
 /**
- * Convert a date to a specific timezone
+ * Convert a date to a specific timezone using Intl API
  */
 function convertToTimezone(date, timezone) {
-  // This is a simplified version
-  // In production, use a library like 'date-fns-tz' or 'luxon'
-  const offsetMap = {
-    'Asia/Kolkata': 5.5 * 60,
-    'America/New_York': -5 * 60,
-    'Europe/London': 0 * 60,
-    'America/Toronto': -5 * 60,
-    'Australia/Sydney': 10 * 60,
-    'Europe/Berlin': 1 * 60,
-    'Europe/Paris': 1 * 60,
-    'Asia/Tokyo': 9 * 60,
-    'Asia/Singapore': 8 * 60,
-    'Asia/Dubai': 4 * 60
-  };
+  // Use Intl API to get the proper local time for the timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false
+  });
 
-  const offsetMinutes = offsetMap[timezone] || 0;
-  const utcDate = new Date(date);
-  const localDate = new Date(utcDate.getTime() + offsetMinutes * 60 * 1000);
+  // Format the date in the target timezone and parse it back
+  const parts = formatter.formatToParts(date);
+  const partValues = {};
+  parts.forEach(part => {
+    partValues[part.type] = part.value;
+  });
+
+  // Create a new Date object with the timezone-adjusted values
+  const localDate = new Date(
+    partValues.year,
+    partValues.month - 1,
+    partValues.day,
+    partValues.hour,
+    partValues.minute,
+    partValues.second || 0
+  );
 
   return localDate;
 }
@@ -200,18 +286,88 @@ function getCountriesInBusiness() {
 
   for (const [code, config] of Object.entries(countryTimezones)) {
     if (isBusinessHour(now, code)) {
+      // Get the local time string for display
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: config.timezone
+      });
+
+      // For sorting, get UTC offset in hours
+      const offsetString = now.toLocaleString('en-US', {
+        timeZone: config.timezone,
+        timeZoneName: 'shortOffset'
+      });
+      // Extract offset (e.g., "GMT+5:30" -> 5.5)
+      const offsetMatch = offsetString.match(/GMT([+-])(\d+):?(\d+)?/);
+      let offsetHours = 0;
+      if (offsetMatch) {
+        const sign = offsetMatch[1] === '-' ? -1 : 1;
+        offsetHours = sign * (parseInt(offsetMatch[2]) + (offsetMatch[3] ? parseInt(offsetMatch[3]) / 60 : 0));
+      }
+
       countriesInBusiness.push({
         country: code,
         name: config.name,
         timezone: config.timezone,
-        currentLocalTime: convertToTimezone(now, config.timezone)
+        currentLocalTime: timeString,
+        offsetHours: offsetHours
       });
     }
   }
 
-  return countriesInBusiness.sort((a, b) =>
-    a.currentLocalTime.getTime() - b.currentLocalTime.getTime()
-  );
+  return countriesInBusiness.sort((a, b) => a.offsetHours - b.offsetHours);
+}
+
+/**
+ * Get the status reason for a country (why it's not in business hours)
+ * Returns: 'weekend' | 'outside_hours' | 'open'
+ */
+function getCountryStatus(date, countryCode) {
+  const config = getTimezoneConfig(countryCode);
+
+  // Get hour in the recipient's timezone using Intl API with formatToParts
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timezone,
+    hour: 'numeric',
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(date);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const hour = hourPart ? parseInt(hourPart.value) : 0;
+
+  // Get day of week by formatting the date in the target timezone
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timezone,
+    weekday: 'long'
+  });
+  const dayString = dayFormatter.format(date).toLowerCase();
+
+  // Map day names to numbers (0 = Sunday, 1 = Monday, etc.)
+  const dayMap = {
+    'sunday': 0,
+    'monday': 1,
+    'tuesday': 2,
+    'wednesday': 3,
+    'thursday': 4,
+    'friday': 5,
+    'saturday': 6
+  };
+  const day = dayMap[dayString];
+
+  // Check if it's a weekend
+  if (config.weekendDays.includes(day)) {
+    return 'weekend';
+  }
+
+  // Check if it's within business hours
+  if (hour >= config.businessStart && hour < config.businessEnd) {
+    return 'open';
+  }
+
+  return 'outside_hours';
 }
 
 /**
@@ -268,12 +424,114 @@ function getSmartSendTimeForContact(contactId, db) {
   return calculateOptimalSendTime(countryCode);
 }
 
+/**
+ * Adjust a date to fall within business hours
+ * If the date is outside business hours, moves it to the next valid business hour
+ */
+function adjustToBusinessHours(date, countryCode) {
+  const config = getTimezoneConfig(countryCode);
+  let adjustedDate = new Date(date.getTime());
+
+  // Check if we're outside business hours in the target timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: config.timezone,
+    hour: 'numeric',
+    hour12: false,
+    weekday: 'long'
+  });
+
+  const parts = formatter.formatToParts(adjustedDate);
+  const hourPart = parts.find(p => p.type === 'hour');
+  const dayPart = parts.find(p => p.type === 'weekday');
+  const hour = hourPart ? parseInt(hourPart.value) : 0;
+  const dayName = dayPart ? dayPart.value.toLowerCase() : '';
+
+  const dayMap = {
+    'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+    'thursday': 4, 'friday': 5, 'saturday': 6
+  };
+  const day = dayMap[dayName];
+
+  // If it's a weekend, move to next business day morning
+  if (config.weekendDays.includes(day)) {
+    // Find the next non-weekend day
+    while (true) {
+      adjustedDate.setDate(adjustedDate.getDate() + 1);
+      const newParts = formatter.formatToParts(adjustedDate);
+      const newDayPart = newParts.find(p => p.type === 'weekday');
+      const newDayName = newDayPart ? newDayPart.value.toLowerCase() : '';
+      const newDay = dayMap[newDayName];
+
+      if (!config.weekendDays.includes(newDay)) {
+        // Set to business start time
+        adjustedDate.setHours(config.businessStart, 0, 0, 0);
+        break;
+      }
+    }
+  } else if (hour < config.businessStart) {
+    // Before business hours - move to start time today
+    adjustedDate.setHours(config.businessStart, 0, 0, 0);
+  } else if (hour >= config.businessEnd) {
+    // After business hours - move to start time tomorrow
+    adjustedDate.setDate(adjustedDate.getDate() + 1);
+    adjustedDate.setHours(config.businessStart, 0, 0, 0);
+
+    // Check if tomorrow is a weekend
+    const tomorrowParts = formatter.formatToParts(adjustedDate);
+    const tomorrowDayPart = tomorrowParts.find(p => p.type === 'weekday');
+    const tomorrowDayName = tomorrowDayPart ? tomorrowDayPart.value.toLowerCase() : '';
+    const tomorrowDay = dayMap[tomorrowDayName];
+
+    if (config.weekendDays.includes(tomorrowDay)) {
+      // Skip to Monday (or next business day)
+      while (config.weekendDays.includes(tomorrowDay)) {
+        adjustedDate.setDate(adjustedDate.getDate() + 1);
+        const checkParts = formatter.formatToParts(adjustedDate);
+        const checkDayPart = checkParts.find(p => p.type === 'weekday');
+        const checkDayName = checkDayPart ? checkDayPart.value.toLowerCase() : '';
+        const checkDay = dayMap[checkDayName];
+        if (!config.weekendDays.includes(checkDay)) break;
+      }
+    }
+  }
+
+  return adjustedDate;
+}
+
+/**
+ * Calculate follow-up date by adding calendar days, then adjusting to business hours
+ * This ensures follow-ups respect the configured delay but skip weekends/hours
+ */
+function calculateFollowUpDate(baseDate, daysToAdd, countryCode) {
+  const config = getTimezoneConfig(countryCode);
+
+  // Add the calendar days
+  const followUpDate = new Date(baseDate.getTime());
+  followUpDate.setDate(followUpDate.getDate() + daysToAdd);
+
+  // Now adjust to business hours (handles weekends and off-hours)
+  return adjustToBusinessHours(followUpDate, countryCode);
+}
+
+/**
+ * Calculate the first available send time for a recipient
+ * Returns the next business hour if currently outside business hours
+ */
+function calculateFirstSendTime(countryCode) {
+  const now = new Date();
+  return adjustToBusinessHours(now, countryCode);
+}
+
 module.exports = {
   getTimezoneConfig,
   isBusinessHour,
+  getCountryStatus,
   calculateOptimalSendTime,
   getCountriesInBusiness,
   batchScheduleEmailsByTimezone,
   getSmartSendTimeForContact,
+  adjustToBusinessHours,
+  calculateFollowUpDate,
+  calculateFirstSendTime,
   countryTimezones
 };

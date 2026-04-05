@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require("../../database/database.js");
 const aiClient = require("../ai/ai-client");
 const aiWorker = require("../ai/ai-processor");
+const timezoneScheduler = require("./timezone-scheduler");
 
 // ============================================
 // DATABASE TABLES SETUP
@@ -224,6 +225,13 @@ function initializeEmailTables() {
   // Add sequence_position column to email_queue (which step in the sequence)
   try {
     db.run(`ALTER TABLE email_queue ADD COLUMN sequence_position INTEGER`);
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Add country_code column to email_queue for timezone-aware scheduling
+  try {
+    db.run(`ALTER TABLE email_queue ADD COLUMN country_code TEXT`);
   } catch (e) {
     // Column already exists
   }
@@ -2165,15 +2173,16 @@ router.post("/campaigns", (req, res) => {
     let emailsToQueue = [];
     if (target_type === "all") {
       const contacts = db.all(
-        "SELECT value as email, site_id FROM contacts WHERE type = 'email' AND value IS NOT NULL",
+        "SELECT c.value as email, c.site_id, s.country FROM contacts c LEFT JOIN sites s ON c.site_id = s.id WHERE c.type = 'email' AND c.value IS NOT NULL",
       );
       emailsToQueue = contacts.map((c) => ({
         email: c.email,
         site_id: c.site_id,
+        country: c.country,
       }));
     } else if (target_type === "wordpress") {
       const contacts = db.all(`
-        SELECT c.value as email, c.site_id
+        SELECT c.value as email, c.site_id, s.country
         FROM contacts c
         JOIN sites s ON c.site_id = s.id
         WHERE c.type = 'email' AND c.value IS NOT NULL AND s.is_wordpress = 1
@@ -2181,6 +2190,7 @@ router.post("/campaigns", (req, res) => {
       emailsToQueue = contacts.map((c) => ({
         email: c.email,
         site_id: c.site_id,
+        country: c.country,
       }));
     } else if (target_type === "executives") {
       // Assuming executives might have an email column or we just pull from contacts if there's a link.
@@ -2192,8 +2202,9 @@ router.post("/campaigns", (req, res) => {
       ...new Map(emailsToQueue.map((item) => [item.email, item])).values(),
     ];
 
-    // 4. Queue them up!
+    // 4. Queue them up with timezone-aware scheduling!
     let queuedCount = 0;
+    let scheduledCount = 0;
 
     for (const target of uniqueEmails) {
       // Get site data for template variable replacement (includes email-based name extraction)
@@ -2213,10 +2224,14 @@ router.post("/campaigns", (req, res) => {
         templateData,
       );
 
+      // Get country code for later scheduling by worker
+      const countryCode = (target.country || 'in').toLowerCase();
+
+      // Insert with queued status only - worker will handle scheduling
       db.run(
         `
-        INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status, country_code)
+        VALUES (?, ?, ?, ?, ?, 'queued', ?)
       `,
         [
           campaignId,
@@ -2224,7 +2239,7 @@ router.post("/campaigns", (req, res) => {
           processedSubject,
           processedHtml,
           processedText,
-          "queued",
+          target.country || 'in', // Default to 'in' if country is null
         ],
       );
       queuedCount++;
@@ -2239,13 +2254,72 @@ router.post("/campaigns", (req, res) => {
     // If status is 'sending', worker will pick it up automatically
     res.json({
       success: true,
-      message: `Campaign created and ${queuedCount} emails queued.`,
+      message: `Campaign created and ${queuedCount} emails queued. Worker will process them according to business rules.`,
       data: { campaign_id: campaignId, queued: queuedCount },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/email/queue/health
+ * Get worker health status and diagnose issues
+ */
+router.get("/queue/health", (req, res) => {
+  try {
+    const health = worker.getHealthStatus();
+
+    // Get queue breakdown
+    const queueBreakdown = db.all(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN scheduled_at IS NULL THEN 1 END) as immediate,
+        COUNT(CASE WHEN scheduled_at IS NOT NULL AND scheduled_at <= datetime('now') THEN 1 END) as ready,
+        COUNT(CASE WHEN scheduled_at IS NOT NULL AND scheduled_at > datetime('now') THEN 1 END) as scheduled
+      FROM email_queue
+      WHERE status = 'queued'
+    `)[0];
+
+    res.json({
+      success: true,
+      data: {
+        ...health,
+        queueBreakdown: queueBreakdown,
+        diagnosis: {
+          issues: [],
+          recommendations: []
+        }
+      }
+    });
+
+    // Add diagnosis
+    const diagnosis = health.activeSenders === 0
+      ? "No active email senders configured. Please activate at least one sender account."
+      : health.queuedEmails === 0
+      ? "No emails in queue. Add contacts to a campaign to start sending."
+      : !health.isRunning && !health.isPaused
+      ? "Worker is not running. Click 'Start Queue' to begin processing."
+      : health.isPaused
+      ? "Worker is paused. Click 'Resume' to continue processing."
+      : "Worker is healthy and processing emails.";
+
+    res.json({
+      success: true,
+      data: {
+        worker: health,
+        queue: queueBreakdown,
+        diagnosis: diagnosis,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -2565,17 +2639,20 @@ router.post("/queue/add-selected", (req, res) => {
     );
     const campaignId = campaignResult.lastInsertRowid;
 
-    // Fetch contacts by IDs
+    // Fetch contacts by IDs with site country information
     const placeholders = contact_ids.map(() => "?").join(",");
     const contacts = db.all(
-      `SELECT id, value as email, site_id FROM contacts WHERE id IN (${placeholders}) AND type = 'email'`,
+      `SELECT c.id, c.value as email, c.site_id, s.country
+       FROM contacts c
+       LEFT JOIN sites s ON c.site_id = s.id
+       WHERE c.id IN (${placeholders}) AND c.type = 'email'`,
       contact_ids,
     );
 
     let queuedCount = 0;
     const insertQueue = db.prepare(
-      `INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status)
-       VALUES (?, ?, ?, ?, ?, 'queued')`,
+      `INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status, country_code)
+       VALUES (?, ?, ?, ?, ?, 'queued', ?)`,
     );
     const insertLog = db.prepare(
       `INSERT INTO email_send_log (contact_id, contact_email, template_id, campaign_id, send_type, status)
@@ -2603,12 +2680,16 @@ router.post("/queue/add-selected", (req, res) => {
         templateData,
       );
 
+      // Calculate timezone-aware send time
+      const countryCode = (contact.country || 'in').toLowerCase();
+
       insertQueue.run(
         campaignId,
         contact.email,
         processedSubject,
         processedHtml,
         processedText,
+        countryCode,
       );
       insertLog.run(
         contact.id,
@@ -2628,7 +2709,7 @@ router.post("/queue/add-selected", (req, res) => {
 
     res.json({
       success: true,
-      message: `${queuedCount} emails added to queue`,
+      message: `${queuedCount} emails added to queue. Worker will process them according to business rules.`,
       data: { campaign_id: campaignId, queued: queuedCount },
     });
   } catch (error) {
@@ -2691,10 +2772,13 @@ router.post("/queue/add-by-tag", (req, res) => {
 
     const templateIds = tagTemplates.map((t) => t.id);
 
-    // Fetch contacts by IDs
+    // Fetch contacts by IDs with country information
     const placeholders = contact_ids.map(() => "?").join(",");
     const contacts = db.all(
-      `SELECT id, value as email, site_id FROM contacts WHERE id IN (${placeholders}) AND type = 'email'`,
+      `SELECT c.id, c.value as email, c.site_id, s.country
+       FROM contacts c
+       LEFT JOIN sites s ON c.site_id = s.id
+       WHERE c.id IN (${placeholders}) AND c.type = 'email'`,
       contact_ids,
     );
 
@@ -2733,7 +2817,7 @@ router.post("/queue/add-by-tag", (req, res) => {
     const campaignId = campaignResult.lastInsertRowid;
 
     const insertQueue = db.prepare(
-      `INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status, scheduled_at, contact_id, tag, sequence_position)
+      `INSERT INTO email_queue (campaign_id, recipient_email, subject, html_content, text_content, status, contact_id, tag, sequence_position, country_code)
        VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?)`,
     );
     const insertLog = db.prepare(
@@ -2771,30 +2855,19 @@ router.post("/queue/add-by-tag", (req, res) => {
         continue;
       }
 
-      // Queue ALL remaining templates with appropriate scheduling
-      let cumulativeDays = 0;
+      // Queue ALL remaining templates
+      // Get country code for worker to use during scheduling
+      const siteCountry = db.get(
+        "SELECT country FROM sites WHERE id = ?",
+        [contact.site_id]
+      );
+      const countryCode = (siteCountry?.country || 'in').toLowerCase();
+
       remainingTemplates.forEach((template, idx) => {
         const seqIndex = tagTemplates.indexOf(template);
         const sendType = seqIndex === 0 ? "main" : `followup_${seqIndex}`;
 
-        // Calculate scheduled_at:
-        // First remaining template = immediate (no gap)
-        // Subsequent templates = cumulative gaps from the gap settings
-        let scheduledAt = null;
-        if (idx === 0) {
-          // First remaining template sends immediately
-          scheduledAt = null;
-        } else {
-          // Use the gap for this sequence position
-          const gapDays = gaps[seqIndex] || gaps[gaps.length - 1] || 5;
-          cumulativeDays += gapDays;
-          const schedDate = new Date();
-          schedDate.setDate(schedDate.getDate() + cumulativeDays);
-          scheduledAt = schedDate.toISOString();
-        }
-
         // Get site data for template variable replacement
-        // Get site data for template variable replacement (includes email-based name extraction)
         const templateData = getSiteDataForTemplate(
           contact.site_id,
           contact.email,
@@ -2813,16 +2886,17 @@ router.post("/queue/add-by-tag", (req, res) => {
           templateData,
         );
 
+        // Insert with queued status only - worker will handle all scheduling
         insertQueue.run(
           campaignId,
           contact.email,
           processedSubject,
           processedHtml,
           processedText,
-          scheduledAt,
           contact.id,
           trimmedTag,
           seqIndex + 1,
+          countryCode,
         );
         insertLog.run(
           contact.id,
@@ -2832,42 +2906,35 @@ router.post("/queue/add-by-tag", (req, res) => {
           sendType,
         );
 
-        if (scheduledAt) {
-          scheduledCount++;
-        } else {
-          queuedCount++;
-        }
+        queuedCount++;
 
         details.push({
           email: contact.email,
-          status: scheduledAt ? "scheduled" : "queued",
+          status: "queued",
           template: template.name,
           sendType,
-          scheduledAt: scheduledAt || "immediate",
-          daysFromNow: cumulativeDays,
+          sequencePosition: seqIndex + 1,
         });
       });
     }
 
     // Update campaign total
-    const totalQueued = queuedCount + scheduledCount;
     db.run("UPDATE email_campaigns SET total_recipients = ? WHERE id = ?", [
-      totalQueued,
+      queuedCount,
       campaignId,
     ]);
 
     // If nothing was queued, clean up the empty campaign
-    if (totalQueued === 0) {
+    if (queuedCount === 0) {
       db.run("DELETE FROM email_campaigns WHERE id = ?", [campaignId]);
     }
 
     res.json({
       success: true,
-      message: `${queuedCount} emails queued immediately, ${scheduledCount} scheduled as follow-ups, ${skippedCount} skipped`,
+      message: `${queuedCount} emails queued. Worker will process them sequentially according to business rules.`,
       data: {
-        campaign_id: totalQueued > 0 ? campaignId : null,
+        campaign_id: queuedCount > 0 ? campaignId : null,
         queued: queuedCount,
-        scheduled: scheduledCount,
         skipped: skippedCount,
         tag: trimmedTag,
         total_templates: tagTemplates.length,

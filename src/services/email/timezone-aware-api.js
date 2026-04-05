@@ -11,6 +11,39 @@ const db = require("../../database/database.js");
 const timezoneScheduler = require("../email/timezone-scheduler");
 
 /**
+ * Normalize country code to handle various input formats
+ * - Trims whitespace
+ * - Converts to lowercase
+ * - Handles duplicates like "IN IN" -> "in"
+ * - Handles malformed codes by extracting valid part
+ * @param {string} code - The country code to normalize
+ * @returns {string|null} - Normalized lowercase country code, or null if invalid
+ */
+function normalizeCountryCode(code) {
+  if (!code) return null;
+
+  // Convert to string, trim, uppercase
+  let normalized = String(code).trim().toUpperCase();
+
+  // Handle duplicate codes like "IN IN" -> extract first valid part
+  // Split by space and take the first 2-letter valid code
+  const parts = normalized.split(/\s+/);
+  for (const part of parts) {
+    // Check if it looks like a valid country code (2-3 letters)
+    if (/^[A-Z]{2,3}$/.test(part)) {
+      return part.toLowerCase();
+    }
+  }
+
+  // If no valid part found, try first 2 chars of trimmed string
+  if (normalized.length >= 2) {
+    return normalized.substring(0, 2).toLowerCase();
+  }
+
+  return null;
+}
+
+/**
  * GET /api/email/timezone/countries
  * Get all countries with their timezone configurations
  */
@@ -29,6 +62,138 @@ router.get("/timezone/countries", (req, res) => {
     res.json({
       success: true,
       data: countries,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/email/timezone/countries/:countryCode
+ * Get a specific country's timezone configuration
+ */
+router.get("/timezone/countries/:countryCode", (req, res) => {
+  try {
+    const { countryCode } = req.params;
+    const normalizedCode = countryCode.toLowerCase();
+
+    // Get from country_timezones table or use defaults
+    const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
+
+    // Check if there's a custom config in the database
+    const customConfig = db.get(
+      "SELECT * FROM country_timezones WHERE country_code = ?",
+      [normalizedCode]
+    );
+
+    const countryData = {
+      country_code: normalizedCode,
+      name: config.name,
+      timezone: config.timezone,
+      business_start: config.businessStart,
+      business_end: config.businessEnd,
+      weekend_days: config.weekendDays.join(','),
+      has_custom_config: !!customConfig
+    };
+
+    // Override with custom values if they exist
+    if (customConfig) {
+      countryData.business_start = customConfig.business_start;
+      countryData.business_end = customConfig.business_end;
+      countryData.weekend_days = customConfig.weekend_days;
+    }
+
+    res.json({
+      success: true,
+      data: countryData,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/email/timezone/countries/:countryCode
+ * Update a country's timezone configuration
+ */
+router.put("/timezone/countries/:countryCode", (req, res) => {
+  try {
+    const { countryCode } = req.params;
+    const { business_start, business_end, weekend_days } = req.body;
+
+    // Validate inputs
+    if (typeof business_start !== 'number' || business_start < 0 || business_start > 23) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid business_start hour (must be 0-23)"
+      });
+    }
+    if (typeof business_end !== 'number' || business_end < 0 || business_end > 23) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid business_end hour (must be 0-23)"
+      });
+    }
+
+    // Parse weekend_days - can be array or comma-separated string
+    let weekendDaysArray;
+    if (Array.isArray(weekend_days)) {
+      weekendDaysArray = weekend_days;
+    } else if (typeof weekend_days === 'string') {
+      weekendDaysArray = weekend_days.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    } else {
+      weekendDaysArray = [0, 6]; // Default to Sunday, Saturday
+    }
+
+    const normalizedCode = countryCode.toLowerCase();
+
+    // Check if custom config already exists
+    const existing = db.get(
+      "SELECT * FROM country_timezones WHERE country_code = ?",
+      [normalizedCode]
+    );
+
+    if (existing) {
+      // Update existing record
+      db.run(
+        `UPDATE country_timezones
+         SET business_start = ?, business_end = ?, weekend_days = ?
+         WHERE country_code = ?`,
+        [business_start, business_end, weekendDaysArray.join(','), normalizedCode]
+      );
+    } else {
+      // Insert new custom config
+      const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
+      db.run(
+        `INSERT INTO country_timezones (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          normalizedCode,
+          config.timezone,
+          config.name,
+          config.offset || 0,
+          business_start,
+          business_end,
+          weekendDaysArray.join(',')
+        ]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: "Country settings updated successfully",
+      data: {
+        country_code: normalizedCode,
+        business_start,
+        business_end,
+        weekend_days: weekendDaysArray.join(',')
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -162,27 +327,25 @@ router.post("/campaign/timezone-aware", (req, res) => {
       const batchSendTime = new Date(batch.send_time);
       const delayMs = batchSendTime.getTime() - now.getTime();
 
-      // Only queue if send time is in the future
-      if (delayMs > 0) {
-        batch.contacts.forEach((contact) => {
-          db.run(
-            `
-            INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, scheduled_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)
-          `,
-            [
-              campaignId,
-              contact.email,
-              "", // recipient_name - can be extracted later
-              "Subject placeholder", // subject - will be replaced by template
-              "<html>Body placeholder</html>", // html_content
-              "Body placeholder", // text_content
-              batch.send_time,
-            ],
-          );
-          queuedCount++;
-        });
-      }
+      // Queue all contacts - worker will handle scheduling based on country and business rules
+      batch.contacts.forEach((contact) => {
+        db.run(
+          `
+          INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, country_code)
+          VALUES (?, ?, ?, ?, ?, 'queued', ?)
+        `,
+          [
+            campaignId,
+            contact.email,
+            "", // recipient_name - can be extracted later
+            "Subject placeholder", // subject - will be replaced by template
+            "<html>Body placeholder</html>", // html_content
+            "Body placeholder", // text_content
+            batch.country,
+          ],
+        );
+        queuedCount++;
+      });
     });
 
     // Update campaign with actual queued count
@@ -193,7 +356,7 @@ router.post("/campaign/timezone-aware", (req, res) => {
 
     res.json({
       success: true,
-      message: `Timezone-aware campaign created with ${queuedCount} emails queued`,
+      message: `Timezone-aware campaign created with ${queuedCount} emails queued. Worker will process them according to business rules.`,
       data: {
         campaign_id: campaignId,
         total_contacts: contacts.length,
@@ -284,6 +447,967 @@ router.get("/timezone/optimal-times/:contactId", (req, res) => {
         timezone: tzConfig,
         optimal_send_times: optimalTimes,
       },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/email/timezone/monitoring
+ * Get comprehensive monitoring data for the dashboard
+ * Shows ONLY countries that have emails in the system (fully data-driven)
+ */
+router.get("/timezone/monitoring", (req, res) => {
+  try {
+    const worker = require('./email-queue-worker');
+
+    // Get worker health status
+    let healthStatus;
+    try {
+      healthStatus = worker.getHealthStatus();
+    } catch (workerError) {
+      healthStatus = {
+        isRunning: false,
+        isPaused: false,
+        activeSenders: 0,
+        queuedEmails: 0,
+        recentErrors: [],
+        lastCheck: new Date().toISOString(),
+        parallelMode: true
+      };
+    }
+
+    const now = new Date();
+
+    // Get ALL email stats by country - includes all statuses, no exclusions
+    // Normalize region codes and handle missing data
+    let emailStatsByCountry = [];
+    try {
+      // First, let's see what raw data we have
+      const rawData = db.all(`
+        SELECT DISTINCT
+          -- Get country code from various sources in priority order:
+          -- 1. email_queue.country_code (new field, may be NULL for old emails)
+          -- 2. sites.country (from site linked via contact)
+          -- 3. Default to NULL which will be filtered out
+          eq.country_code as queue_country,
+          s.country as site_country,
+          eq.id as email_id,
+          eq.status,
+          eq.scheduled_at,
+          eq.created_at
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE eq.id IS NOT NULL
+      `);
+
+      // Verify no duplicates in raw data
+      const uniqueIds = new Set(rawData.map(r => r.email_id));
+      if (uniqueIds.size !== rawData.length) {
+        console.warn(`[Monitoring] DUPLICATE DETECTED: ${rawData.length} rows but only ${uniqueIds.size} unique email IDs`);
+      }
+
+      console.log(`[Monitoring] Found ${rawData.length} total emails in queue`);
+
+      // Normalize and group by country code
+      const countryGroups = new Map();
+
+      for (const row of rawData) {
+        // Determine the country code with proper normalization
+        let countryCode = null;
+
+        // Try queue_country first (new field)
+        if (row.queue_country) {
+          countryCode = normalizeCountryCode(row.queue_country);
+        }
+        // Fall back to site_country
+        else if (row.site_country) {
+          countryCode = normalizeCountryCode(row.site_country);
+        }
+
+        // Skip rows with no valid country code
+        if (!countryCode || countryCode === 'unknown') {
+          continue;
+        }
+
+        // Initialize group if needed
+        if (!countryGroups.has(countryCode)) {
+          countryGroups.set(countryCode, {
+            country_code: countryCode,
+            total_count: 0,
+            queued_count: 0,
+            scheduled_count: 0,
+            ready_count: 0,
+            sending_count: 0,
+            sent_count: 0,
+            failed_count: 0,
+            waiting_count: 0,
+            earliest_scheduled: null
+          });
+        }
+
+        // Update counts
+        const group = countryGroups.get(countryCode);
+        group.total_count++;
+
+        // Status-based counts
+        if (row.status === 'queued') {
+          group.queued_count++;
+        } else if (row.status === 'sending') {
+          group.sending_count++;
+        } else if (row.status === 'sent') {
+          group.sent_count++;
+        } else if (row.status === 'failed') {
+          group.failed_count++;
+        }
+
+        // Scheduled vs ready logic
+        if (row.status === 'queued') {
+          if (row.scheduled_at) {
+            const scheduledDate = new Date(row.scheduled_at);
+            if (scheduledDate > now) {
+              group.scheduled_count++;
+              group.waiting_count++;
+            } else {
+              group.ready_count++;
+            }
+          } else {
+            group.ready_count++;
+          }
+        }
+
+        // Track earliest scheduled time
+        if (row.scheduled_at) {
+          if (!group.earliest_scheduled || new Date(row.scheduled_at) < new Date(group.earliest_scheduled)) {
+            group.earliest_scheduled = row.scheduled_at;
+          }
+        }
+      }
+
+      // Convert map to array
+      emailStatsByCountry = Array.from(countryGroups.values());
+
+      // Debug log: Show detailed breakdown for each country
+      console.log(`[Monitoring] Aggregated into ${emailStatsByCountry.length} countries:`);
+      emailStatsByCountry.forEach(stat => {
+        console.log(`[Monitoring] ${stat.country_code.toUpperCase()}: total=${stat.total_count}, queued=${stat.queued_count}, ready=${stat.ready_count}, waiting=${stat.waiting_count}, sent=${stat.sent_count}, failed=${stat.failed_count}`);
+      });
+
+    } catch (dbError) {
+      console.error("Error fetching email stats by country:", dbError);
+      emailStatsByCountry = [];
+    }
+
+    // Build comprehensive country info ONLY for countries that have emails
+    const countriesWithStats = emailStatsByCountry.map(stat => {
+      const code = stat.country_code.toLowerCase();
+
+      // Get timezone config (reads from DB first, falls back to defaults)
+      const config = timezoneScheduler.getTimezoneConfig(code);
+
+      // Get business status (open, weekend, outside_hours)
+      const status = timezoneScheduler.getCountryStatus(now, code);
+      const inBusiness = status === 'open';
+
+      // Calculate local time in country's timezone
+      const localTimeString = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: config.timezone
+      });
+      const localDateString = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        weekday: 'short',
+        timeZone: config.timezone
+      });
+
+      // Calculate next valid business time
+      let nextBusinessStart = null;
+      let nextBusinessStartDisplay = null;
+      let hoursUntilBusiness = null;
+      let delayReason = null;
+
+      if (!inBusiness) {
+        delayReason = status; // 'weekend' or 'outside_hours'
+        try {
+          nextBusinessStart = timezoneScheduler.calculateFirstSendTime(code);
+          nextBusinessStartDisplay = nextBusinessStart.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            month: 'short',
+            day: 'numeric'
+          });
+          hoursUntilBusiness = Math.floor((nextBusinessStart - now) / (1000 * 60 * 60));
+        } catch (e) {
+          // Ignore calculation errors
+        }
+      }
+
+      // Format business hours for display
+      const formatBusinessHour = (hour) => {
+        const dateInTimezone = new Date(now.toLocaleString('en-US', { timeZone: config.timezone }));
+        dateInTimezone.setHours(hour, 0, 0, 0);
+        return dateInTimezone.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      };
+
+      const businessHoursDisplay = `${formatBusinessHour(config.businessStart)} - ${formatBusinessHour(config.businessEnd)}`;
+
+      return {
+        country_code: code.toUpperCase(),
+        country_code_lower: code,
+        timezone: config.timezone,
+        timezone_name: config.name,
+        // Business status
+        in_business_hours: inBusiness,
+        status_reason: status,
+        delay_reason: delayReason,
+        // Time display
+        local_time_display: localTimeString,
+        local_date: localDateString,
+        // Business hours config
+        business_start: config.businessStart,
+        business_end: config.businessEnd,
+        business_hours_display: businessHoursDisplay,
+        weekend_days: config.weekendDays || [0, 6],
+        // Next valid send time
+        next_business_start: nextBusinessStart ? nextBusinessStart.toISOString() : null,
+        next_business_start_display: nextBusinessStartDisplay,
+        hours_until_business: hoursUntilBusiness,
+        // Email counts (aggregated)
+        total: stat.total_count || 0,
+        queued: stat.queued_count || 0,
+        waiting: stat.waiting_count || 0,
+        scheduled: stat.scheduled_count || 0,
+        ready: stat.ready_count || 0,
+        sending: stat.sending_count || 0,
+        sent: stat.sent_count || 0,
+        failed: stat.failed_count || 0,
+        earliest_scheduled: stat.earliest_scheduled
+      };
+    });
+
+    // Sort countries: in-business first, then by ready count descending
+    countriesWithStats.sort((a, b) => {
+      if (a.in_business_hours && !b.in_business_hours) return -1;
+      if (!a.in_business_hours && b.in_business_hours) return 1;
+      return b.ready - a.ready;
+    });
+
+    // Calculate summary stats
+    const summary = {
+      total_countries: countriesWithStats.length,
+      countries_in_business: countriesWithStats.filter(c => c.in_business_hours).length,
+      total_emails: countriesWithStats.reduce((sum, c) => sum + c.total, 0),
+      total_queued: countriesWithStats.reduce((sum, c) => sum + c.queued, 0),
+      total_waiting: countriesWithStats.reduce((sum, c) => sum + c.waiting, 0),
+      total_scheduled: countriesWithStats.reduce((sum, c) => sum + c.scheduled, 0),
+      total_ready: countriesWithStats.reduce((sum, c) => sum + c.ready, 0),
+      total_sending: countriesWithStats.reduce((sum, c) => sum + c.sending, 0),
+      total_sent: countriesWithStats.reduce((sum, c) => sum + c.sent, 0),
+      total_failed: countriesWithStats.reduce((sum, c) => sum + c.failed, 0)
+    };
+
+    // Get upcoming sends (next hour across all countries) with normalized country codes
+    let upcomingEmails = [];
+    try {
+      const rawUpcoming = db.all(`
+        SELECT
+          eq.id,
+          eq.recipient_email,
+          eq.scheduled_at,
+          eq.created_at,
+          eq.country_code as queue_country,
+          s.country as site_country
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE eq.status = 'queued'
+          AND eq.scheduled_at IS NOT NULL
+          AND eq.scheduled_at > datetime('now')
+          AND eq.scheduled_at <= datetime('now', '+1 hour')
+        ORDER BY eq.scheduled_at ASC
+        LIMIT 20
+      `);
+
+      // Normalize country codes
+      upcomingEmails = rawUpcoming.map(email => ({
+        ...email,
+        country_code: normalizeCountryCode(email.queue_country || email.site_country) || 'unknown'
+      })).filter(e => e.country_code !== 'unknown');
+
+    } catch (dbError) {
+      console.error("Error fetching upcoming emails:", dbError);
+      upcomingEmails = [];
+    }
+
+    // Get recent sends (last hour) with normalized country codes
+    let recentSends = [];
+    try {
+      const rawRecent = db.all(`
+        SELECT
+          eq.id,
+          eq.recipient_email,
+          eq.sent_at,
+          eq.country_code as queue_country,
+          s.country as site_country
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE eq.status = 'sent'
+          AND eq.sent_at >= datetime('now', '-1 hour')
+        ORDER BY eq.sent_at DESC
+        LIMIT 20
+      `);
+
+      // Normalize country codes
+      recentSends = rawRecent.map(email => ({
+        ...email,
+        country_code: normalizeCountryCode(email.queue_country || email.site_country) || 'unknown'
+      })).filter(e => e.country_code !== 'unknown');
+
+    } catch (dbError) {
+      console.error("Error fetching recent sends:", dbError);
+      recentSends = [];
+    }
+
+    res.json({
+      success: true,
+      data: {
+        worker_status: {
+          is_running: healthStatus.isRunning,
+          is_paused: healthStatus.isPaused,
+          active_senders: healthStatus.activeSenders,
+          parallel_mode: healthStatus.parallelMode
+        },
+        countries: countriesWithStats,
+        upcoming_sends: upcomingEmails,
+        recent_sends: recentSends,
+        summary: summary,
+        generated_at: now.toISOString()
+      }
+    });
+  } catch (error) {
+    console.error("Error in timezone monitoring:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/email/timezone/monitoring/country/:countryCode
+ * Get detailed email list for a specific country with filtering
+ * Query params:
+ * - status: filter by email status (queued, sending, sent, failed, all)
+ * - startDate: filter emails created after this date (ISO string)
+ * - endDate: filter emails created before this date (ISO string)
+ * - search: search in email address or site URL
+ * - category: filter by template tag/category
+ * - limit: max results (default 100)
+ * - offset: pagination offset (default 0)
+ */
+router.get("/timezone/monitoring/country/:countryCode", (req, res) => {
+  try {
+    const { countryCode } = req.params;
+    const {
+      status = 'all',
+      startDate,
+      endDate,
+      search,
+      category,
+      limit = 100,
+      offset = 0
+    } = req.query;
+
+    // Normalize the requested country code
+    const normalizedCountryCode = normalizeCountryCode(countryCode);
+    if (!normalizedCountryCode) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid country code"
+      });
+    }
+
+    const limitNum = Math.min(parseInt(limit) || 100, 500);
+    const offsetNum = parseInt(offset) || 0;
+
+    // Debug logging
+    console.log(`[Country Drill-Down] Fetching emails for country: ${countryCode} -> normalized: ${normalizedCountryCode}`);
+    console.log(`[Country Drill-Down] Filters: status=${status}, category=${category}, search=${search}`);
+
+    // Debug: Check what country codes exist in the database
+    try {
+      const countryCodesInDb = db.all(`
+        SELECT DISTINCT
+          LOWER(TRIM(eq.country_code)) as queue_country,
+          LOWER(TRIM(s.country)) as site_country,
+          COUNT(*) as count
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        GROUP BY LOWER(TRIM(eq.country_code)), LOWER(TRIM(s.country))
+        LIMIT 10
+      `);
+      console.log('[Country Drill-Down] Country codes in DB:', countryCodesInDb);
+    } catch (debugError) {
+      console.warn('[Country Drill-Down] Could not debug country codes:', debugError.message);
+    }
+
+    // Build query conditions
+    const conditions = [];
+    const params = [];
+
+    // Country filter - match normalized codes from both sources
+    // We need to check if the normalized version of either field matches
+    conditions.push("(LOWER(TRIM(eq.country_code)) = ? OR LOWER(TRIM(s.country)) = ?)");
+    params.push(normalizedCountryCode, normalizedCountryCode);
+
+    // Status filter
+    if (status && status !== 'all') {
+      conditions.push("eq.status = ?");
+      params.push(status);
+    }
+
+    // Date range filter
+    if (startDate) {
+      conditions.push("eq.created_at >= ?");
+      params.push(startDate);
+    }
+    if (endDate) {
+      conditions.push("eq.created_at <= ?");
+      params.push(endDate);
+    }
+
+    // Search filter (email or site URL)
+    if (search) {
+      conditions.push("(eq.recipient_email LIKE ? OR s.url LIKE ?)");
+      const searchTerm = `%${search}%`;
+      params.push(searchTerm, searchTerm);
+    }
+
+    // Category/tag filter (from email_templates via email_campaigns)
+    if (category) {
+      conditions.push("et.tags LIKE ?");
+      params.push(`%${category}%`);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Get paginated email list with full details
+    // CRITICAL: Use DISTINCT on eq.id to prevent duplication from joins
+    let emails = [];
+    try {
+      emails = db.all(`
+        SELECT DISTINCT
+          eq.id,
+          eq.campaign_id,
+          eq.recipient_email,
+          eq.subject,
+          eq.status,
+          eq.scheduled_at,
+          eq.sent_at,
+          eq.created_at,
+          eq.error_message,
+          eq.attempts,
+          eq.tag as email_tag,
+          eq.sequence_position,
+          eq.country_code as queue_country_code,
+          s.url as site_url,
+          s.country as site_country,
+          s.page_title,
+          s.ai_actual_category,
+          s.checked_at as site_checked_at,
+          ec.name as campaign_name,
+          et.name as template_name,
+          et.tags as template_tags,
+          c.type as contact_type
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+        LEFT JOIN email_templates et ON ec.template_id = et.id
+        ${whereClause}
+        ORDER BY eq.created_at DESC
+        LIMIT ? OFFSET ?
+      `, [...params, limitNum, offsetNum]);
+    } catch (dbError) {
+      console.error("Error fetching country emails:", dbError);
+      emails = [];
+    }
+
+    console.log(`[Country Drill-Down] Query returned ${emails.length} unique emails`);
+
+    // Get total count for pagination
+    let totalCount = 0;
+    try {
+      const countResult = db.get(`
+        SELECT COUNT(DISTINCT eq.id) as count
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+        LEFT JOIN email_templates et ON ec.template_id = et.id
+        ${whereClause}
+      `, params);
+      totalCount = countResult?.count || 0;
+    } catch (countError) {
+      totalCount = emails.length;
+    }
+
+    // Enrich emails with delay reason and status info
+    const now = new Date();
+    const enrichedEmails = emails.map(email => {
+      const countryCode = email.queue_country_code || email.site_country || 'unknown';
+      let delayReason = null;
+      let isWaiting = false;
+
+      if (email.status === 'queued' && email.scheduled_at) {
+        const scheduledDate = new Date(email.scheduled_at);
+        if (scheduledDate > now) {
+          isWaiting = true;
+          // Check why it's waiting
+          const countryStatus = timezoneScheduler.getCountryStatus(scheduledDate, countryCode);
+          delayReason = countryStatus === 'weekend' ? 'weekend' :
+                        countryStatus === 'outside_hours' ? 'outside_business_hours' :
+                        'scheduled';
+        }
+      }
+
+      return {
+        ...email,
+        is_waiting: isWaiting,
+        delay_reason: delayReason,
+        status_display: email.status === 'queued' ? (isWaiting ? 'waiting' : 'ready') : email.status
+      };
+    });
+
+    // Get country info for display
+    const config = timezoneScheduler.getTimezoneConfig(normalizedCountryCode);
+    const countryStatus = timezoneScheduler.getCountryStatus(now, normalizedCountryCode);
+    const inBusiness = countryStatus === 'open';
+
+    // Calculate aggregated stats for ALL emails (not just current page)
+    // This ensures counts match between global monitor and modal
+    let stats = {
+      total: 0,
+      queued: 0,
+      waiting: 0,
+      ready: 0,
+      sending: 0,
+      sent: 0,
+      failed: 0,
+      scheduled: 0
+    };
+
+    try {
+      // Get ALL email records for this country (without pagination)
+      // to calculate accurate stats - use DISTINCT to ensure unique emails
+      const allEmails = db.all(`
+        SELECT DISTINCT
+          eq.id,
+          eq.status,
+          eq.scheduled_at,
+          eq.country_code as queue_country_code,
+          s.country as site_country
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        ${whereClause}
+      `, params);
+
+      console.log(`[Country Drill-Down] Calculating stats from ${allEmails.length} unique emails`);
+
+      // Aggregate stats using same logic as global monitor
+      for (const email of allEmails) {
+        stats.total++;
+
+        // Status-based counts
+        if (email.status === 'queued') {
+          stats.queued++;
+        } else if (email.status === 'sending') {
+          stats.sending++;
+        } else if (email.status === 'sent') {
+          stats.sent++;
+        } else if (email.status === 'failed') {
+          stats.failed++;
+        }
+
+        // Scheduled vs ready logic (same as global monitor)
+        if (email.status === 'queued') {
+          if (email.scheduled_at) {
+            const scheduledDate = new Date(email.scheduled_at);
+            if (scheduledDate > now) {
+              stats.scheduled++;
+              stats.waiting++;
+            } else {
+              stats.ready++;
+            }
+          } else {
+            stats.ready++;
+          }
+        }
+      }
+
+      console.log(`[Country Drill-Down] Stats: total=${stats.total}, queued=${stats.queued}, ready=${stats.ready}, waiting=${stats.waiting}, sent=${stats.sent}, failed=${stats.failed}`);
+    } catch (statsError) {
+      console.error('[Country Drill-Down] Error calculating stats:', statsError);
+      // Fall back to using totalCount for total
+      stats.total = totalCount;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        country_code: normalizedCountryCode.toUpperCase(),
+        country_info: {
+          timezone: config.timezone,
+          timezone_name: config.name,
+          business_hours: `${config.businessStart}:00 - ${config.businessEnd}:00`,
+          weekend_days: config.weekendDays,
+          in_business_hours: inBusiness,
+          status: countryStatus
+        },
+        emails: enrichedEmails,
+        stats: stats,
+        pagination: {
+          total: totalCount,
+          limit: limitNum,
+          offset: offsetNum,
+          has_more: (offsetNum + emails.length) < totalCount
+        },
+        filters_applied: {
+          status,
+          start_date: startDate,
+          end_date: endDate,
+          search,
+          category
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error in country drill-down:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/email/timezone/monitoring/debug/compare
+ * Debug endpoint: Compare counts between global monitor and modal logic
+ * Use this to verify consistency between the two aggregation methods
+ */
+router.get("/timezone/monitoring/debug/compare", (req, res) => {
+  try {
+    const now = new Date();
+    const normalizeCountryCode = (code) => {
+      if (!code) return null;
+      let normalized = String(code).trim().toUpperCase();
+      const parts = normalized.split(/\s+/);
+      for (const part of parts) {
+        if (/^[A-Z]{2,3}$/.test(part)) {
+          return part.toLowerCase();
+        }
+      }
+      if (normalized.length >= 2) {
+        return normalized.substring(0, 2).toLowerCase();
+      }
+      return null;
+    };
+
+    // Method 1: Global monitor aggregation (client-side grouping)
+    const rawData = db.all(`
+      SELECT DISTINCT
+        eq.country_code as queue_country,
+        s.country as site_country,
+        eq.id as email_id,
+        eq.status,
+        eq.scheduled_at,
+        eq.created_at
+      FROM email_queue eq
+      LEFT JOIN contacts c ON eq.contact_id = c.id
+      LEFT JOIN sites s ON c.site_id = s.id
+      WHERE eq.id IS NOT NULL
+    `);
+
+    const globalMonitorStats = new Map();
+    for (const row of rawData) {
+      let countryCode = null;
+      if (row.queue_country) {
+        countryCode = normalizeCountryCode(row.queue_country);
+      } else if (row.site_country) {
+        countryCode = normalizeCountryCode(row.site_country);
+      }
+
+      if (!countryCode || countryCode === 'unknown') continue;
+
+      if (!globalMonitorStats.has(countryCode)) {
+        globalMonitorStats.set(countryCode, {
+          country_code: countryCode,
+          total: 0,
+          queued: 0,
+          ready: 0,
+          waiting: 0,
+          scheduled: 0,
+          sending: 0,
+          sent: 0,
+          failed: 0
+        });
+      }
+
+      const group = globalMonitorStats.get(countryCode);
+      group.total++;
+
+      if (row.status === 'queued') {
+        group.queued++;
+        if (row.scheduled_at) {
+          const scheduledDate = new Date(row.scheduled_at);
+          if (scheduledDate > now) {
+            group.scheduled++;
+            group.waiting++;
+          } else {
+            group.ready++;
+          }
+        } else {
+          group.ready++;
+        }
+      } else if (row.status === 'sending') {
+        group.sending++;
+      } else if (row.status === 'sent') {
+        group.sent++;
+      } else if (row.status === 'failed') {
+        group.failed++;
+      }
+    }
+
+    // Method 2: Modal aggregation (per-country query)
+    const modalStats = new Map();
+    const countries = Array.from(globalMonitorStats.keys());
+
+    for (const countryCode of countries) {
+      const allEmails = db.all(`
+        SELECT DISTINCT
+          eq.id,
+          eq.status,
+          eq.scheduled_at,
+          eq.country_code as queue_country_code,
+          s.country as site_country
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE (LOWER(TRIM(eq.country_code)) = ? OR LOWER(TRIM(s.country)) = ?)
+      `, [countryCode, countryCode]);
+
+      const stats = {
+        country_code: countryCode,
+        total: allEmails.length,
+        queued: 0,
+        ready: 0,
+        waiting: 0,
+        scheduled: 0,
+        sending: 0,
+        sent: 0,
+        failed: 0
+      };
+
+      for (const email of allEmails) {
+        if (email.status === 'queued') {
+          stats.queued++;
+          if (email.scheduled_at) {
+            const scheduledDate = new Date(email.scheduled_at);
+            if (scheduledDate > now) {
+              stats.scheduled++;
+              stats.waiting++;
+            } else {
+              stats.ready++;
+            }
+          } else {
+            stats.ready++;
+          }
+        } else if (email.status === 'sending') {
+          stats.sending++;
+        } else if (email.status === 'sent') {
+          stats.sent++;
+        } else if (email.status === 'failed') {
+          stats.failed++;
+        }
+      }
+
+      modalStats.set(countryCode, stats);
+    }
+
+    // Compare results
+    const comparison = [];
+    const mismatches = [];
+
+    for (const countryCode of countries) {
+      const global = globalMonitorStats.get(countryCode);
+      const modal = modalStats.get(countryCode);
+
+      const match = global.total === modal.total &&
+                    global.queued === modal.queued &&
+                    global.ready === modal.ready &&
+                    global.waiting === modal.waiting &&
+                    global.sent === modal.sent &&
+                    global.failed === modal.failed;
+
+      const entry = {
+        country_code: countryCode.toUpperCase(),
+        match: match,
+        global_monitor: global,
+        modal_api: modal
+      };
+
+      if (!match) {
+        mismatches.push({
+          country: countryCode.toUpperCase(),
+          reason: {
+            total: global.total !== modal.total ? `global=${global.total}, modal=${modal.total}` : null,
+            queued: global.queued !== modal.queued ? `global=${global.queued}, modal=${modal.queued}` : null,
+            ready: global.ready !== modal.ready ? `global=${global.ready}, modal=${modal.ready}` : null,
+            waiting: global.waiting !== modal.waiting ? `global=${global.waiting}, modal=${modal.waiting}` : null,
+            sent: global.sent !== modal.sent ? `global=${global.sent}, modal=${modal.sent}` : null,
+            failed: global.failed !== modal.failed ? `global=${global.failed}, modal=${modal.failed}` : null
+          }
+        });
+      }
+
+      comparison.push(entry);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        total_countries: countries.length,
+        all_match: mismatches.length === 0,
+        mismatches: mismatches,
+        comparison: comparison.sort((a, b) => b.country_code.localeCompare(a.country_code))
+      }
+    });
+  } catch (error) {
+    console.error("Error in debug comparison:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email/worker/toggle-parallel
+ * Toggle parallel sending mode
+ */
+router.post("/worker/toggle-parallel", (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const worker = require('./email-queue-worker');
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: "enabled must be a boolean"
+      });
+    }
+
+    worker.toggleParallelMode(enabled);
+
+    res.json({
+      success: true,
+      message: `Parallel sending mode ${enabled ? 'enabled' : 'disabled'}`,
+      data: { parallelMode: enabled }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/email/timezone/update-country
+ * Update business hours settings for a country
+ */
+router.post("/timezone/update-country", (req, res) => {
+  try {
+    const { country_code, business_start, business_end, weekend_days } = req.body;
+
+    if (!country_code) {
+      return res.status(400).json({
+        success: false,
+        error: "country_code is required",
+      });
+    }
+
+    if (typeof business_start !== 'number' || typeof business_end !== 'number') {
+      return res.status(400).json({
+        success: false,
+        error: "business_start and business_end must be numbers",
+      });
+    }
+
+    // Check if country exists in database
+    const existing = db.get(
+      "SELECT * FROM country_timezones WHERE country_code = ?",
+      [country_code.toLowerCase()]
+    );
+
+    const weekendDaysStr = Array.isArray(weekend_days)
+      ? weekend_days.join(',')
+      : (weekend_days || '0,6');
+
+    if (existing) {
+      // Update existing record
+      db.run(
+        `UPDATE country_timezones
+         SET business_start = ?, business_end = ?, weekend_days = ?
+         WHERE country_code = ?`,
+        [business_start, business_end, weekendDaysStr, country_code.toLowerCase()]
+      );
+    } else {
+      // Get config from timezone-scheduler for new countries
+      const timezoneScheduler = require('../timezone-scheduler');
+      const defaultConfig = timezoneScheduler.getTimezoneConfig(country_code) || timezoneScheduler.getTimezoneConfig('us');
+
+      // Insert new record
+      db.run(
+        `INSERT INTO country_timezones (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          country_code.toLowerCase(),
+          defaultConfig.timezone,
+          defaultConfig.name,
+          0, // offset_hours - not critical for this feature
+          business_start,
+          business_end,
+          weekendDaysStr
+        ]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Business hours updated for ${country_code.toUpperCase()}`,
+      data: {
+        country_code: country_code.toLowerCase(),
+        business_start,
+        business_end,
+        weekend_days: weekendDaysStr
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -397,5 +1521,55 @@ router.get("/timezone/stats", (req, res) => {
     });
   }
 });
+
+/**
+ * Helper: Calculate next business window for countries outside business hours
+ */
+function calculateNextBusinessWindow(countries) {
+  const now = new Date();
+  let minMinutesUntilOpen = Infinity;
+
+  countries.forEach(country => {
+    try {
+      if (!country.in_business_hours && country.timezone && country.country_code !== 'unknown') {
+        const nextOpen = timezoneScheduler.calculateOptimalSendTime(country.country_code.toLowerCase(), now);
+        const minutesUntil = Math.floor((nextOpen - now) / (1000 * 60));
+        if (minutesUntil < minMinutesUntilOpen && minutesUntil > 0) {
+          minMinutesUntilOpen = minutesUntil;
+        }
+      }
+    } catch (e) {
+      // Skip countries that cause errors
+    }
+  });
+
+  if (minMinutesUntilOpen === Infinity) return 'unknown';
+  if (minMinutesUntilOpen < 60) return `${minMinutesUntilOpen} minutes`;
+  if (minMinutesUntilOpen < 1440) return `${Math.floor(minMinutesUntilOpen / 60)} hours`;
+  return `${Math.floor(minMinutesUntilOpen / 1440)} days`;
+}
+
+/**
+ * Helper: Get next business hour start time
+ */
+function getNextBusinessHourStart(countries) {
+  const now = new Date();
+  let nextOpen = null;
+
+  countries.forEach(country => {
+    try {
+      if (!country.in_business_hours && country.country_code !== 'unknown') {
+        const tzOpen = timezoneScheduler.calculateOptimalSendTime(country.country_code.toLowerCase(), now);
+        if (!nextOpen || tzOpen < nextOpen) {
+          nextOpen = tzOpen;
+        }
+      }
+    } catch (e) {
+      // Skip countries that cause errors
+    }
+  });
+
+  return nextOpen ? nextOpen.toISOString() : null;
+}
 
 module.exports = router;

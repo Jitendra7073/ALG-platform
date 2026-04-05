@@ -1541,7 +1541,8 @@ function getEmails(page = 1, limit = 50, search = null) {
         s.url as site_url,
         s.is_wordpress,
         s.search_query,
-        s.ai_actual_category
+        s.ai_actual_category,
+        s.country
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email' AND c.value LIKE ?
@@ -1572,7 +1573,8 @@ function getEmails(page = 1, limit = 50, search = null) {
         s.url as site_url,
         s.is_wordpress,
         s.search_query,
-        s.ai_actual_category
+        s.ai_actual_category,
+        s.country
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email'
@@ -1625,7 +1627,8 @@ function getEmailById(id) {
         s.url as site_url,
         s.is_wordpress,
         s.search_query,
-        s.ai_actual_category
+        s.ai_actual_category,
+        s.country
       FROM contacts c
       INNER JOIN sites s ON c.site_id = s.id
       WHERE c.type = 'email' AND c.id = ?

@@ -3500,6 +3500,23 @@
       border-bottom: none;
     }
 
+    /* Email row left border indicators */
+    .email-row-wordpress {
+      border-left: 4px solid #22c55e;
+    }
+
+    .email-row-wordpress td:first-child {
+      border-left: 4px solid #22c55e;
+    }
+
+    .email-row-non-wordpress {
+      border-left: 4px solid #eab308;
+    }
+
+    .email-row-non-wordpress td:first-child {
+      border-left: 4px solid #eab308;
+    }
+
     .sites-table-container td {
       padding: 14px 16px;
       font-size: 13px;
@@ -3540,6 +3557,24 @@
     .email-link:hover {
       color: var(--primary);
       text-decoration: none;
+    }
+
+    /* Region Cell Styles */
+    .region-cell {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .region-flag {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .region-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
     }
 
     /* Phone Cell Styles */
@@ -3868,6 +3903,1243 @@
       background: var(--gradient-primary);
       border-radius: 4px;
       transition: width 0.5s ease;
+    }
+
+    /* Timezone Monitoring Panel */
+    .timezone-monitoring-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .timezone-monitoring-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .timezone-monitoring-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .monitoring-refresh-indicator {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-weight: 400;
+    }
+
+    .monitoring-live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #10b981;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    .refreshing-spinner {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+      margin-right: 4px;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .timezone-monitoring-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .monitoring-action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .monitoring-action-btn:hover {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .timezone-monitoring-content {
+      padding: 20px;
+    }
+
+    .timezone-monitoring-content.collapsed {
+      display: none;
+    }
+
+    .monitoring-quick-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .monitoring-stat-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      border: 1px solid var(--border-default);
+      position: relative;
+    }
+
+    .monitoring-stat-card.success {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .monitoring-stat-card.warning {
+      border-color: rgba(245, 158, 11, 0.3);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .monitoring-stat-card.info {
+      border-color: rgba(59, 130, 246, 0.3);
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .monitoring-stat-card.primary {
+      border-color: rgba(139, 92, 246, 0.3);
+      background: rgba(139, 92, 246, 0.05);
+    }
+
+    .monitoring-stat-icon {
+      font-size: 24px;
+    }
+
+    .monitoring-stat-content {
+      flex: 1;
+    }
+
+    .monitoring-stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+
+    .monitoring-stat-label {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    .monitoring-toggle-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .monitoring-toggle-btn:hover {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .monitoring-status-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .monitoring-status-banner.active {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .monitoring-status-banner.waiting {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .monitoring-status-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .monitoring-status-content {
+      flex: 1;
+    }
+
+    .monitoring-status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .monitoring-status-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .monitoring-countries-section {
+      margin-bottom: 20px;
+    }
+
+    .monitoring-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .monitoring-section-header h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .monitoring-recommendation {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(139, 92, 246, 0.1);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .recommendation-icon {
+      font-size: 14px;
+    }
+
+    .recommendation-text {
+      font-weight: 500;
+    }
+
+    .monitoring-countries-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .monitoring-country-card {
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      background: var(--bg-tertiary);
+      border-radius: 12px;
+      border: 1px solid var(--border-default);
+      transition: all 0.2s ease;
+      overflow: hidden;
+      min-height: 120px;
+    }
+
+    .monitoring-country-card:hover {
+      border-color: var(--border-strong);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .monitoring-country-card.in-business {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, var(--bg-tertiary) 100%);
+    }
+
+    .country-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+    }
+
+    .country-card-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .country-card-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .monitoring-country-checkbox {
+      display: flex;
+      align-items: center;
+    }
+
+    .monitoring-country-checkbox input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--primary-color);
+    }
+
+    .monitoring-country-flag {
+      font-size: 22px;
+    }
+
+    .country-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .monitoring-country-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .country-code-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      background: var(--bg-secondary);
+      border-radius: 3px;
+      color: var(--text-tertiary);
+      font-weight: 500;
+      align-self: flex-start;
+    }
+
+    .country-card-body {
+      padding: 0 16px 14px;
+    }
+
+    .country-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .country-info-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .country-info-item .icon {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+
+    .country-info-item .value {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .country-stats-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .country-stats-group {
+      display: flex;
+      gap: 16px;
+    }
+
+    .country-stat {
+      text-align: center;
+    }
+
+    .country-stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-color);
+      line-height: 1;
+    }
+
+    .country-stat-label {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .monitoring-country-badge {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .monitoring-country-badge.in-business {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+    }
+
+    .monitoring-country-badge.out-business {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    .monitoring-country-badge.weekend {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+
+    .country-settings-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px;
+      margin-left: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+    }
+
+    .country-settings-btn:hover {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    .country-settings-btn:active {
+      transform: scale(0.95);
+    }
+
+    .monitoring-country-config-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+    }
+
+    .monitoring-country-config-btn:hover {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: white;
+    }
+
+    .monitoring-country-card.selected {
+      border-color: var(--primary-color) !important;
+      box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+    }
+
+    .monitoring-country-config-btn {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .monitoring-country-config-btn:hover {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    /* Business Hours Modal */
+    .business-hours-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .business-hours-modal.active {
+      display: flex;
+    }
+
+    .business-hours-modal-content {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .business-hours-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .business-hours-modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .business-hours-modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .business-hours-modal-close:hover {
+      background: var(--bg-hover);
+    }
+
+    .business-hours-form-group {
+      margin-bottom: 16px;
+    }
+
+    .business-hours-form-label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .business-hours-form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .business-hours-form-row>* {
+      flex: 1;
+    }
+
+    .business-hours-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    .business-hours-input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+    }
+
+    .business-hours-checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .business-hours-checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .business-hours-checkbox-label:hover {
+      background: var(--bg-hover);
+    }
+
+    .business-hours-checkbox-label input:checked+span {
+      color: var(--primary-color);
+    }
+
+    .business-hours-checkbox-label:has(input:checked) {
+      background: rgba(74, 144, 226, 0.1);
+      border-color: var(--primary-color);
+    }
+
+    .business-hours-modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .business-hours-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .business-hours-btn-primary {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .business-hours-btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .business-hours-btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+
+    .business-hours-btn-secondary:hover {
+      background: var(--bg-hover);
+    }
+
+    /* Country Drill-down Modal Styles */
+    .country-drill-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 10px;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .country-drill-modal.active {
+      display: flex;
+    }
+
+    .country-drill-modal-content {
+      background: var(--bg-card);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    .country-drill-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      gap: 20px;
+    }
+
+    .country-drill-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .drill-country-flag {
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+
+    .country-drill-title h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .drill-country-code {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      background: var(--bg-tertiary);
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .country-drill-modal-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .drill-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .drill-status-badge.in-business {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .drill-status-badge.out-business {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .drill-status-badge.weekend {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+
+    .drill-modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .drill-modal-close:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .drill-filters-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .drill-filter-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .drill-filter-select,
+    .drill-filter-input {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      font-size: 13px;
+      min-width: 120px;
+    }
+
+    .drill-search-box {
+      flex: 1;
+      max-width: 250px;
+    }
+
+    .drill-search-box input {
+      width: 100%;
+    }
+
+    .drill-stats-summary {
+      display: flex;
+      justify-content: space-around;
+      padding: 16px 24px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .drill-stat-item {
+      text-align: center;
+    }
+
+    .drill-stat-value {
+      display: block;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .drill-stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .drill-stat-item.drill-ready .drill-stat-value {
+      color: #22c55e;
+    }
+
+    .drill-stat-item.drill-waiting .drill-stat-value {
+      color: #f59e0b;
+    }
+
+    .drill-stat-item.drill-scheduled .drill-stat-value {
+      color: #3b82f6;
+    }
+
+    .drill-stat-item.drill-sent .drill-stat-value {
+      color: #8b5cf6;
+    }
+
+    .drill-stat-item.drill-failed .drill-stat-value {
+      color: #ef4444;
+    }
+
+    .drill-business-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      padding: 16px 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .drill-business-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .drill-business-item .icon {
+      font-size: 16px;
+    }
+
+    .drill-business-item strong {
+      color: var(--text-primary);
+    }
+
+    .drill-emails-container {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drill-emails-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .drill-emails-header h4 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .drill-emails-count {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .drill-emails-headers-row {
+      display: grid;
+      grid-template-columns: 2fr 2fr 1fr 1fr 1.5fr;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+    }
+
+    .drill-header-cell {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .drill-emails-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .drill-email-item {
+      display: grid;
+      grid-template-columns: 2fr 2fr 1fr 1fr 1.5fr;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border-color);
+      align-items: center;
+      transition: background 0.15s;
+    }
+
+    .drill-email-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .drill-email-item.status-queued {
+      border-left: 3px solid #3b82f6;
+    }
+
+    .drill-email-item.status-sending {
+      border-left: 3px solid #f59e0b;
+    }
+
+    .drill-email-item.status-sent {
+      border-left: 3px solid #22c55e;
+    }
+
+    .drill-email-item.status-failed {
+      border-left: 3px solid #ef4444;
+    }
+
+    .drill-email-value {
+      font-size: 13px;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .drill-email-value.secondary {
+      color: var(--text-secondary);
+    }
+
+    .drill-email-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .drill-email-status.queued {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+
+    .drill-email-status.sending {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+
+    .drill-email-status.sent {
+      background: rgba(34, 197, 94, 0.15);
+      color: #22c55e;
+    }
+
+    .drill-email-status.failed {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+
+    .drill-email-status.waiting {
+      background: rgba(168, 85, 247, 0.15);
+      color: #a855f7;
+    }
+
+    .drill-delay-reason {
+      font-size: 11px;
+      color: #f59e0b;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .drill-email-subject {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.4;
+    }
+
+    .drill-sequence-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #6366f1;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 6px;
+    }
+
+    .drill-pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+    }
+
+    .drill-page-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    .drill-page-btn:hover:not(:disabled) {
+      background: var(--bg-hover);
+      border-color: var(--primary-color);
+    }
+
+    .drill-page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .drill-page-info {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* Empty state for drill modal */
+    .drill-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 24px;
+      color: var(--text-secondary);
+    }
+
+    .drill-empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    /* Highlight styles for country card stats */
+    .highlight-ready {
+      color: #22c55e !important;
+    }
+
+    .highlight-waiting {
+      color: #f59e0b !important;
+    }
+
+    .highlight-scheduled {
+      color: #3b82f6 !important;
+    }
+
+    .highlight-failed {
+      color: #ef4444 !important;
+    }
+
+    .status-active {
+      color: #22c55e;
+    }
+
+    .status-inactive {
+      color: var(--text-secondary);
+    }
+
+    .country-delay-reason {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      padding: 8px 12px;
+      background: rgba(245, 158, 11, 0.1);
+      border-radius: 6px;
+      font-size: 12px;
+      color: #f59e0b;
+    }
+
+    .delay-icon {
+      font-size: 14px;
+    }
+
+    .monitoring-activity-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .monitoring-activity-column {
+      background: var(--bg-tertiary);
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid var(--border-default);
+    }
+
+    .monitoring-count {
+      padding: 4px 10px;
+      background: var(--bg-secondary);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .monitoring-list {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .monitoring-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-default);
+    }
+
+    .monitoring-list-item:last-child {
+      border-bottom: none;
+    }
+
+    .monitoring-list-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .monitoring-list-email {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .monitoring-list-meta {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .monitoring-list-time {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .monitoring-list-sent {
+      color: var(--success);
+    }
+
+    .monitoring-list-pending {
+      color: var(--warning);
+    }
+
+    .monitoring-empty-state {
+      text-align: center;
+      padding: 30px 20px;
+      color: var(--text-tertiary);
+      font-size: 13px;
     }
 
     /* Queue Settings Panel */
@@ -5956,7 +7228,8 @@
         </div>
 
         <!-- Status-wise Breakdown -->
-        <div style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <div
+          style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
           <h3 style="font-size: 16px; font-weight: 600; margin: 0 0 16px 0;">📊 Status-wise Breakdown</h3>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
             <div class="status-breakdown-item">
@@ -5993,13 +7266,17 @@
         </div>
 
         <!-- Email History Table -->
-        <div style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; overflow: hidden;">
-          <div style="padding: 20px; border-bottom: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center;">
+        <div
+          style="background: var(--bg-secondary); border: 1px solid var(--border-default); border-radius: 8px; overflow: hidden;">
+          <div
+            style="padding: 20px; border-bottom: 1px solid var(--border-default); display: flex; justify-content: space-between; align-items: center;">
             <div>
               <h3 style="font-size: 16px; font-weight: 600; margin: 0;">📨 Recent Email Activity</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); margin: 5px 0 0 0;">Latest email sending history</p>
+              <p style="font-size: 13px; color: var(--text-secondary); margin: 5px 0 0 0;">Latest email sending history
+              </p>
             </div>
-            <button class="btn-primary" onclick="switchTab('emails')" style="padding: 8px 16px; border-radius: 6px; font-size: 13px;">
+            <button class="btn-primary" onclick="switchTab('emails')"
+              style="padding: 8px 16px; border-radius: 6px; font-size: 13px;">
               View All
             </button>
           </div>
@@ -6007,11 +7284,21 @@
             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
               <thead>
                 <tr style="background: var(--bg-tertiary);">
-                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Status</th>
-                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Recipient</th>
-                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Subject</th>
-                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Sender</th>
-                  <th style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">Sent At</th>
+                  <th
+                    style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">
+                    Status</th>
+                  <th
+                    style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">
+                    Recipient</th>
+                  <th
+                    style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">
+                    Subject</th>
+                  <th
+                    style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">
+                    Sender</th>
+                  <th
+                    style="padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); border-bottom: 1px solid var(--border-default);">
+                    Sent At</th>
                 </tr>
               </thead>
               <tbody id="dashboard-email-history-table">
@@ -6377,54 +7664,6 @@
         </div>
       </div>
 
-      <!-- Timezone Status Dashboard -->
-      <div style="margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div>
-            <h2 style="font-size: 18px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px;">
-               Global Timezone Status
-            </h2>
-            <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0 0;">
-              Current local times and email sending availability by country
-            </p>
-          </div>
-          <button class="btn-primary" onclick="loadTimezoneStatus()" style="padding: 8px 16px; border-radius: 6px; font-size: 13px;">
-            Refresh
-          </button>
-        </div>
-
-        <!-- Platform Rules Info -->
-        <div style="background: var(--bg-tertiary); border-left: 4px solid var(--primary); padding: 12px 16px; border-radius: 6px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: start; gap: 12px;">
-            <span style="font-size: 16px;"></span>
-            <div>
-              <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Platform Sending Rules:</div>
-              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-                • Emails are sent during recipient's <strong>business hours (9 AM - 5 PM local time)</strong><br>
-                • <strong>Weekends are automatically avoided</strong> (Saturday/Sunday for most countries)<br>
-                • System calculates optimal send time based on recipient's country/timezone<br>
-                • Respects cultural differences (e.g., UAE weekends: Friday-Saturday)<br>
-                • Maximum <strong>10-15 emails per hour</strong> per country to avoid spam filters
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Timezone Grid -->
-        <div id="timezone-status-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-          <!-- Timezone cards will be loaded here -->
-          <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);">
-            <div style="font-size: 24px; margin-bottom: 8px;"></div>
-            Loading timezone status...
-          </div>
-        </div>
-
-        <!-- Summary Stats -->
-        <div id="timezone-summary" style="margin-top: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
-          <!-- Will be populated by JavaScript -->
-        </div>
-      </div>
-
       <!-- Queue Stats Cards -->
       <div class="email-queue-stats" id="email-queue-stats-panel">
         <div class="queue-stat-card">
@@ -6530,6 +7769,326 @@
         </div>
       </div>
 
+      <!-- Timezone Monitoring Dashboard -->
+      <div class="timezone-monitoring-panel" id="timezone-monitoring-panel">
+        <div class="timezone-monitoring-header">
+          <div class="timezone-monitoring-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+              </path>
+            </svg>
+            <span>Global Email Monitor</span>
+            <span class="monitoring-live-indicator">
+              <span class="live-dot"></span>
+              <span class="monitoring-refresh-indicator" id="monitoring-last-update"></span>
+            </span>
+          </div>
+          <div class="timezone-monitoring-actions">
+            <button class="monitoring-action-btn" onclick="toggleMonitoringPanel()" title="Collapse/Expand">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <button class="monitoring-action-btn" onclick="refreshMonitoringData()" title="Refresh">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="timezone-monitoring-content" id="timezone-monitoring-content">
+          <!-- Quick Stats Row -->
+          <div class="monitoring-quick-stats">
+            <div class="monitoring-stat-card success" id="monitoring-ready-card">
+              <div class="monitoring-stat-icon">🟢</div>
+              <div class="monitoring-stat-content">
+                <div class="monitoring-stat-value" id="monitoring-ready-count">0</div>
+                <div class="monitoring-stat-label">Ready to Send</div>
+              </div>
+            </div>
+            <div class="monitoring-stat-card warning" id="monitoring-scheduled-card">
+              <div class="monitoring-stat-icon">⏰</div>
+              <div class="monitoring-stat-content">
+                <div class="monitoring-stat-value" id="monitoring-scheduled-count">0</div>
+                <div class="monitoring-stat-label">Scheduled</div>
+              </div>
+            </div>
+            <div class="monitoring-stat-card info" id="monitoring-business-card">
+              <div class="monitoring-stat-icon">🌍</div>
+              <div class="monitoring-stat-content">
+                <div class="monitoring-stat-value" id="monitoring-business-count">0</div>
+                <div class="monitoring-stat-label">Countries In Business</div>
+              </div>
+            </div>
+            <div class="monitoring-stat-card primary" id="monitoring-parallel-card">
+              <div class="monitoring-stat-icon">⚡</div>
+              <div class="monitoring-stat-content">
+                <div class="monitoring-stat-value" id="monitoring-parallel-status">ON</div>
+                <div class="monitoring-stat-label">Parallel Mode</div>
+              </div>
+              <button class="monitoring-toggle-btn" onclick="toggleParallelMode()" title="Toggle parallel sending">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                  <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Status Banner -->
+          <div class="monitoring-status-banner" id="monitoring-status-banner">
+            <div class="monitoring-status-icon" id="monitoring-status-icon">ℹ️</div>
+            <div class="monitoring-status-content">
+              <div class="monitoring-status-title" id="monitoring-status-title">Loading...</div>
+              <div class="monitoring-status-description" id="monitoring-status-description"></div>
+            </div>
+          </div>
+
+          <!-- Countries Grid -->
+          <div class="monitoring-countries-section">
+            <div class="monitoring-section-header">
+              <h4>Countries & Queue Status</h4>
+              <div class="monitoring-recommendation" id="monitoring-recommendation">
+                <span class="recommendation-icon">💡</span>
+                <span class="recommendation-text" id="recommendation-text">Loading...</span>
+              </div>
+            </div>
+            <div class="monitoring-countries-grid" id="monitoring-countries-grid">
+              <!-- Populated by JavaScript -->
+            </div>
+          </div>
+
+          <!-- Upcoming & Recent Section -->
+          <div class="monitoring-activity-section">
+            <div class="monitoring-activity-column">
+              <div class="monitoring-section-header">
+                <h4>Upcoming Sends (Next Hour)</h4>
+                <span class="monitoring-count" id="upcoming-count">0</span>
+              </div>
+              <div class="monitoring-list" id="monitoring-upcoming-list">
+                <!-- Populated by JavaScript -->
+              </div>
+            </div>
+            <div class="monitoring-activity-column">
+              <div class="monitoring-section-header">
+                <h4>Recent Sends</h4>
+                <span class="monitoring-count" id="recent-count">0</span>
+              </div>
+              <div class="monitoring-list" id="monitoring-recent-list">
+                <!-- Populated by JavaScript -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Business Hours Configuration Modal -->
+      <div class="business-hours-modal" id="business-hours-modal">
+        <div class="business-hours-modal-content">
+          <div class="business-hours-modal-header">
+            <h3 class="business-hours-modal-title">Configure Business Hours</h3>
+            <button class="business-hours-modal-close" onclick="closeBusinessHoursModal()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div class="business-hours-form-group">
+            <label class="business-hours-form-label">Country</label>
+            <input type="hidden" id="bh-country-code">
+            <input type="text" class="business-hours-input" id="bh-country-name" readonly>
+          </div>
+
+          <div class="business-hours-form-row">
+            <div class="business-hours-form-group">
+              <label class="business-hours-form-label" for="bh-start-time">Start Time (Hour)</label>
+              <select class="business-hours-input" id="bh-start-time">
+                <option value="6">6 AM</option>
+                <option value="7">7 AM</option>
+                <option value="8">8 AM</option>
+                <option value="9" selected>9 AM</option>
+                <option value="10">10 AM</option>
+                <option value="11">11 AM</option>
+                <option value="12">12 PM</option>
+              </select>
+            </div>
+            <div class="business-hours-form-group">
+              <label class="business-hours-form-label" for="bh-end-time">End Time (Hour)</label>
+              <select class="business-hours-input" id="bh-end-time">
+                <option value="12">12 PM</option>
+                <option value="13">1 PM</option>
+                <option value="14">2 PM</option>
+                <option value="15">3 PM</option>
+                <option value="16">4 PM</option>
+                <option value="17" selected>5 PM</option>
+                <option value="18">6 PM</option>
+                <option value="19">7 PM</option>
+                <option value="20">8 PM</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="business-hours-form-group">
+            <label class="business-hours-form-label">Weekend Days</label>
+            <div class="business-hours-checkbox-group">
+              <label class="business-hours-checkbox-label">
+                <input type="checkbox" name="bh-weekend" value="0">
+                <span>Sunday</span>
+              </label>
+              <label class="business-hours-checkbox-label">
+                <input type="checkbox" name="bh-weekend" value="6">
+                <span>Saturday</span>
+              </label>
+              <label class="business-hours-checkbox-label">
+                <input type="checkbox" name="bh-weekend" value="5">
+                <span>Friday</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="business-hours-modal-actions">
+            <button class="business-hours-btn business-hours-btn-secondary"
+              onclick="closeBusinessHoursModal()">Cancel</button>
+            <button class="business-hours-btn business-hours-btn-primary" onclick="saveBusinessHours()">Save
+              Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Country Drill-down Modal -->
+      <div class="country-drill-modal" id="country-drill-modal">
+        <div class="country-drill-modal-content">
+          <div class="country-drill-modal-header">
+            <div class="country-drill-title">
+              <span id="drill-country-flag" class="drill-country-flag">🌐</span>
+              <div>
+                <h3 id="drill-country-name">Country Name</h3>
+                <span id="drill-country-code" class="drill-country-code">XX</span>
+              </div>
+            </div>
+            <div class="country-drill-modal-actions">
+              <div class="drill-status-badge" id="drill-status-badge">
+                <span id="drill-status-icon">●</span>
+                <span id="drill-status-text">Open</span>
+              </div>
+              <button class="drill-modal-close" onclick="closeCountryModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="drill-filters-bar">
+            <div class="drill-filter-group">
+              <select id="drill-status-filter" class="drill-filter-select" onchange="refreshCountryModalData()">
+                <option value="all">All Statuses</option>
+                <option value="queued">Queued</option>
+                <option value="sending">Sending</option>
+                <option value="sent">Sent</option>
+                <option value="failed">Failed</option>
+              </select>
+              <select id="drill-category-filter" class="drill-filter-select" onchange="refreshCountryModalData()">
+                <option value="">All Categories</option>
+                <option value="coupon">Coupon</option>
+                <option value="followup">Follow-up</option>
+                <option value="newsletter">Newsletter</option>
+              </select>
+              <input type="date" id="drill-start-date" class="drill-filter-input" onchange="refreshCountryModalData()">
+              <input type="date" id="drill-end-date" class="drill-filter-input" onchange="refreshCountryModalData()">
+            </div>
+            <div class="drill-search-box">
+              <input type="search" id="drill-search-input" placeholder="Search email or domain..."
+                oninput="debounceRefreshCountryModal()">
+            </div>
+          </div>
+
+          <!-- Stats Summary -->
+          <div class="drill-stats-summary">
+            <div class="drill-stat-item">
+              <span class="drill-stat-value" id="drill-total-count">0</span>
+              <span class="drill-stat-label">Total</span>
+            </div>
+            <div class="drill-stat-item drill-ready">
+              <span class="drill-stat-value" id="drill-ready-count">0</span>
+              <span class="drill-stat-label">Ready</span>
+            </div>
+            <div class="drill-stat-item drill-waiting">
+              <span class="drill-stat-value" id="drill-waiting-count">0</span>
+              <span class="drill-stat-label">Waiting</span>
+            </div>
+            <div class="drill-stat-item drill-scheduled">
+              <span class="drill-stat-value" id="drill-scheduled-count">0</span>
+              <span class="drill-stat-label">Scheduled</span>
+            </div>
+            <div class="drill-stat-item drill-sent">
+              <span class="drill-stat-value" id="drill-sent-count">0</span>
+              <span class="drill-stat-label">Sent</span>
+            </div>
+            <div class="drill-stat-item drill-failed">
+              <span class="drill-stat-value" id="drill-failed-count">0</span>
+              <span class="drill-stat-label">Failed</span>
+            </div>
+          </div>
+
+          <!-- Business Hours Info -->
+          <div class="drill-business-info" id="drill-business-info">
+            <div class="drill-business-item">
+              <span class="icon">🕐</span>
+              <span>Local Time: <strong id="drill-local-time">--:--</strong></span>
+            </div>
+            <div class="drill-business-item">
+              <span class="icon">💼</span>
+              <span>Business Hours: <strong id="drill-business-hours">--:-- - --:--</strong></span>
+            </div>
+            <div class="drill-business-item">
+              <span class="icon">📅</span>
+              <span>Weekend: <strong id="drill-weekend">--</strong></span>
+            </div>
+            <div class="drill-business-item">
+              <span class="icon">⏰</span>
+              <span>Next Send: <strong id="drill-next-send">--</strong></span>
+            </div>
+          </div>
+
+          <!-- Email List -->
+          <div class="drill-emails-container">
+            <div class="drill-emails-header">
+              <h4>Emails</h4>
+              <span class="drill-emails-count" id="drill-emails-count">0 results</span>
+            </div>
+
+            <!-- Column Headers -->
+            <div class="drill-emails-headers-row">
+              <div class="drill-header-cell">Email / Subject</div>
+              <div class="drill-header-cell">Site</div>
+              <div class="drill-header-cell">Category</div>
+              <div class="drill-header-cell">Status</div>
+              <div class="drill-header-cell">Dates</div>
+            </div>
+
+            <div class="drill-emails-list" id="drill-emails-list">
+              <!-- Populated by JavaScript -->
+            </div>
+            <!-- Pagination -->
+            <div class="drill-pagination" id="drill-pagination">
+              <button class="drill-page-btn" id="drill-prev-btn" onclick="prevDrillPage()" disabled>Previous</button>
+              <span class="drill-page-info" id="drill-page-info">Page 1 of 1</span>
+              <button class="drill-page-btn" id="drill-next-btn" onclick="nextDrillPage()" disabled>Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Queue Settings Panel (collapsible) -->
       <div class="queue-settings-panel" id="queue-settings-panel" style="display: none;">
         <div class="queue-settings-header">
@@ -6574,6 +8133,10 @@
             <option value="not-sent">Not Sent Yet</option>
             <option value="sent">Already Sent</option>
           </select>
+          <select class="filter-select" id="emails-region-filter" onchange="handleEmailRegionFilter()">
+            <option value="all">All Regions</option>
+            <!-- Regions populated dynamically -->
+          </select>
           <select class="filter-select" id="emails-send-status-filter" onchange="handleEmailSendStatusFilter()">
             <option value="all">All Statuses</option>
             <option value="not_sent">Not Sent</option>
@@ -6613,8 +8176,8 @@
               </th>
               <th style="width: 22%">Email Address</th>
               <th style="width: 20%">Site URL</th>
-              <th style="width: 13%">Category</th>
-              <th style="width: 12%">Type</th>
+              <th style="width: 12%">Region</th>
+              <th style="width: 14%">Category</th>
               <th style="width: 12%">Status</th>
               <th style="width: 12%">Found Date</th>
               <th style="width: 5%; text-align: center;">Actions</th>
@@ -6696,10 +8259,7 @@
             style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
             Cancelled
           </button>
-          <button class="history-tab" onclick="switchEmailHistoryTab('all')" data-tab="all"
-            style="padding: 8px 16px; border: none; background: none; font-weight: 500; cursor: pointer; color: var(--text-muted);">
-            All History
-          </button>
+
         </div>
 
         <!-- History Filters -->
@@ -6743,19 +8303,19 @@
             <div style="display: flex; align-items: center; gap: 6px;">
               <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">From:</label>
               <input type="datetime-local" class="filter-select" id="history-start-datetime"
-                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
+                style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
               <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">To:</label>
               <input type="datetime-local" class="filter-select" id="history-end-datetime"
-                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
+                style="padding: 6px 10px; font-size: 13px; border-radius: 6px; min-width: 180px;">
             </div>
             <button class="btn-primary" onclick="applyCustomDateRange()"
-                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
               Apply
             </button>
             <button class="btn-secondary" onclick="clearCustomDateRange()"
-                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
               Clear
             </button>
           </div>
@@ -6765,15 +8325,15 @@
             <div style="display: flex; align-items: center; gap: 6px;">
               <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">Min (hours):</label>
               <input type="number" class="filter-select" id="gap-min-hours" min="0" max="720" value="0"
-                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
+                style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
               <label style="font-size: 12px; color: var(--text-secondary); white-space: nowrap;">Max (hours):</label>
               <input type="number" class="filter-select" id="gap-max-hours" min="0" max="720" value="24"
-                     style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
+                style="padding: 6px 10px; font-size: 13px; border-radius: 6px; width: 80px;">
             </div>
             <button class="btn-primary" onclick="applyCustomGapRange()"
-                    style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
+              style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">
               Apply
             </button>
           </div>
@@ -7944,7 +9504,7 @@
                 align-items: center;
                 gap: 8px;
               ">
-             Create New Campaign
+            Create New Campaign
           </div>
         </div>
         <form id="campaign-form" onsubmit="saveCampaign(event)" style="padding: 24px">
@@ -8037,7 +9597,7 @@
                 justify-content: flex-end;
               ">
             <button type="submit" class="btn btn-primary">
-               Create Campaign
+              Create Campaign
             </button>
           </div>
         </form>
@@ -8063,7 +9623,7 @@
                 align-items: center;
                 gap: 8px;
               ">
-             Email Queue Status
+            Email Queue Status
           </div>
         </div>
         <div style="padding: 20px">
@@ -8567,7 +10127,7 @@
           </h3>
           <button onclick="loadAIHistory()" class="action-btn btn-secondary"
             style="padding: 6px 12px; font-size: 12px;">
-             Refresh
+            Refresh
           </button>
         </div>
         <div style="overflow-x: auto">
@@ -10793,7 +12353,7 @@
             align-items: center;
           ">
         <h3 style="font-size: 18px; font-weight: 600"> Select Target Country</h3>
-        <button onclick="closeCountryModal()" style="
+        <button onclick="closeCountrySelectionModal()" style="
               background: none;
               border: none;
               font-size: 24px;
@@ -10864,7 +12424,7 @@
               border-radius: 6px;
             "></div>
           <div style="font-size: 10px; opacity: 0.8; margin-top: 8px;">
-             This is the actual Google search URL that will be used for scraping
+            This is the actual Google search URL that will be used for scraping
           </div>
         </div>
 
@@ -10883,7 +12443,8 @@
         </button>
 
         <div style="display: flex; gap: 12px; justify-content: flex-end;">
-          <button onclick="closeCountryModal()" class="btn btn-secondary" style="padding: 10px 20px;">Cancel</button>
+          <button onclick="closeCountrySelectionModal()" class="btn btn-secondary"
+            style="padding: 10px 20px;">Cancel</button>
           <button onclick="confirmCountryAndStart()" class="btn btn-primary" style="padding: 10px 20px;"> Start
             Scraping</button>
         </div>
@@ -11383,7 +12944,7 @@
         </button>
         <button class="action-btn btn-primary" onclick="submitScheduleQueue()"
           style="padding: 8px 16px; border-radius: 8px">
-           Confirm Schedule
+          Confirm Schedule
         </button>
       </div>
     </div>
@@ -11542,6 +13103,8 @@
         loadQueueSettings();
         loadEmailHistory();
         loadTimezoneStatus();
+        // Initialize timezone monitoring panel
+        initMonitoringPanel();
       } else if (tab === "phones") loadPhones();
       else if (tab === "linkedin") loadLinkedin();
       else if (tab === "linkedin-credentials") loadLinkedInCredentials();
@@ -11888,6 +13451,1064 @@
       };
       return badges[status] || `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: var(--bg-tertiary); color: var(--text-secondary);">${status}</span>`;
     }
+
+    // ========== Timezone Monitoring Functions ==========
+    let monitoringRefreshInterval = null;
+    let isMonitoringPanelCollapsed = false;
+
+    // Initialize monitoring panel
+    function initMonitoringPanel() {
+      refreshMonitoringData();
+      // Auto-refresh every 30 seconds
+      if (monitoringRefreshInterval) clearInterval(monitoringRefreshInterval);
+      monitoringRefreshInterval = setInterval(refreshMonitoringData, 5000);
+    }
+
+    // Refresh monitoring data
+    async function refreshMonitoringData() {
+      // Show refreshing indicator
+      const lastUpdateEl = document.getElementById('monitoring-last-update');
+      if (lastUpdateEl) {
+        lastUpdateEl.innerHTML = '<span class="refreshing-spinner">↻</span> Refreshing...';
+        lastUpdateEl.style.color = 'var(--primary-color)';
+      }
+
+      try {
+        // Add cache-busting parameter to ensure fresh data
+        const cacheBuster = new Date().getTime();
+        const res = await fetch(`${API_BASE}/email/timezone/monitoring?t=${cacheBuster}`);
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+          updateMonitoringDashboard(data.data);
+          // Hide any error message
+          const errorMsg = document.querySelector('.monitoring-error-message');
+          if (errorMsg) errorMsg.style.display = 'none';
+        } else {
+          showMonitoringError(data.error || 'Unknown error loading monitoring data');
+        }
+      } catch (error) {
+        console.error("Error loading monitoring data:", error);
+        showMonitoringError(error.message);
+      }
+    }
+
+    // Show monitoring error message
+    function showMonitoringError(message) {
+      // Try to find existing error container
+      let errorContainer = document.querySelector('.monitoring-error-message');
+
+      if (!errorContainer) {
+        // Create error container
+        errorContainer = document.createElement('div');
+        errorContainer.className = 'monitoring-error-message';
+        errorContainer.style.cssText = 'background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-size: 13px;';
+
+        // Insert at the top of monitoring content
+        const monitoringContent = document.getElementById('timezone-monitoring-content');
+        if (monitoringContent) {
+          monitoringContent.insertBefore(errorContainer, monitoringContent.firstChild);
+        }
+      }
+
+      errorContainer.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Error loading timezone data: ${message}</span>
+      `;
+      errorContainer.style.display = 'flex';
+
+      // Set default values for dashboard
+      document.getElementById('monitoring-ready-count').textContent = '-';
+      document.getElementById('monitoring-scheduled-count').textContent = '-';
+      document.getElementById('monitoring-business-count').textContent = '-';
+    }
+
+    // Update monitoring dashboard with data
+    function updateMonitoringDashboard(data) {
+      // Update quick stats with new API structure
+      const summary = data.summary || {};
+      document.getElementById('monitoring-ready-count').textContent = summary.total_ready || 0;
+      document.getElementById('monitoring-scheduled-count').textContent = summary.total_scheduled || 0;
+      document.getElementById('monitoring-business-count').textContent = summary.countries_in_business || 0;
+      document.getElementById('monitoring-parallel-status').textContent = data.worker_status?.parallel_mode ? 'ON' : 'OFF';
+
+      // Update recommendation
+      const recText = document.getElementById('recommendation-text');
+      const recCard = document.getElementById('monitoring-ready-card');
+      const readyCount = summary.total_ready || 0;
+      const waitingCount = summary.total_waiting || 0;
+      const inBusinessCount = summary.countries_in_business || 0;
+
+      if (readyCount > 0) {
+        recText.textContent = `✅ ${readyCount} emails ready to send now`;
+        recCard.className = 'monitoring-stat-card success';
+      } else if (waitingCount > 0) {
+        recText.textContent = `⏰ ${waitingCount} emails waiting for business hours`;
+        recCard.className = 'monitoring-stat-card warning';
+      } else if (summary.total_queued > 0) {
+        recText.textContent = `📧 ${summary.total_queued} emails in queue`;
+        recCard.className = 'monitoring-stat-card info';
+      } else {
+        recText.textContent = '📭 No emails in queue';
+        recCard.className = 'monitoring-stat-card';
+      }
+
+      // Update status banner
+      const statusBanner = document.getElementById('monitoring-status-banner');
+      const statusIcon = document.getElementById('monitoring-status-icon');
+      const statusTitle = document.getElementById('monitoring-status-title');
+      const statusDesc = document.getElementById('monitoring-status-description');
+
+      statusBanner.classList.remove('active', 'waiting');
+
+      if (readyCount > 0) {
+        statusBanner.classList.add('active');
+        statusIcon.textContent = '🚀';
+        statusTitle.textContent = 'Sending Emails Now';
+        const inBusinessCountries = data.countries?.filter(c => c.in_business_hours) || [];
+        const countryNames = inBusinessCountries
+          .map(c => c.timezone_name || c.country_code)
+          .slice(0, 3)
+          .join(', ');
+        const moreCount = inBusinessCountries.length > 3 ? ` +${inBusinessCountries.length - 3} more` : '';
+        statusDesc.textContent = `Sending to ${readyCount} emails across ${inBusinessCountries.length} countries (${countryNames}${moreCount})`;
+      } else if (waitingCount > 0) {
+        statusBanner.classList.add('waiting');
+        statusIcon.textContent = '⏰';
+        statusTitle.textContent = 'Waiting for Business Hours';
+        const waitingCountries = data.countries?.filter(c => c.waiting > 0) || [];
+        if (waitingCountries.length > 0) {
+          const sortedByOpen = waitingCountries
+            .filter(c => c.next_business_start)
+            .sort((a, b) => new Date(a.next_business_start) - new Date(b.next_business_start));
+          if (sortedByOpen.length > 0) {
+            const nextCountry = sortedByOpen[0];
+            const nextTime = new Date(nextCountry.next_business_start);
+            const hoursUntil = Math.floor((nextTime - new Date()) / (1000 * 60 * 60));
+            if (hoursUntil < 1) {
+              statusDesc.textContent = `Next batch in ${Math.floor((nextTime - new Date()) / (1000 * 60))} min for ${nextCountry.timezone_name}`;
+            } else if (hoursUntil < 24) {
+              statusDesc.textContent = `Next batch in ${hoursUntil}h for ${nextCountry.timezone_name}`;
+            } else {
+              statusDesc.textContent = `Next batch on ${nextTime.toLocaleDateString()} for ${nextCountry.timezone_name}`;
+            }
+          }
+        } else {
+          statusDesc.textContent = 'Emails are scheduled for future business hours.';
+        }
+      } else {
+        statusBanner.classList.add('waiting');
+        statusIcon.textContent = '📭';
+        statusTitle.textContent = 'No Emails in Queue';
+        statusDesc.textContent = 'Add emails to the queue to see monitoring data.';
+      }
+
+      // Update last update time
+      const now = new Date();
+      document.getElementById('monitoring-last-update').textContent = `Updated ${now.toLocaleTimeString()}`;
+
+      // Store data for filtering
+      window.currentMonitoringData = data;
+      allUpcomingEmails = data.upcoming_sends || [];
+      allRecentSends = data.recent_sends || [];
+
+      // Update countries grid (preserves selections)
+      renderMonitoringCountries(data.countries || []);
+
+      // Update upcoming and recent sends
+      renderMonitoringUpcoming(allUpcomingEmails);
+      renderMonitoringRecent(allRecentSends);
+
+      // Update counts
+      document.getElementById('upcoming-count').textContent = allUpcomingEmails.length || 0;
+      document.getElementById('recent-count').textContent = allRecentSends.length || 0;
+    }
+
+    // Store all emails data for filtering
+    let allUpcomingEmails = [];
+    let allRecentSends = [];
+    let selectedCountries = new Set();
+
+    // Store country data for modal access
+    let countryDataCache = {};
+
+    function openBusinessHoursModal(countryCode, countryName) {
+      const modal = document.getElementById('business-hours-modal');
+      document.getElementById('bh-country-code').value = countryCode;
+      document.getElementById('bh-country-name').value = countryName;
+
+      // Get cached country data
+      const countryData = countryDataCache[countryCode] || {};
+      document.getElementById('bh-start-time').value = countryData.business_start || 9;
+      document.getElementById('bh-end-time').value = countryData.business_end || 17;
+
+      // Reset weekend checkboxes
+      document.querySelectorAll('input[name="bh-weekend"]').forEach(cb => cb.checked = false);
+
+      // Get weekend days from cache
+      const weekendDays = countryData.weekend_days || [0, 6];
+
+      // Set weekend checkboxes
+      if (Array.isArray(weekendDays)) {
+        weekendDays.forEach(day => {
+          const cb = document.querySelector(`input[name="bh-weekend"][value="${day}"]`);
+          if (cb) cb.checked = true;
+        });
+      }
+
+      modal.classList.add('active');
+    }
+    function renderMonitoringCountries(countries) {
+      const container = document.getElementById('monitoring-countries-grid');
+
+      if (!countries || countries.length === 0) {
+        container.innerHTML = '<div class="monitoring-empty-state">No countries with emails found</div>';
+        return;
+      }
+
+      // Country flag emojis
+      const flags = {
+        'in': '🇮🇳', 'us': '🇺🇸', 'uk': '🇬🇧', 'ca': '🇨🇦', 'au': '🇦🇺',
+        'de': '🇩🇪', 'fr': '🇫🇷', 'jp': '🇯🇵', 'sg': '🇸🇬', 'ae': '🇦🇪',
+        'br': '🇧🇷', 'za': '🇿🇦', 'cn': '🇨🇳', 'it': '🇮🇹', 'es': '🇪🇸',
+        'nl': '🇳🇱', 'se': '🇸🇪', 'no': '🇳🇴', 'dk': '🇩🇰', 'fi': '🇫🇮',
+        'ch': '🇨🇭', 'at': '🇦🇹', 'be': '🇧🇪', 'pl': '🇵🇱', 'cz': '🇨🇿',
+        'gr': '🇬🇷', 'pt': '🇵🇹', 'ru': '🇷🇺', 'mx': '🇲🇽', 'ar': '🇦🇷',
+        'co': '🇨🇴', 'cl': '🇨🇱', 'pe': '🇵🇪', 'kr': '🇰🇷', 'tw': '🇹🇼',
+        'th': '🇹🇭', 'my': '🇲🇾', 'id': '🇮🇩', 'ph': '🇵🇭', 'vn': '🇻🇳',
+        'hk': '🇭🇰', 'nz': '🇳🇿', 'ie': '🇮🇪', 'il': '🇮🇱', 'sa': '🇸🇦',
+        'qa': '🇶🇦', 'kw': '🇰🇼', 'tr': '🇹🇷', 'eg': '🇪🇬', 'ng': '🇳🇬',
+        'ke': '🇰🇪', 'unknown': '🌐'
+      };
+
+      // Day names for weekend display
+      const dayNames = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' };
+
+      container.innerHTML = countries.map(country => {
+        const flag = flags[country.country_code_lower] || '🌐';
+        const localTime = country.local_time_display || '--:--';
+        const inBusiness = country.in_business_hours;
+        const statusReason = country.status_reason || 'outside_hours';
+        const isSelected = selectedCountries.has(country.country_code_lower);
+
+        // Format weekend days
+        const weekendDays = country.weekend_days || [];
+        const weekendDisplay = weekendDays.length > 0 ? weekendDays.map(d => dayNames[d]).join(',') : 'None';
+
+        // Use pre-formatted business hours from API
+        const businessHours = country.business_hours_display || `${country.business_start}:00 - ${country.business_end}:00`;
+
+        // Build badge text based on status
+        let badgeText = '○ Closed';
+        let badgeClass = 'out-business';
+        if (inBusiness) {
+          badgeText = '● Open';
+          badgeClass = 'in-business';
+        } else if (statusReason === 'weekend') {
+          badgeText = '○ Weekend';
+          badgeClass = 'weekend';
+        }
+
+        // Build next opening text
+        let openText = inBusiness ? 'Active now' : (statusReason === 'weekend' ? 'Weekend' : 'Closed');
+        if (!inBusiness && country.hours_until_business !== null && country.hours_until_business < 24) {
+          openText = `Opens in ${country.hours_until_business}h`;
+        } else if (!inBusiness && country.next_business_start_display) {
+          openText = `Next: ${country.next_business_start_display}`;
+        }
+
+        // Escape country name for onclick
+        const safeName = (country.timezone_name || country.country_code).replace(/'/g, "\\'");
+
+        // Cache country data for modal access
+        countryDataCache[country.country_code_lower] = {
+          business_start: country.business_start,
+          business_end: country.business_end,
+          weekend_days: weekendDays,
+          timezone_name: country.timezone_name
+        };
+
+        // New field names from API
+        const total = country.total || 0;
+        const queued = country.queued || 0;
+        const waiting = country.waiting || 0;
+        const scheduled = country.scheduled || 0;
+        const ready = country.ready || 0;
+        const sent = country.sent || 0;
+        const failed = country.failed || 0;
+
+        return `
+          <div class="monitoring-country-card ${inBusiness ? 'in-business' : ''} ${isSelected ? 'selected' : ''}"
+               data-country="${country.country_code_lower}"
+               onclick="openCountryModal('${country.country_code_lower}', '${safeName}')"
+               style="cursor: pointer;">
+            <div class="country-card-header">
+              <div class="country-card-left">
+                <span class="monitoring-country-flag">${flag}</span>
+                <div class="country-title">
+                  <span class="monitoring-country-name">${country.timezone_name || country.country_code.toUpperCase()}</span>
+                  <span class="country-code-badge">${country.country_code.toUpperCase()}</span>
+                </div>
+              </div>
+              <div class="country-card-right">
+                <span class="monitoring-country-badge ${badgeClass}">
+                  ${badgeText}
+                </span>
+                <button class="country-settings-btn"
+                        onclick="event.stopPropagation(); editCountryTimezone('${country.country_code_lower}')"
+                        title="Edit timezone settings">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 1v6m0 6v6m5.66-14.66l-4.24 4.24m0 5.66l4.24 4.24M23 12h-6m-6 0H1m14.66 5.66l-4.24-4.24m0-5.66l4.24-4.24">
+                  </path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="country-card-body">
+              <div class="country-info-grid">
+                <div class="country-info-item">
+                  <span class="icon">🕐</span>
+                  <span>${localTime} ${country.local_date || ''}</span>
+                </div>
+                <div class="country-info-item">
+                  <span class="icon">💼</span>
+                  <span>${businessHours}</span>
+                </div>
+                <div class="country-info-item">
+                  <span class="icon">📅</span>
+                  <span>Weekend: ${weekendDisplay}</span>
+                </div>
+                <div class="country-info-item">
+                  <span class="icon">📊</span>
+                  <span class="value ${inBusiness ? 'status-active' : 'status-inactive'}">${openText}</span>
+                </div>
+              </div>
+
+              <div class="country-stats-bar">
+                <div class="country-stats-group">
+                  <div class="country-stat ${ready > 0 ? 'highlight-ready' : ''}">
+                    <div class="country-stat-value">${ready}</div>
+                    <div class="country-stat-label">Ready</div>
+                  </div>
+                  <div class="country-stat ${waiting > 0 ? 'highlight-waiting' : ''}">
+                    <div class="country-stat-value">${waiting}</div>
+                    <div class="country-stat-label">Waiting</div>
+                  </div>
+                  <div class="country-stat ${scheduled > 0 ? 'highlight-scheduled' : ''}">
+                    <div class="country-stat-value">${scheduled}</div>
+                    <div class="country-stat-label">Scheduled</div>
+                  </div>
+                  <div class="country-stat">
+                    <div class="country-stat-value">${sent}</div>
+                    <div class="country-stat-label">Sent</div>
+                  </div>
+                  <div class="country-stat ${failed > 0 ? 'highlight-failed' : ''}">
+                    <div class="country-stat-value">${failed}</div>
+                    <div class="country-stat-label">Failed</div>
+                  </div>
+                </div>
+              </div>
+
+              ${country.delay_reason ? `
+                <div class="country-delay-reason">
+                  <span class="delay-icon">⏳</span>
+                  <span>${country.delay_reason === 'weekend' ? 'Waiting for weekend to end' :
+              country.delay_reason === 'outside_hours' ? 'Outside business hours' :
+                'Scheduled for later'}</span>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Toggle country filter
+    function toggleCountryFilter(countryCode) {
+      if (selectedCountries.has(countryCode)) {
+        selectedCountries.delete(countryCode);
+      } else {
+        selectedCountries.add(countryCode);
+      }
+
+      // Re-render countries to update selection visual
+      refreshMonitoringCountries();
+
+      // Filter upcoming and recent sends
+      renderMonitoringUpcoming(allUpcomingEmails);
+      renderMonitoringRecent(allRecentSends);
+    }
+
+    // Refresh only countries grid (not full data reload)
+    function refreshMonitoringCountries() {
+      const countries = window.currentMonitoringData?.countries || [];
+      renderMonitoringCountries(countries);
+    }
+
+    // Render upcoming sends (with country filter)
+    function renderMonitoringUpcoming(emails) {
+      allUpcomingEmails = emails; // Store for filtering
+      const container = document.getElementById('monitoring-upcoming-list');
+
+      const filteredEmails = selectedCountries.size > 0
+        ? emails.filter(e => e.site_country && selectedCountries.has(e.site_country.toLowerCase()))
+        : emails;
+
+      document.getElementById('upcoming-count').textContent = filteredEmails.length;
+
+      if (!filteredEmails || filteredEmails.length === 0) {
+        const message = selectedCountries.size > 0
+          ? `No upcoming emails for selected countries`
+          : 'No upcoming emails';
+        container.innerHTML = `<div class="monitoring-empty-state">${message}</div>`;
+        return;
+      }
+
+      container.innerHTML = filteredEmails.map(email => {
+        const scheduledTime = new Date(email.scheduled_at);
+        const timeUntil = getTimeUntil(scheduledTime);
+        const country = email.site_country || 'unknown';
+
+        return `
+          <div class="monitoring-list-item">
+            <div class="monitoring-list-item-left">
+              <span class="monitoring-list-email">${email.recipient_email}</span>
+              <span class="monitoring-list-meta">${country.toUpperCase()} • ${email.subject?.substring(0, 30) || 'No subject'}...</span>
+            </div>
+            <span class="monitoring-list-time monitoring-list-pending">${timeUntil}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render recent sends (with country filter)
+    function renderMonitoringRecent(emails) {
+      allRecentSends = emails; // Store for filtering
+      const container = document.getElementById('monitoring-recent-list');
+
+      const filteredEmails = selectedCountries.size > 0
+        ? emails.filter(e => e.site_country && selectedCountries.has(e.site_country.toLowerCase()))
+        : emails;
+
+      document.getElementById('recent-count').textContent = filteredEmails.length;
+
+      if (!filteredEmails || filteredEmails.length === 0) {
+        const message = selectedCountries.size > 0
+          ? `No recent sends for selected countries`
+          : 'No recent sends';
+        container.innerHTML = `<div class="monitoring-empty-state">${message}</div>`;
+        return;
+      }
+
+      container.innerHTML = filteredEmails.map(email => {
+        const sentTime = new Date(email.sent_at);
+        const timeAgo = getTimeAgo(sentTime);
+        const country = email.site_country || 'unknown';
+
+        return `
+          <div class="monitoring-list-item">
+            <div class="monitoring-list-item-left">
+              <span class="monitoring-list-email">${email.recipient_email}</span>
+              <span class="monitoring-list-meta">${country.toUpperCase()} • via ${email.sender_name || 'Unknown'}</span>
+            </div>
+            <span class="monitoring-list-time monitoring-list-sent">${timeAgo}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Get time until string
+    function getTimeUntil(date) {
+      const now = new Date();
+      const diff = date - now;
+      const minutes = Math.floor(diff / 60000);
+
+      if (minutes < 1) return 'Now';
+      if (minutes < 60) return `in ${minutes}m`;
+
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `in ${hours}h ${minutes % 60}m`;
+
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Get time ago string
+    function getTimeAgo(date) {
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+
+      if (minutes < 1) return 'Just now';
+      if (minutes < 60) return `${minutes}m ago`;
+
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Toggle monitoring panel
+    function toggleMonitoringPanel() {
+      const content = document.getElementById('timezone-monitoring-content');
+      isMonitoringPanelCollapsed = !isMonitoringPanelCollapsed;
+
+      if (isMonitoringPanelCollapsed) {
+        content.classList.add('collapsed');
+      } else {
+        content.classList.remove('collapsed');
+      }
+    }
+
+    // Toggle parallel mode
+    async function toggleParallelMode() {
+      try {
+        const currentStatus = document.getElementById('monitoring-parallel-status').textContent === 'ON';
+        const newStatus = !currentStatus;
+
+        const res = await fetch(`${API_BASE}/email/worker/toggle-parallel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: newStatus })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          refreshMonitoringData();
+        }
+      } catch (error) {
+        console.error("Error toggling parallel mode:", error);
+      }
+    }
+
+    function closeBusinessHoursModal() {
+      const modal = document.getElementById('business-hours-modal');
+      modal.classList.remove('active');
+    }
+
+    async function saveBusinessHours() {
+      const countryCode = document.getElementById('bh-country-code').value;
+      const businessStart = parseInt(document.getElementById('bh-start-time').value);
+      const businessEnd = parseInt(document.getElementById('bh-end-time').value);
+
+      // Get selected weekend days
+      const weekendDays = [];
+      document.querySelectorAll('input[name="bh-weekend"]:checked').forEach(cb => {
+        weekendDays.push(parseInt(cb.value));
+      });
+
+      // Validate
+      if (businessStart >= businessEnd) {
+        alert('Start time must be before end time');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/email/timezone/update-country`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            country_code: countryCode,
+            business_start: businessStart,
+            business_end: businessEnd,
+            weekend_days: weekendDays
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          closeBusinessHoursModal();
+          // Refresh monitoring data to show updated settings
+          await refreshMonitoringData();
+          // Show success message (using toast instead of alert)
+          showToast(`Business hours updated for ${document.getElementById('bh-country-name').value}`);
+        } else {
+          alert('Error saving settings: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error saving business hours:', error);
+        alert('Error saving settings: ' + error.message);
+      }
+    }
+
+    // Simple toast notification function
+    function showToast(message) {
+      // Remove existing toast if any
+      const existingToast = document.querySelector('.toast-notification');
+      if (existingToast) existingToast.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'toast-notification';
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        z-index: 10000;
+        animation: slideIn 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Add toast animations
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Close modal on outside click
+    document.addEventListener('click', (e) => {
+      const modal = document.getElementById('business-hours-modal');
+      if (e.target === modal) {
+        closeBusinessHoursModal();
+      }
+    });
+
+    // ========== Country Drill-down Modal Functions ==========
+
+    // State for drill-down modal
+    let currentDrillCountry = null;
+    let drillModalPage = 0;
+    let drillModalPageSize = 20;
+    let drillModalTotal = 0;
+    let drillModalData = [];
+    let drillRefreshTimeout = null;
+
+    // Open country drill-down modal
+    function openCountryModal(countryCode, countryName) {
+      currentDrillCountry = countryCode.toLowerCase();
+      drillModalPage = 0;
+
+      const modal = document.getElementById('country-drill-modal');
+      modal.classList.add('active');
+
+      // Set country info in header
+      const flags = {
+        'in': '🇮🇳', 'us': '🇺🇸', 'uk': '🇬🇧', 'ca': '🇨🇦', 'au': '🇦🇺',
+        'de': '🇩🇪', 'fr': '🇫🇷', 'jp': '🇯🇵', 'sg': '🇸🇬', 'ae': '🇦🇪',
+        'unknown': '🌐'
+      };
+      document.getElementById('drill-country-flag').textContent = flags[currentDrillCountry] || '🌐';
+      document.getElementById('drill-country-name').textContent = countryName;
+      document.getElementById('drill-country-code').textContent = currentDrillCountry.toUpperCase();
+
+      refreshCountryModalData();
+    }
+
+    // Close country drill-down modal
+    function closeCountryModal() {
+      const modal = document.getElementById('country-drill-modal');
+      modal.classList.remove('active');
+      currentDrillCountry = null;
+      if (drillRefreshTimeout) {
+        clearTimeout(drillRefreshTimeout);
+      }
+    }
+
+    // Debounced refresh for search input
+    function debounceRefreshCountryModal() {
+      if (drillRefreshTimeout) {
+        clearTimeout(drillRefreshTimeout);
+      }
+      drillRefreshTimeout = setTimeout(() => {
+        drillModalPage = 0;
+        refreshCountryModalData();
+      }, 300);
+    }
+
+    // Refresh country modal data from API
+    async function refreshCountryModalData() {
+      if (!currentDrillCountry) return;
+
+      const statusFilter = document.getElementById('drill-status-filter').value;
+      const categoryFilter = document.getElementById('drill-category-filter').value;
+      const startDate = document.getElementById('drill-start-date').value;
+      const endDate = document.getElementById('drill-end-date').value;
+      const search = document.getElementById('drill-search-input').value;
+
+      // Build query params
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (categoryFilter) params.append('category', categoryFilter);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      if (search) params.append('search', search);
+      params.append('limit', drillModalPageSize);
+      params.append('offset', drillModalPage * drillModalPageSize);
+
+      // Show loading state
+      const container = document.getElementById('drill-emails-list');
+      if (container) {
+        container.innerHTML = `
+          <div class="drill-empty-state">
+            <div class="drill-empty-state-icon">⏳</div>
+            <div>Loading email data...</div>
+          </div>
+        `;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/email/timezone/monitoring/country/${currentDrillCountry}?${params}`);
+
+        // Handle HTTP errors
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+
+        console.log('Country drill-down response:', data);
+
+        if (data.success && data.data) {
+          drillModalData = data.data.emails || [];
+          drillModalTotal = data.data.pagination?.total || 0;
+
+          console.log('Emails found:', drillModalData.length, 'Total:', drillModalTotal);
+
+          updateDrillModalUI(data.data);
+        } else {
+          console.error('API returned error:', data.error);
+          if (container) {
+            container.innerHTML = `
+              <div class="drill-empty-state">
+                <div class="drill-empty-state-icon">⚠️</div>
+                <div>Error: ${escapeHtml(data.error || 'Unknown error')}</div>
+              </div>
+            `;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading country details:', error);
+        if (container) {
+          container.innerHTML = `
+            <div class="drill-empty-state">
+              <div class="drill-empty-state-icon">⚠️</div>
+              <div>Failed to load data</div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+                ${escapeHtml(error.message || 'Network error')}
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // Update drill modal UI with data
+    function updateDrillModalUI(data) {
+      if (!data) {
+        console.warn('updateDrillModalUI called with no data');
+        return;
+      }
+
+      const countryInfo = data.country_info || {};
+
+      // Helper function to safely set element content
+      const safeSetText = (elementId, text) => {
+        const el = document.getElementById(elementId);
+        if (el) el.textContent = text;
+      };
+
+      // Helper function to safely set element HTML
+      const safeSetHtml = (elementId, html) => {
+        const el = document.getElementById(elementId);
+        if (el) el.innerHTML = html;
+      };
+
+      // Update status badge
+      const statusBadge = document.getElementById('drill-status-badge');
+      const statusIcon = document.getElementById('drill-status-icon');
+      const statusText = document.getElementById('drill-status-text');
+
+      if (statusBadge && statusIcon && statusText) {
+        statusBadge.classList.remove('in-business', 'out-business', 'weekend');
+        if (countryInfo.in_business_hours) {
+          statusBadge.classList.add('in-business');
+          statusIcon.textContent = '●';
+          statusText.textContent = 'Open Now';
+        } else if (countryInfo.status === 'weekend') {
+          statusBadge.classList.add('weekend');
+          statusIcon.textContent = '○';
+          statusText.textContent = 'Weekend';
+        } else {
+          statusBadge.classList.add('out-business');
+          statusIcon.textContent = '○';
+          statusText.textContent = 'Closed';
+        }
+      }
+
+      // Update business info - with timezone error handling
+      const now = new Date();
+      try {
+        const localTime = now.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: countryInfo.timezone || 'UTC'
+        });
+        safeSetText('drill-local-time', localTime);
+      } catch (e) {
+        console.warn('Error formatting local time:', e);
+        safeSetText('drill-local-time', 'Timezone error');
+      }
+
+      safeSetText('drill-business-hours', countryInfo.business_hours || '--:-- - --:--');
+
+      const dayNames = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' };
+      try {
+        const weekendDays = (countryInfo.weekend_days || []).map(d => dayNames[d]).join(', ');
+        safeSetText('drill-weekend', weekendDays || 'None');
+      } catch (e) {
+        console.warn('Error formatting weekend days:', e);
+        safeSetText('drill-weekend', 'Unknown');
+      }
+
+      // Calculate next send time - use API data or show fallback
+      // Find the earliest scheduled email time from the data
+      try {
+        if (countryInfo.in_business_hours) {
+          safeSetText('drill-next-send', 'Now (Open)');
+        } else {
+          // Find earliest scheduled email from current data
+          const scheduledEmails = drillModalData.filter(e => e.scheduled_at && new Date(e.scheduled_at) > now);
+          if (scheduledEmails.length > 0) {
+            const nextScheduled = scheduledEmails.sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0];
+            safeSetText('drill-next-send', new Date(nextScheduled.scheduled_at).toLocaleString());
+          } else {
+            // Fallback to showing status reason
+            if (countryInfo.status === 'weekend') {
+              safeSetText('drill-next-send', 'Next business day (Weekend)');
+            } else {
+              safeSetText('drill-next-send', `Next business day (${countryInfo.business_hours || '9:00'})`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not calculate next send time:', e);
+        safeSetText('drill-next-send', 'Pending calculation');
+      }
+
+      // Update stats - use API-provided stats for consistency with global monitor
+      // The API returns stats aggregated from ALL emails, not just the current page
+      let stats = data.stats || {
+        total: 0,
+        queued: 0,
+        waiting: 0,
+        ready: 0,
+        sending: 0,
+        sent: 0,
+        failed: 0,
+        scheduled: 0
+      };
+
+      // If API didn't provide stats (fallback), calculate from current page data
+      if (!data.stats && drillModalData) {
+        console.warn('[Modal] API did not provide stats, calculating from paginated data (may be inaccurate)');
+        try {
+          stats = (drillModalData || []).reduce((acc, email) => {
+            acc.total++;
+            if (email.status === 'queued') acc.queued++;
+            if (email.is_waiting) acc.waiting++;
+            if (email.status === 'sending') acc.sending++;
+            if (email.status === 'sent') acc.sent++;
+            if (email.status === 'failed') acc.failed++;
+            return acc;
+          }, { total: 0, queued: 0, waiting: 0, sending: 0, sent: 0, failed: 0, ready: 0, scheduled: 0 });
+          // Calculate ready/scheduled from queued
+          stats.ready = Math.max(0, stats.queued - stats.waiting);
+          stats.scheduled = (drillModalData || []).filter(e => e.scheduled_at && new Date(e.scheduled_at) > now).length;
+        } catch (e) {
+          console.warn('Error calculating fallback stats:', e);
+        }
+      }
+
+      console.log('[Modal] Displaying stats:', stats);
+
+      safeSetText('drill-total-count', stats.total || 0);
+      safeSetText('drill-ready-count', stats.ready || 0);
+      safeSetText('drill-waiting-count', stats.waiting || 0);
+      safeSetText('drill-scheduled-count', stats.scheduled || 0);
+      safeSetText('drill-sent-count', stats.sent || 0);
+      safeSetText('drill-failed-count', stats.failed || 0);
+
+      // Update email list
+      renderDrillEmailList(drillModalData || []);
+
+      // Update pagination
+      updateDrillPagination();
+    }
+
+    // Render email list in drill modal
+    function renderDrillEmailList(emails) {
+      const container = document.getElementById('drill-emails-list');
+
+      // Handle null/undefined data gracefully
+      if (!container) {
+        console.error('Email list container not found');
+        return;
+      }
+
+      const emailCount = emails ? emails.length : 0;
+      const totalCount = drillModalTotal || 0;
+      document.getElementById('drill-emails-count').textContent = `${emailCount} of ${totalCount} results`;
+
+      if (!emails || emails.length === 0) {
+        container.innerHTML = `
+          <div class="drill-empty-state">
+            <div class="drill-empty-state-icon">📭</div>
+            <div>No emails found matching the current filters</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+              Try changing the filters or check back later
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const now = new Date();
+
+      try {
+        container.innerHTML = emails.map(email => {
+          // Defensive: ensure email object has required fields
+          if (!email) return '';
+
+          const statusClass = email.is_waiting ? 'waiting' : (email.status || 'unknown');
+          const statusDisplay = email.is_waiting ? 'Waiting' : (email.status || 'Unknown');
+
+          let delayReason = '';
+          if (email.is_waiting && email.delay_reason) {
+            const reasonMap = {
+              'weekend': 'Weekend',
+              'outside_business_hours': 'Outside hours',
+              'scheduled': 'Scheduled'
+            };
+            delayReason = `<div class="drill-delay-reason">⏳ ${reasonMap[email.delay_reason] || email.delay_reason}</div>`;
+          }
+
+          // Format dates with fallback
+          const createdDate = email.created_at ? new Date(email.created_at).toLocaleDateString() : '--';
+          const scheduledDate = email.scheduled_at ? new Date(email.scheduled_at).toLocaleString() : '--';
+
+          // Format template subject with sequence position
+          let templateDisplay = '';
+          if (email.subject) {
+            let sequenceLabel = '';
+            if (email.sequence_position) {
+              const stepLabels = {
+                1: 'Initial',
+                2: 'Follow-up 1',
+                3: 'Follow-up 2',
+                4: 'Follow-up 3',
+                5: 'Follow-up 4'
+              };
+              sequenceLabel = stepLabels[email.sequence_position] || `Step ${email.sequence_position}`;
+            }
+
+            if (sequenceLabel) {
+              templateDisplay = `<span class="drill-sequence-label">${escapeHtml(sequenceLabel)}</span> ${escapeHtml(email.subject)}`;
+            } else {
+              templateDisplay = escapeHtml(email.subject);
+            }
+          } else {
+            templateDisplay = '<span style="color: var(--text-secondary); font-style: italic;">No subject available</span>';
+          }
+
+          return `
+            <div class="drill-email-item status-${statusClass}">
+              <div class="drill-email-value">
+                <strong>${escapeHtml(email.recipient_email || 'No email')}</strong>
+                ${templateDisplay ? `<div class="drill-email-subject">${templateDisplay}</div>` : ''}
+              </div>
+              <div class="drill-email-value secondary">${escapeHtml(email.site_url || '--')}</div>
+              <div class="drill-email-value">${escapeHtml(email.ai_actual_category || email.email_tag || '--')}</div>
+              <div>
+                <span class="drill-email-status ${statusClass}">${statusDisplay}</span>
+              </div>
+              <div class="drill-email-value secondary">
+                <div>${createdDate}</div>
+                ${email.scheduled_at ? `<div style="font-size: 11px; color: #f59e0b;">⏰ ${scheduledDate}</div>` : ''}
+                ${delayReason}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error('Error rendering email list:', e);
+        container.innerHTML = `
+          <div class="drill-empty-state">
+            <div class="drill-empty-state-icon">⚠️</div>
+            <div>Error rendering email list</div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
+              ${escapeHtml(e.message || 'Unknown error')}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Update pagination controls
+    function updateDrillPagination() {
+      const totalPages = Math.ceil(drillModalTotal / drillModalPageSize);
+      const currentPage = drillModalPage + 1;
+
+      document.getElementById('drill-page-info').textContent = `Page ${currentPage} of ${totalPages || 1}`;
+      document.getElementById('drill-prev-btn').disabled = drillModalPage === 0;
+      document.getElementById('drill-next-btn').disabled = drillModalPage >= totalPages - 1 || totalPages === 0;
+    }
+
+    // Pagination functions
+    function prevDrillPage() {
+      if (drillModalPage > 0) {
+        drillModalPage--;
+        refreshCountryModalData();
+      }
+    }
+
+    function nextDrillPage() {
+      const totalPages = Math.ceil(drillModalTotal / drillModalPageSize);
+      if (drillModalPage < totalPages - 1) {
+        drillModalPage++;
+        refreshCountryModalData();
+      }
+    }
+
+    // Close drill modal on outside click
+    document.addEventListener('click', (e) => {
+      const drillModal = document.getElementById('country-drill-modal');
+      if (e.target === drillModal) {
+        closeCountryModal();
+      }
+    });
+
+    // ========== End Timezone Monitoring Functions ==========
 
     // Load content categories from AI analysis
     async function loadContentCategories() {
@@ -12529,6 +15150,7 @@
       const urlPage = urlParams.get('page');
       const urlSearch = urlParams.get('search');
       const urlSendStatus = urlParams.get('sendStatus');
+      const urlRegion = urlParams.get('region');
 
       // Update form inputs from URL if switching from another context
       if (urlFilter && document.getElementById("emails-filter")) {
@@ -12540,10 +15162,15 @@
       if (urlSearch && document.getElementById("emails-search")) {
         document.getElementById("emails-search").value = urlSearch;
       }
+      // Restore region from URL
+      if (urlRegion && document.getElementById("emails-region-filter")) {
+        document.getElementById("emails-region-filter").value = urlRegion;
+      }
 
       const search = document.getElementById("emails-search")?.value || "";
       const filter = document.getElementById("emails-filter")?.value || "all";
       const sendStatusFilter = document.getElementById("emails-send-status-filter")?.value || "all";
+      const regionFilter = document.getElementById("emails-region-filter")?.value || "all";
       pageState.emails.filter = filter;
 
       try {
@@ -12577,6 +15204,9 @@
         if (json.success) {
           let emails = json.data.emails;
 
+          // Populate region filter dynamically from the emails data
+          populateRegionFilter(emails);
+
           // Apply type filter
           if (filter === "wordpress") {
             emails = emails.filter((e) => e.is_wordpress === 1);
@@ -12586,6 +15216,14 @@
             emails = emails.filter((e) => !emailSendLog[e.id]);
           } else if (filter === "sent") {
             emails = emails.filter((e) => emailSendLog[e.id]);
+          }
+
+          // Apply region filter
+          if (regionFilter !== "all") {
+            emails = emails.filter((e) => {
+              const region = normalizeRegion(e.country || '');
+              return region === regionFilter.toLowerCase();
+            });
           }
 
           // Apply send-status filter
@@ -12675,6 +15313,59 @@
       }
     }
 
+    // Normalize region/country code (handles "US US" -> "US", etc.)
+    function normalizeRegion(code) {
+      if (!code) return '';
+      let normalized = String(code).trim().toUpperCase();
+      // Handle duplicates like "US US" -> extract first valid code
+      const parts = normalized.split(/\s+/);
+      for (const part of parts) {
+        if (/^[A-Z]{2}$/.test(part)) {
+          return part.toLowerCase();
+        }
+      }
+      // If no 2-letter code found, take first 2 chars
+      if (normalized.length >= 2) {
+        return normalized.substring(0, 2).toLowerCase();
+      }
+      return normalized.toLowerCase();
+    }
+
+    // Populate region filter dynamically from emails data
+    function populateRegionFilter(emails) {
+      const select = document.getElementById('emails-region-filter');
+      if (!select) return;
+
+      // Extract unique regions from emails
+      const regionSet = new Set();
+      emails.forEach(email => {
+        if (email.country) {
+          const normalized = normalizeRegion(email.country);
+          if (normalized) regionSet.add(normalized);
+        }
+      });
+
+      // Sort regions alphabetically
+      const sortedRegions = Array.from(regionSet).sort();
+
+      // Save current selection
+      const currentVal = select.value;
+
+      // Build HTML
+      let html = '<option value="all">All Regions</option>';
+      sortedRegions.forEach(region => {
+        const regionUpper = region.toUpperCase();
+        html += `<option value="${region}">${regionUpper}</option>`;
+      });
+
+      select.innerHTML = html;
+
+      // Restore previous selection if it still exists
+      if ([...select.options].some(o => o.value === currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
     function renderEmails(emails) {
       const tbody = document.getElementById("emails-table");
       if (emails.length === 0) {
@@ -12685,14 +15376,38 @@
         return;
       }
 
+      // Country flag emojis
+      const countryFlags = {
+        'in': '🇮🇳', 'us': '🇺🇸', 'uk': '🇬🇧', 'ca': '🇨🇦', 'au': '🇦🇺',
+        'de': '🇩🇪', 'fr': '🇫🇷', 'jp': '🇯🇵', 'sg': '🇸🇬', 'ae': '🇦🇪',
+        'in': '🇮🇳', 'br': '🇧🇷', 'mx': '🇲🇽', 'es': '🇪🇸', 'it': '🇮🇹',
+        'nl': '🇳🇱', 'za': '🇿🇦', 'nz': '🇳🇿', 'ch': '🇨🇭', 'se': '🇸🇪',
+        'no': '🇳🇴', 'dk': '🇩🇰', 'fi': '🇫🇮', 'be': '🇧🇪', 'at': '🇦🇹',
+        'pl': '🇵🇱', 'cz': '🇨🇿', 'hu': '🇭🇺', 'gr': '🇬🇷', 'tr': '🇹🇷',
+        'il': '🇮🇱', 'th': '🇹🇭', 'vn': '🇻🇳', 'id': '🇮🇩', 'my': '🇲🇾',
+        'ph': '🇵🇭', 'kr': '🇰🇷', 'cn': '🇨🇳', 'tw': '🇹🇼', 'hk': '🇭🇰',
+        'ru': '🇷🇺', 'ua': '🇺🇦', 'kz': '🇰🇿', 'sa': '🇸🇦', 'qa': '🇶🇦',
+        'kw': '🇰🇼', 'bh': '🇧🇭', 'om': '🇴🇲', 'jo': '🇯🇴', 'lb': '🇱🇧',
+        'eg': '🇪🇬', 'ng': '🇳🇬', 'ke': '🇰🇪', 'za': '🇿🇦', 'ar': '🇦🇷',
+        'cl': '🇨🇱', 'co': '🇨🇴', 'pe': '🇵🇪', 'unknown': '🌐'
+      };
+
       tbody.innerHTML = emails
         .map(
-          (e) => `
-        <tr>
+          (e) => {
+            // Get country flag and name
+            const countryCode = (e.country || 'unknown').toLowerCase();
+            const flag = countryFlags[countryCode] || countryFlags['unknown'];
+            const countryName = e.country ? e.country.toUpperCase() : 'Unknown';
+            // Row border class based on WordPress status
+            const rowBorderClass = e.is_wordpress ? 'email-row-wordpress' : 'email-row-non-wordpress';
+
+            return `
+        <tr class="${rowBorderClass}">
           <td style="text-align: center;">
             <input type="checkbox" class="email-row-check" data-id="${e.id
-            }" onchange="updateEmailSelection()" ${selectedEmailIds.has(e.id) ? "checked" : ""
-            } />
+              }" onchange="updateEmailSelection()" ${selectedEmailIds.has(e.id) ? "checked" : ""
+              } />
           </td>
           <td>
             <div class="email-cell">
@@ -12701,16 +15416,17 @@
           </td>
           <td>
             <div class="site-url-cell">
-              <a href="${escapeHtml(e.site_url)}" target="_blank" class="site-url">${escapeHtml(truncate(e.site_url, 45))}</a>
+              <a href="${escapeHtml(e.site_url)}" target="_blank" class="site-url">${escapeHtml(truncate(e.site_url, 40))}</a>
+            </div>
+          </td>
+          <td>
+            <div class="region-cell">
+              <span class="region-flag">${flag}</span>
+              <span class="region-name">${countryName}</span>
             </div>
           </td>
           <td>
             ${e.ai_actual_category ? `<span class="site-category-badge">${escapeHtml(e.ai_actual_category)}</span>` : '<span style="color: var(--text-tertiary); font-size: 12px;">-</span>'}
-          </td>
-          <td>
-            <span class="site-status-badge ${e.is_wordpress ? "wordpress" : "not-verified"}">
-              ${e.is_wordpress ? "WordPress" : "Non-WP"}
-            </span>
           </td>
           <td>${getSentStatusBadge(e.id)}</td>
           <td>
@@ -12758,7 +15474,8 @@
             </div>
           </td>
         </tr>
-      `,
+      `;
+          }
         )
         .join("");
 
@@ -13888,12 +16605,19 @@
       loadEmails();
     }
 
+    function handleEmailRegionFilter() {
+      pageState.emails.page = 1;
+      updateUrlForEmails();
+      loadEmails();
+    }
+
     //  Update URL with current emails filter/page/search state
     function updateUrlForEmails() {
       const url = new URL(window.location);
       const search = document.getElementById("emails-search")?.value || "";
       const filter = document.getElementById("emails-filter")?.value || "all";
       const sendStatus = document.getElementById("emails-send-status-filter")?.value || "all";
+      const region = document.getElementById("emails-region-filter")?.value || "all";
 
       url.searchParams.set('tab', 'emails');
       if (filter !== 'all') url.searchParams.set('filter', filter);
@@ -13904,6 +16628,8 @@
       else url.searchParams.delete('search');
       if (sendStatus !== 'all') url.searchParams.set('sendStatus', sendStatus);
       else url.searchParams.delete('sendStatus');
+      if (region !== 'all') url.searchParams.set('region', region);
+      else url.searchParams.delete('region');
 
       window.history.replaceState({ tab: 'emails' }, '', url.toString());
     }
@@ -15014,7 +17740,7 @@
       updateSearchUrlPreview();
     }
 
-    function closeCountryModal() {
+    function closeCountrySelectionModal() {
       document.getElementById("country-selection-modal").style.display = "none";
       pendingScraperId = null;
       pendingKeyword = null;
@@ -15177,7 +17903,7 @@
         };
       }
 
-      closeCountryModal();
+      closeCountrySelectionModal();
       showToast(`Starting scraper with regional settings for ${country.toUpperCase()}...`, "success");
 
       try {
@@ -15506,9 +18232,9 @@
         const res = await fetch(`${API_BASE}/email/senders/${id}/test`, {
           method: "POST",
         });
-        console.log("[Email]",res)
+        console.log("[Email]", res)
         const json = await res.json();
-        console.log("[Email]",json)
+        console.log("[Email]", json)
 
         if (json.success) {
           showToast("Connection test successful!", "success");
@@ -18818,7 +21544,7 @@
         const today = new Date();
 
         // Only apply date filters if not using gap filter
-        if (currentFilterType !== 'gap') {
+        if (currentFilterType !== 'gap' && dateFilter !== 'all') {
           // Use custom date range if set, otherwise use quick filter
           if (customDateRange) {
             // Use full datetime for custom range
@@ -18852,6 +21578,22 @@
         // Add date type filter
         url += `&dateType=${currentFilterType}`;
 
+        // Add search query if present
+        if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+        // Debug logging
+        console.log('[Email History] Loading with filters:', {
+          status,
+          dateFilter,
+          dateType: currentFilterType,
+          gapFilter,
+          startDate,
+          endDate,
+          startDateTime,
+          endDateTime,
+          searchQuery
+        });
+
         // Don't apply date filters for scheduled tab when viewing scheduled items
         if (status !== 'scheduled') {
           if (currentFilterType === 'gap' && customGapRange) {
@@ -18869,7 +21611,7 @@
             if (range) {
               url += `&minGapHours=${range.min}&maxGapHours=${range.max === Infinity ? 720 : range.max}`;
             }
-          } else if (currentFilterType !== 'gap') {
+          } else if (currentFilterType !== 'gap' && dateFilter !== 'all') {
             // Date-based filters
             if (startDateTime && endDateTime) {
               url += `&startDateTime=${startDateTime}&endDateTime=${endDateTime}`;
@@ -18879,6 +21621,8 @@
             }
           }
         }
+
+        console.log('[Email History] Fetching URL:', url);
 
         const res = await fetch(url);
         const json = await res.json();
@@ -18892,6 +21636,7 @@
           tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon"></div>${json.error || 'Failed to load history'}</td></tr>`;
         }
       } catch (e) {
+        console.error('[Email History] Error loading history:', e);
         tableBody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-state-icon"></div>Error loading history</td></tr>`;
       }
     }
@@ -19117,14 +21862,14 @@
         gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div class="loading-spinner"></div>Loading timezone data...</div>';
 
         // Fetch timezone statistics
-        const statsRes = await fetch(`${API_BASE}/email/timezone/stats`);
-        const statsData = await statsRes.json();
+        const countriesRes = await fetch(`${API_BASE}/email/timezone/countries`);
+        const countriesData = await statsRes.json();
 
-        if (!statsData.success) {
-          throw new Error(statsData.error || 'Failed to load timezone data');
+        if (!countriesData.success) {
+          throw new Error(countriesData.error || 'Failed to load timezone data');
         }
 
-        const distribution = statsData.data.distribution || [];
+        const countries = countriesData.data || [];
 
         if (distribution.length === 0) {
           gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div style="font-size: 24px; margin-bottom: 8px;"></div>No timezone data available yet</div>';
@@ -19136,7 +21881,7 @@
         renderTimezoneCards(distribution);
 
         // Render summary statistics
-        renderTimezoneSummary(statsData.data);
+        renderTimezoneSummary(countriesData.data);
 
         // Start auto-refresh every 30 seconds
         startTimezoneAutoRefresh();
@@ -19192,7 +21937,7 @@
 
         const localHour = localTime.getUTCHours();
         const nextBusinessHour = isInBusiness ? localHour :
-                                (localHour < 9 ? 9 : localHour >= 17 ? 9 : localHour + 1);
+          (localHour < 9 ? 9 : localHour >= 17 ? 9 : localHour + 1);
 
         let statusBadge = '';
         if (isInBusiness) {
@@ -19281,6 +22026,211 @@
         </div>
       `;
     }
+
+
+    async function editCountryTimezone(countryCode) {
+      try {
+        const res = await fetch(`${API_BASE}/email/timezone/countries/${countryCode}`);
+        const data = await res.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load country settings');
+        }
+
+        const country = data.data;
+
+        // Parse weekend days into array
+        let weekendDaysArray = [];
+        if (typeof country.weekend_days === 'string') {
+          weekendDaysArray = country.weekend_days.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+        } else if (Array.isArray(country.weekend_days)) {
+          weekendDaysArray = country.weekend_days;
+        } else {
+          weekendDaysArray = [0, 6]; // Default: Sunday, Saturday
+        }
+
+        // Convert business hours to 12-hour format
+        const startHour = country.business_start;
+        const endHour = country.business_end;
+        const startPeriod = startHour >= 12 ? 'PM' : 'AM';
+        const endPeriod = endHour >= 12 ? 'PM' : 'AM';
+        const startHour12 = startHour === 0 ? 12 : (startHour > 12 ? startHour - 12 : startHour);
+        const endHour12 = endHour === 0 ? 12 : (endHour > 12 ? endHour - 12 : endHour);
+
+        // Day names array
+        const dayNames = [
+          { value: 0, name: 'Sunday', short: 'Sun' },
+          { value: 1, name: 'Monday', short: 'Mon' },
+          { value: 2, name: 'Tuesday', short: 'Tue' },
+          { value: 3, name: 'Wednesday', short: 'Wed' },
+          { value: 4, name: 'Thursday', short: 'Thu' },
+          { value: 5, name: 'Friday', short: 'Fri' },
+          { value: 6, name: 'Saturday', short: 'Sat' }
+        ];
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(4px);';
+
+        modal.innerHTML = `
+          <div style="background: var(--bg-primary); padding: 32px; border-radius: 16px; max-width: 500px; width: 90%; border: 1px solid var(--border-default); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 24px;">
+              <h3 style="margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; flex: 1; min-width: 0;">
+                ${country.name} Timezone Settings
+              </h3>
+              <button id="closeModalBtn" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-secondary); padding: 4px; line-height: 1; flex-shrink: 0; min-width: 24px;">&times;</button>
+            </div>
+
+            <!-- Business Hours -->
+            <div style="margin-bottom: 24px;">
+              <label style="display: block; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-primary);">Business Hours</label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <!-- Start Time -->
+                <div>
+                  <label style="display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary);">Start Time</label>
+                  <div style="display: flex; gap: 8px;">
+                    <select id="businessStartHour" style="flex: 1; padding: 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                      ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => `<option value="${h}" ${h === startHour12 ? 'selected' : ''}>${h}</option>`).join('')}
+                    </select>
+                    <select id="businessStartPeriod" style="padding: 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                      <option value="AM" ${startPeriod === 'AM' ? 'selected' : ''}>AM</option>
+                      <option value="PM" ${startPeriod === 'PM' ? 'selected' : ''}>PM</option>
+                    </select>
+                  </div>
+                </div>
+                <!-- End Time -->
+                <div>
+                  <label style="display: block; margin-bottom: 6px; font-size: 12px; color: var(--text-secondary);">End Time</label>
+                  <div style="display: flex; gap: 8px;">
+                    <select id="businessEndHour" style="flex: 1; padding: 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                      ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(h => `<option value="${h}" ${h === endHour12 ? 'selected' : ''}>${h}</option>`).join('')}
+                    </select>
+                    <select id="businessEndPeriod" style="padding: 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                      <option value="AM" ${endPeriod === 'AM' ? 'selected' : ''}>AM</option>
+                      <option value="PM" ${endPeriod === 'PM' ? 'selected' : ''}>PM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                Current: ${startHour12}:00 ${startPeriod} - ${endHour12}:00 ${endPeriod}
+              </div>
+            </div>
+
+            <!-- Weekend Days -->
+            <div style="margin-bottom: 28px;">
+              <label style="display: block; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-primary);">Weekend Days (Non-working Days)</label>
+              <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;">
+                ${dayNames.map(day => `
+                  <label style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    padding: 12px 8px;
+                    border: 2px solid ${weekendDaysArray.includes(day.value) ? 'var(--primary-color)' : 'var(--border-default)'};
+                    border-radius: 8px;
+                    background: ${weekendDaysArray.includes(day.value) ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-secondary)'};
+                    cursor: pointer;
+                    transition: all 0.2s;
+                  " class="weekend-day-checkbox" data-day="${day.value}">
+                    <input type="checkbox" value="${day.value}" ${weekendDaysArray.includes(day.value) ? 'checked' : ''} style="display: none;">
+                    <span style="font-size: 16px; margin-bottom: 4px;">${day.short}</span>
+                    <span style="font-size: 10px; color: var(--text-secondary); font-weight: 500;">${day.name}</span>
+                  </label>
+                `).join('')}
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                Select the days that are weekends (no email sending)
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+              <button id="cancelBtn" style="padding: 10px 20px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font-size: 14px;">Cancel</button>
+              <button id="saveBtn" style="padding: 10px 20px; border: none; border-radius: 8px; background: var(--primary-color); color: white; cursor: pointer; font-size: 14px; font-weight: 500;">Save Changes</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Add click handlers for weekend day checkboxes
+        modal.querySelectorAll('.weekend-day-checkbox').forEach(label => {
+          label.addEventListener('click', function () {
+            const checkbox = this.querySelector('input[type="checkbox"]');
+            const isChecked = !checkbox.checked;
+            checkbox.checked = isChecked;
+
+            // Update visual state
+            if (isChecked) {
+              this.style.borderColor = 'var(--primary-color)';
+              this.style.background = 'rgba(139, 92, 246, 0.1)';
+            } else {
+              this.style.borderColor = 'var(--border-default)';
+              this.style.background = 'var(--bg-secondary)';
+            }
+          });
+        });
+
+        document.getElementById('saveBtn').onclick = async () => {
+          // Get start time
+          const startHour = parseInt(document.getElementById('businessStartHour').value);
+          const startPeriod = document.getElementById('businessStartPeriod').value;
+          const endHour = parseInt(document.getElementById('businessEndHour').value);
+          const endPeriod = document.getElementById('businessEndPeriod').value;
+
+          // Convert to 24-hour format
+          let businessStart = startHour;
+          if (startPeriod === 'PM' && startHour !== 12) businessStart += 12;
+          if (startPeriod === 'AM' && startHour === 12) businessStart = 0;
+
+          let businessEnd = endHour;
+          if (endPeriod === 'PM' && endHour !== 12) businessEnd += 12;
+          if (endPeriod === 'AM' && endHour === 12) businessEnd = 0;
+
+          // Get selected weekend days
+          const weekendCheckboxes = modal.querySelectorAll('.weekend-day-checkbox input[type="checkbox"]:checked');
+          const weekendDays = Array.from(weekendCheckboxes).map(cb => parseInt(cb.value));
+
+          if (weekendDays.length === 7) {
+            showToast('⚠️ Please select at least one working day', 'warning');
+            return;
+          }
+
+          try {
+            const updateRes = await fetch(`${API_BASE}/email/timezone/countries/${countryCode}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                business_start: businessStart,
+                business_end: businessEnd,
+                weekend_days: weekendDays
+              })
+            });
+
+            const updateData = await updateRes.json();
+
+            if (updateData.success) {
+              showToast(`✅ ${country.name} timezone settings updated!`, 'success');
+              modal.remove();
+              refreshMonitoringData();
+            } else {
+              showToast(`❌ Error: ${updateData.error}`, 'error');
+            }
+          } catch (error) {
+            showToast(`❌ Error: ${error.message}`, 'error');
+          }
+        };
+
+        const closeModal = () => modal.remove();
+        document.getElementById('cancelBtn').onclick = closeModal;
+        document.getElementById('closeModalBtn').onclick = closeModal;
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+      } catch (error) {
+        showToast(`❌ Error: ${error.message}`, 'error');
+      }
+    }
+
+    window.editCountryTimezone = editCountryTimezone;
 
     function startTimezoneAutoRefresh() {
       // Clear existing interval
@@ -21624,6 +24574,140 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+
+    // ============================================
+    // TIMEZONE-AWARE EMAIL SENDING WARNINGS
+    // ============================================
+
+    /**
+     * Show warning popup when sending emails outside business hours
+     */
+    async function checkTimezoneBeforeSend(recipientEmail) {
+      try {
+        // Get recipient's region from their email
+        const res = await fetch(`${API_BASE}/email/recipient-region?${new URLSearchParams({ email: recipientEmail })}`);
+
+        if (!res.ok) {
+          // If endpoint doesn't exist, skip the warning
+          return true;
+        }
+
+        const data = await res.json();
+
+        if (!data.success || !data.region) {
+          // No region data, allow sending
+          return true;
+        }
+
+        const region = data.region;
+        const countryName = region.name || region.country_code.toUpperCase();
+        const inBusinessHours = region.in_business_hours;
+
+        if (!inBusinessHours) {
+          // Show warning popup
+          const userConfirmed = confirm(
+            `⚠️ Timezone Warning\n\n` +
+            `Recipient is in ${countryName}\n` +
+            `Current local time: ${region.current_local_time}\n\n` +
+            `❌ OUTSIDE BUSINESS HOURS\n` +
+            `Business hours: ${region.business_start}:00 - ${region.business_end}:00\n\n` +
+            `📧 This email will be QUEUED and automatically sent\n` +
+            `   during the next business hours window.\n\n` +
+            `Continue anyway?`
+          );
+
+          return userConfirmed;
+        }
+
+        // In business hours, allow sending
+        return true;
+
+      } catch (error) {
+        console.error('Error checking timezone:', error);
+        // On error, allow sending (don't block)
+        return true;
+      }
+    }
+
+    /**
+     * Enhanced send queue function with timezone warnings
+     */
+    async function sendQueueWithTimezoneCheck() {
+      const queuedEmails = await fetchQueuedEmails();
+
+      if (queuedEmails.length === 0) {
+        alert('ℹ️ No emails in queue to send');
+        return;
+      }
+
+      // Count emails by business hour status
+      const readyToSend = [];
+      const outsideHours = [];
+
+      for (const email of queuedEmails) {
+        try {
+          const res = await fetch(`${API_BASE}/email/timezone/check?${new URLSearchParams({ email: email.recipient_email })}`);
+          const data = await res.json();
+
+          if (data.success && data.data && !data.data.in_business_hours) {
+            outsideHours.push({
+              email: email.recipient_email,
+              country: data.data.name,
+              localTime: data.data.current_local_time,
+              businessHours: `${data.data.business_start}:00 - ${data.data.business_end}:00`
+            });
+          } else {
+            readyToSend.push(email.recipient_email);
+          }
+        } catch (e) {
+          readyToSend.push(email.recipient_email);
+        }
+      }
+
+      // Show summary before sending
+      let message = `📧 Email Queue Summary\n\n`;
+      message += `Total emails: ${queuedEmails.length}\n`;
+      message += `✅ Ready to send now: ${readyToSend.length}\n`;
+
+      if (outsideHours.length > 0) {
+        message += `⏰ Outside business hours: ${outsideHours.length}\n\n`;
+        message += `Emails outside business hours will be automatically\n`;
+        message += `scheduled during the recipient's business hours.\n\n`;
+        message += `Examples:\n`;
+        outsideHours.slice(0, 3).forEach(e => {
+          message += `• ${e.email} (${e.country})\n`;
+        });
+        if (outsideHours.length > 3) {
+          message += `... and ${outsideHours.length - 3} more\n`;
+        }
+      }
+
+      message += `\nContinue sending emails?`;
+
+      const confirmed = confirm(message);
+
+      if (confirmed) {
+        // Trigger the queue
+        const triggerRes = await fetch(`${API_BASE}/email/queue/trigger`, {
+          method: 'POST'
+        });
+
+        const triggerData = await triggerRes.json();
+
+        if (triggerData.success) {
+          alert(`✅ Email queue processing started!\n\n` +
+            `Sending immediately: ${readyToSend.length}\n` +
+            `Scheduled for later: ${outsideHours.length}`);
+        } else {
+          alert(`❌ Error: ${triggerData.error}`);
+        }
+      }
+    }
+
+    // Make functions available globally
+    window.checkTimezoneBeforeSend = checkTimezoneBeforeSend;
+    window.sendQueueWithTimezoneCheck = sendQueueWithTimezoneCheck;
 
   </script>
 </body>
