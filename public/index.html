@@ -22184,6 +22184,12 @@
 
         if (item.status === 'queued' || item.status === 'sending') {
           actionButtons = `
+            <button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" class="action-btn" title="Send immediately" style="color: #22c55e; margin-right: 4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 13 13 2"></polygon>
+                <polygon points="1 22 11 13 11 2 13 11 22 1 22"></polygon>
+              </svg>
+            </button>
             <button onclick="pauseHistoryQueueItem(${item.id})" class="action-btn" title="Pause" style="color: #f59e0b;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="6" y="4" width="4" height="16"></rect>
@@ -22200,6 +22206,12 @@
           `;
         } else if (item.status === 'paused') {
           actionButtons = `
+            <button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" class="action-btn" title="Send immediately" style="color: #22c55e; margin-right: 4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 13 13 2"></polygon>
+                <polygon points="1 22 11 13 11 2 13 11 22 1 22"></polygon>
+              </svg>
+            </button>
             <button onclick="resumeHistoryQueueItem(${item.id})" class="action-btn" title="Resume" style="color: #22c55e;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -22215,7 +22227,13 @@
           `;
         } else if (item.status === 'failed') {
           actionButtons = `
-            <button onclick="retryHistoryQueueItem(${item.id})" class="action-btn" title="Retry" style="color: #22c55e;">
+            <button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" class="action-btn" title="Send immediately" style="color: #22c55e; margin-right: 4px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 13 13 2"></polygon>
+                <polygon points="1 22 11 13 11 2 13 11 22 1 22"></polygon>
+              </svg>
+            </button>
+            <button onclick="retryHistoryQueueItem(${item.id})" class="action-btn" title="Retry with queue" style="color: #667eea;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <polyline points="1 20 1 14 7 14"></polyline>

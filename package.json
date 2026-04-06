@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node src/scrapers/wordpress-detector.js",
+    "detector": "node src/scrapers/wordpress-detector.js",
     "detect": "node src/scrapers/wordpress-detector.js",
     "list": "node src/scripts/runners/view-results.js list",
     "view": "node src/scripts/runners/view-results.js view",
@@ -13,6 +13,8 @@
     "export": "node src/scripts/runners/view-results.js export",
     "server": "node src/api/server.js",
     "admin": "node src/api/server.js",
+    "dev": "node src/api/server.js",
+    "start": "node src/api/server.js",
     "diagnose-email": "node src/scripts/maintenance/diagnose-email-system.js",
     "test-api": "node src/scripts/test-api.js"
   },
