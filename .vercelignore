@@ -44,3 +44,16 @@ C:/automation_chrome/
 
 # Playwright
 .playwright/
+
+# Scripts that shouldn't run in serverless
+src/scripts/runners/
+
+# Development documentation
+*.md
+!README.md
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js

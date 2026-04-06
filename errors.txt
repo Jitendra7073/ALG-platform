@@ -1,0 +1,178 @@
+ [INFO] API Request: GET /api/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+🚀 Running in Vercel environment - Exporting Express app
+Error getting statistics: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at get (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:269:16)
+    at Object.getStatistics (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:206:25)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:595:28
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+[INIT] Server initialized | port=8080
+🚀 Running in Vercel environment - Exporting Express app
+ [INFO] API Request: GET /api/ai/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+ [SUCCESS] API Response: GET /api/ai/stats - Success { status: 200, duration: '79ms' }
+🚀 Running in Vercel environment - Exporting Express app
+ [ERROR] API Response: GET /api/stats - Failed {
+  status: 500,
+  duration: '90ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+ [INFO] API Request: GET /api/contacts/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+[INIT] Server initialized | port=8080
+Error getting contact stats: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at get (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:269:16)
+    at Object.getContactStats (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:1405:25)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:1358:28
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+🚀 Running in Vercel environment - Exporting Express app
+ [INFO] API Request: GET /api/keywords?limit=5 { ip: '127.0.0.1', params: { limit: '5' }, body: undefined }
+Error getting all keywords: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at all (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:289:16)
+    at Object.getAllKeywords (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:270:28)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:521:31
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+Error fetching keywords: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at all (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:289:16)
+    at Object.getAllKeywords (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:270:28)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:521:31
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+ [ERROR] API Response: GET /api/keywords?limit=5 - Failed {
+  status: 500,
+  duration: '434ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+ [ERROR] API Response: GET /api/contacts/stats - Failed {
+  status: 500,
+  duration: '94ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+ [INFO] API Request: GET /api/executives/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+Error getting executives stats: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at get (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:269:16)
+    at Object.getExecutivesStats (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:1495:25)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:1506:28
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+ [ERROR] API Response: GET /api/executives/stats - Failed {
+  status: 500,
+  duration: '294ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+[INIT] Server initialized | port=8080
+🚀 Running in Vercel environment - Exporting Express app
+ [INFO] API Request: GET /api/sites/ai-breakdown { ip: '127.0.0.1', params: undefined, body: undefined }
+ [ERROR] API Response: GET /api/sites/ai-breakdown - Failed {
+  status: 500,
+  duration: '43ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+[INIT] Server initialized | port=8080
+🚀 Running in Vercel environment - Exporting Express app
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+ [INFO] API Request: GET /api/executives/scraper/status { ip: '127.0.0.1', params: undefined, body: undefined }
+ [SUCCESS] API Response: GET /api/executives/scraper/status - Success { status: 200, duration: '52ms' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚡️ secrets for agents: https://dotenvx.com/as2
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+[INIT] Server initialized | port=8080
+🚀 Running in Vercel environment - Exporting Express app
+[INIT] Server initialized | port=8080
+[INIT] Server initialized | port=8080
+ [INFO] API Request: GET /api/ai/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+ [SUCCESS] API Response: GET /api/ai/stats - Success { status: 200, duration: '60ms' }
+🚀 Running in Vercel environment - Exporting Express app
+🚀 Running in Vercel environment - Exporting Express app
+[INIT] Server initialized | port=8080
+ [INFO] API Request: GET /favicon.ico { ip: '127.0.0.1', params: undefined, body: undefined }
+🚀 Running in Vercel environment - Exporting Express app
+ [INFO] API Request: GET /api/keywords?limit=5 { ip: '127.0.0.1', params: { limit: '5' }, body: undefined }
+Error getting all keywords: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at all (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:289:16)
+    at Object.getAllKeywords (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:270:28)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:521:31
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+Error fetching keywords: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at all (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:289:16)
+    at Object.getAllKeywords (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:270:28)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:521:31
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+ [ERROR] API Response: GET /api/keywords?limit=5 - Failed {
+  status: 500,
+  duration: '207ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+ [INFO] API Request: GET /api/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+Error getting statistics: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at get (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:269:16)
+    at Object.getStatistics (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:206:25)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:595:28
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+ [ERROR] API Response: GET /api/stats - Failed {
+  status: 500,
+  duration: '440ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}
+[INIT] Server initialized | port=8080
+🚀 Running in Vercel environment - Exporting Express app
+ [INFO] API Request: GET /api/contacts/stats { ip: '127.0.0.1', params: undefined, body: undefined }
+Error getting contact stats: Error: Database pool not initialized. Call initializePool() first.
+    at getPool (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:86:11)
+    at get (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\db-adapter.js:269:16)
+    at Object.getContactStats (C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\database\database.js:1405:25)
+    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\src\api\server.js:1358:28
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at next (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:144:13)
+    at Route.dispatch (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\route.js:114:3)
+    at Layer.handle [as handle_request] (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\layer.js:95:5)    at C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:284:15
+    at Function.process_params (C:\Users\EnactOn Technologies\Desktop\ALG-platform\node_modules\express\lib\router\index.js:346:12)       
+ [ERROR] API Response: GET /api/contacts/stats - Failed {
+  status: 500,
+  duration: '132ms',
+  error: 'Database pool not initialized. Call initializePool() first.',
+  details: undefined
+}

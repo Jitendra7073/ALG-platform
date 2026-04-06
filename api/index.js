@@ -2,11 +2,12 @@
  * Vercel Serverless Function Entry Point
  *
  * This file serves as the entry point for Vercel deployment.
- * It handles the differences between local development and Vercel serverless environment.
+ * It creates a serverless-compatible Express app without browser/background workers.
  */
 
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 // Create Express app for Vercel
 const app = express();
@@ -18,14 +19,30 @@ app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint for Vercel
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    environment: 'vercel'
+  });
 });
 
-// Import and use the main server routes
+// Import the main Express app from server.js
+// The server.js exports 'apiServer' which contains all routes
 const { apiServer } = require('../src/api/server.js');
 
 // Mount all routes from the main server
 app.use('/', apiServer);
 
-// Export for Vercel
+// SPA fallback for client-side routing - must be last
+app.all('*', (req, res, next) => {
+  // Don't intercept API routes or health endpoint
+  if (req.path.startsWith('/api') || req.path === '/health') {
+    return next(); // Let apiServer handle it
+  }
+  // Serve index.html for all other routes (SPA fallback)
+  res.sendFile(path.join(__dirname, '../public/index.html'));
+});
+
+// Export for Vercel serverless
+
 module.exports = app;

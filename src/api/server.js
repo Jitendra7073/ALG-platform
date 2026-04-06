@@ -23,7 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Export for Vercel deployment
-apiServer = app;
+const apiServer = app;
 const userDataDir = process.env.CHROME_USER_DATA_DIR || (process.platform === 'win32' ? 'C:\\automation_chrome' : '/tmp/automation_chrome');
 
 // NOTE: Workers will be started AFTER database pool initialization (see bottom of file)
@@ -272,7 +272,7 @@ const asyncHandler = (fn) => (req, res, next) => {
 // Serve static files with cache-busting headers to prevent browser caching
 // MUST come before 404 handler to serve index.html, favicon.ico, etc.
 app.use(
-  express.static("public", {
+  express.static(path.join(__dirname, "../../public"), {
     cacheControl: false,
     etag: false,
     setHeaders: (res, filePath) => {
@@ -985,6 +985,15 @@ app.get("/api/scraper/status", (req, res) => {
 // Start scraping for a single keyword
 app.post("/api/scraper/start/:keywordId", async (req, res) => {
   try {
+    // Check if running in Vercel/serverless environment
+    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+    if (isVercel) {
+      return res.status(400).json({
+        success: false,
+        error: "Browser-based scraping is not supported in serverless environments. Please use the local development server for scraping operations."
+      });
+    }
+
     const { keywordId } = req.params;
     const { country, customCountrySettings } = req.body; // New: optional country and custom settings
     const parsedKeywordId = parseInt(keywordId);
@@ -1047,6 +1056,15 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
 // Start scraping for all keywords (sequentially, one by one)
 app.post("/api/scraper/start-all", async (req, res) => {
   try {
+    // Check if running in Vercel/serverless environment
+    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+    if (isVercel) {
+      return res.status(400).json({
+        success: false,
+        error: "Browser-based scraping is not supported in serverless environments. Please use the local development server for scraping operations."
+      });
+    }
+
     const keywords = await db
       .getAllKeywords()
       .filter((k) => k.status !== "running");
@@ -1605,6 +1623,15 @@ app.get("/api/executives/scraper/status", (req, res) => {
 
 // Manually trigger executive scraping
 app.post("/api/executives/scraper/start", async (req, res) => {
+  // Check if running in Vercel/serverless environment
+  const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+  if (isVercel) {
+    return res.status(400).json({
+      success: false,
+      error: "LinkedIn scraping is not supported in serverless environments. Please use the local development server for scraping operations."
+    });
+  }
+
   if (executiveScraperStatus.running) {
     return res
       .status(400)
@@ -3597,17 +3624,20 @@ async function startServer() {
     await initializeCountryTimezonesTable();
 
     // Step 4: Start background workers
-    // Skip background workers in Vercel
-    const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV;
+    // Skip background workers and browser initialization in Vercel
+    const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
     if (!isVercel) {
       aiWorker.start();
-    aiRetryManager.start();
-    emailQueueWorker.start();
+      aiRetryManager.start();
+      emailQueueWorker.start();
+    }
 
-    // Step 5: Start Express server
-    app.listen(PORT, () => {
-      logger.init("Admin panel running", { url: `http://localhost:${PORT}` });
-    });
+    // Step 5: Start Express server (skip in Vercel)
+    if (!isVercel) {
+      app.listen(PORT, () => {
+        logger.init("Admin panel running", { url: `http://localhost:${PORT}` });
+      });
+    }
   } catch (error) {
     logger.error("INIT", "Server start failed", { message: error.message });
     console.error("\nTroubleshooting:");
@@ -3623,12 +3653,12 @@ async function startServer() {
 // ============================================
 
 // Check if running in Vercel serverless environment
-const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV;
+const isVercel = process.env.VERCEL || process.env.VERCEL_ENV || process.env.NODE_ENV === 'production';
 
 if (isVercel) {
   // Vercel deployment: Export app for serverless functions
   console.log('🚀 Running in Vercel environment - Exporting Express app');
-  module.exports = apiServer;
+  module.exports = { apiServer };
 } else {
   // Local development: Auto-start the server
   console.log('💻 Running in local development mode - Auto-starting server');
