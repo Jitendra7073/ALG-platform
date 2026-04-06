@@ -307,7 +307,9 @@ async function addKeyword(keyword, maxSites = 20) {
 
     return await getKeywordById(result.lastInsertId);
   } catch (error) {
-    console.error("Error adding keyword:", error);
+    if (error.code !== '23505') {
+      console.error("Error adding keyword:", error);
+    }
     throw error;
   }
 }
@@ -450,7 +452,9 @@ async function addExcludedDomain(domain, reason = "") {
 
     return await getExcludedDomainById(result.lastInsertId);
   } catch (error) {
-    console.error("Error adding excluded domain:", error);
+    if (error.code !== '23505') {
+      console.error("Error adding excluded domain:", error);
+    }
     throw error;
   }
 }
@@ -586,7 +590,9 @@ async function addIgnoredTag(
 
     return await getIgnoredTagById(result.lastInsertId);
   } catch (error) {
-    console.error("Error adding ignored tag:", error);
+    if (error.code !== '23505') {
+      console.error("Error adding ignored tag:", error);
+    }
     throw error;
   }
 }

@@ -11,13 +11,13 @@ const emailRouter = require("../services/email/email-senders-templates-api.js");
 const timezoneAwareApi = require("../services/email/timezone-aware-api");
 const {
   router: linkedinCredentialsRouter,
-  initializeLinkedInCredentialsTable
+  initializeLinkedInCredentialsTable,
 } = require("../scrapers/linkedin-credentials-api.js");
 const emailQueueWorker = require("../services/email/email-queue-worker.js");
 const aiWorker = require("../services/ai/ai-processor.js"); // Import new AI classification worker
 const aiRetryManager = require("../services/ai/ai-retry-manager.js"); // Import AI retry manager
 const logger = require("../utils/logger"); // Compact logger
-const systemLogger = require("../utils/system-logger.js"); // Keep for UI compatibility
+const systemLogger = require("../utils/system-logger.js"); // System logger for UI logs (has getFormattedLogs)
 
 const app = express();
 const PORT = 8080;
@@ -27,7 +27,7 @@ const userDataDir = "C:\\automation_chrome";
 
 // Intercept console to capture all logs for UI
 systemLogger.interceptConsole();
-logger.init('Server initialized', { port: PORT });
+logger.init("Server initialized", { port: PORT });
 
 // Track executive scraper status
 let executiveScraperStatus = { running: false, progress: 0, total: 0 };
@@ -189,36 +189,117 @@ function extractLinkedIn(content) {
 // Middleware
 app.use(cors());
 app.use(express.json());
-// Serve static files with cache-busting headers to prevent browser caching
-app.use(express.static("public", {
-  cacheControl: false,
-  etag: false,
-  setHeaders: (res, filePath) => {
-    // No caching for HTML and JS files - always load fresh
-    const ext = path.extname(filePath).toLowerCase();
-    if (ext === '.html' || ext === '.js') {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  const { method, url, ip } = req;
+  const params = { ...req.params, ...req.query };
+  const body = method !== "GET" ? req.body : undefined;
+
+  // Log incoming request
+  systemLogger.info(`API Request: ${method} ${url}`, {
+    ip,
+    params: Object.keys(params).length > 0 ? params : undefined,
+    body: body && Object.keys(body).length > 0 ? body : undefined,
+  });
+
+  // Intercept res.json to log responses
+  const originalJson = res.json.bind(res);
+  res.json = function (data) {
+    const duration = Date.now() - startTime;
+    const status = res.statusCode;
+
+    // Log response
+    if (data && data.success === false) {
+      systemLogger.error(`API Response: ${method} ${url} - Failed`, {
+        status,
+        duration: `${duration}ms`,
+        error: data.error,
+        details: data.details,
+      });
+    } else {
+      systemLogger.success(`API Response: ${method} ${url} - Success`, {
+        status,
+        duration: `${duration}ms`,
+      });
     }
-  }
-}));
+
+    return originalJson(data);
+  };
+
+  next();
+});
+
+// Global async error handling middleware
+app.use((err, req, res, next) => {
+  // Log the error
+  systemLogger.error(`Unhandled Error: ${req.method} ${req.url}`, {
+    error: err.message,
+    stack: err.stack,
+    ip: req.ip,
+    params: { ...req.params, ...req.query },
+  });
+
+  // Prevent HTML error responses - only JSON
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || "Internal server error",
+    details:
+      process.env.NODE_ENV === "development"
+        ? {
+            stack: err.stack,
+            url: req.url,
+            method: req.method,
+          }
+        : undefined,
+  });
+});
+
+// Wrapper for async routes to catch errors automatically
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+// Serve static files with cache-busting headers to prevent browser caching
+// MUST come before 404 handler to serve index.html, favicon.ico, etc.
+app.use(
+  express.static("public", {
+    cacheControl: false,
+    etag: false,
+    setHeaders: (res, filePath) => {
+      // No caching for HTML and JS files - always load fresh
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === ".html" || ext === ".js") {
+        res.setHeader(
+          "Cache-Control",
+          "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        );
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+      }
+    },
+  }),
+);
 
 // Store running scrapers
 const runningScrapers = new Map();
 
 // Cleanup stale scrapers every 5 minutes (removes scrapers older than 2 hours)
-setInterval(() => {
-  const now = Date.now();
-  const TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours
-  for (const [id, data] of runningScrapers.entries()) {
-    if (data.started && now - data.started > TIMEOUT) {
-      console.log(`[CLEANUP] Removing stale scraper for keyword ${id}`);
-      runningScrapers.delete(id);
-      db.updateKeywordStatus(id, "error").catch(err => console.error(err));
+setInterval(
+  () => {
+    const now = Date.now();
+    const TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours
+    for (const [id, data] of runningScrapers.entries()) {
+      if (data.started && now - data.started > TIMEOUT) {
+        console.log(`[CLEANUP] Removing stale scraper for keyword ${id}`);
+        runningScrapers.delete(id);
+        db.updateKeywordStatus(id, "error").catch((err) => console.error(err));
+      }
     }
-  }
-}, 5 * 60 * 1000);
+  },
+  5 * 60 * 1000,
+);
 
 // Mount email API routes (using routers imported at top of file)
 app.use("/api/email", emailRouter);
@@ -255,7 +336,7 @@ app.post("/api/excluded-domains", async (req, res) => {
     const result = await db.addExcludedDomain(domain, reason || "");
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE") || error.code === "23505") {
       res
         .status(400)
         .json({ success: false, error: "Domain already excluded" });
@@ -275,7 +356,11 @@ app.put("/api/excluded-domains/:id", async (req, res) => {
         .status(400)
         .json({ success: false, error: "Domain is required" });
     }
-    const result = await db.updateExcludedDomain(parseInt(id), domain, reason || "");
+    const result = await db.updateExcludedDomain(
+      parseInt(id),
+      domain,
+      reason || "",
+    );
     if (!result) {
       return res
         .status(404)
@@ -283,7 +368,7 @@ app.put("/api/excluded-domains/:id", async (req, res) => {
     }
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE") || error.code === "23505") {
       res
         .status(400)
         .json({ success: false, error: "Domain already excluded" });
@@ -334,7 +419,7 @@ app.post("/api/ignored-tags", async (req, res) => {
     const result = await db.addIgnoredTag(tag, match_type, scope, reason);
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE") || error.code === "23505") {
       res.status(400).json({ success: false, error: "Tag already exists" });
     } else {
       res.status(500).json({ success: false, error: error.message });
@@ -363,7 +448,7 @@ app.put("/api/ignored-tags/:id", async (req, res) => {
     }
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE") || error.code === "23505") {
       res.status(400).json({ success: false, error: "Tag already exists" });
     } else {
       res.status(500).json({ success: false, error: error.message });
@@ -401,7 +486,7 @@ app.delete("/api/ignored-tags/:id", async (req, res) => {
 
 // Bulk delete ignored tags
 app.post("/api/ignored-tags-bulk", async (req, res) => {
-    try {
+  try {
     const { ids } = req.body;
 
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -455,7 +540,7 @@ app.post("/api/keywords", async (req, res) => {
     const result = await db.addKeyword(keyword, limit);
     res.json({ success: true, data: result });
   } catch (error) {
-    if (error.message.includes("UNIQUE") || error.code === '23505') {
+    if (error.message.includes("UNIQUE") || error.code === "23505") {
       res.status(400).json({ success: false, error: "Keyword already exists" });
     } else {
       res.status(500).json({ success: false, error: error.message });
@@ -525,10 +610,10 @@ app.get("/api/ai/stats", (req, res) => {
       successRate:
         clientStats.totalRequests > 0
           ? Math.round(
-            ((clientStats.totalRequests - clientStats.errors) /
-              clientStats.totalRequests) *
-            100,
-          )
+              ((clientStats.totalRequests - clientStats.errors) /
+                clientStats.totalRequests) *
+                100,
+            )
           : 100,
       totalRequests: clientStats.totalRequests,
       totalCost: "0.00", // OpenRouter free tier
@@ -600,7 +685,7 @@ app.get("/api/sites/ai-breakdown", async (req, res) => {
         COUNT(CASE WHEN ai_status = 'completed' THEN 1 END) as completed
       FROM sites
       WHERE is_wordpress = 1
-    `
+    `,
     );
 
     res.json({ success: true, data: breakdown });
@@ -628,7 +713,7 @@ app.post("/api/ai/requeue", async (req, res) => {
         AND ai_status = 'completed'
         AND ai_verified_wp IS NULL
         AND text_content IS NOT NULL
-    `
+    `,
     );
 
     const requeued = requeueIncomplete.rows;
@@ -662,7 +747,7 @@ app.post("/api/ai/requeue-all", async (req, res) => {
           ai_error = NULL
       WHERE is_wordpress = 1
         AND text_content IS NOT NULL
-    `
+    `,
     );
 
     const requeued = result.rows;
@@ -735,7 +820,7 @@ app.get("/api/ai/retry/stuck-sites", async (req, res) => {
         AND ai_processed_at < CURRENT_TIMESTAMP - INTERVAL '5 minutes'
       ORDER BY ai_processed_at ASC
       LIMIT 20
-    `
+    `,
     );
 
     // Failed sites that can be retried
@@ -748,7 +833,7 @@ app.get("/api/ai/retry/stuck-sites", async (req, res) => {
         AND text_content IS NOT NULL
       ORDER BY ai_processed_at ASC
       LIMIT 20
-    `
+    `,
     );
 
     // Old pending sites
@@ -760,7 +845,7 @@ app.get("/api/ai/retry/stuck-sites", async (req, res) => {
         AND checked_at < CURRENT_TIMESTAMP - INTERVAL '1 day'
       ORDER BY checked_at ASC
       LIMIT 20
-    `
+    `,
     );
 
     res.json({
@@ -800,7 +885,12 @@ app.get("/api/sites/wordpress", async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const searchQuery = req.query.search || null;
-    const result = await db.getSitesByWordpressStatus(true, page, limit, searchQuery);
+    const result = await db.getSitesByWordpressStatus(
+      true,
+      page,
+      limit,
+      searchQuery,
+    );
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -843,7 +933,13 @@ app.get("/api/sites/all", async (req, res) => {
     const searchQuery = req.query.search || null;
     const filter = req.query.filter || "all";
     const category = req.query.category || null;
-    const result = await db.getAllSites(page, limit, searchQuery, filter, category);
+    const result = await db.getAllSites(
+      page,
+      limit,
+      searchQuery,
+      filter,
+      category,
+    );
     res.json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -912,8 +1008,10 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
     });
 
     // Update keyword status to running (fire-and-forget, runScraper will handle errors)
-    db.updateKeywordStatus(parsedKeywordId, "running").catch(err => {
-      console.error(`[SCRAPER] Failed to update keyword status: ${err.message}`);
+    db.updateKeywordStatus(parsedKeywordId, "running").catch((err) => {
+      console.error(
+        `[SCRAPER] Failed to update keyword status: ${err.message}`,
+      );
       // Clean up runningScrapers on failure
       runningScrapers.delete(parsedKeywordId);
     });
@@ -925,7 +1023,7 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
       keyword.max_sites,
       country || "in",
       customCountrySettings || null,
-    ).catch(err => {
+    ).catch((err) => {
       console.error(`[SCRAPER] Fatal error in runScraper: ${err.message}`);
       // Ensure cleanup on fatal errors outside runScraper's internal error handling
       runningScrapers.delete(parsedKeywordId);
@@ -941,7 +1039,9 @@ app.post("/api/scraper/start/:keywordId", async (req, res) => {
 // Start scraping for all keywords (sequentially, one by one)
 app.post("/api/scraper/start-all", async (req, res) => {
   try {
-    const keywords = await db.getAllKeywords().filter((k) => k.status !== "running");
+    const keywords = await db
+      .getAllKeywords()
+      .filter((k) => k.status !== "running");
 
     if (keywords.length === 0) {
       return res
@@ -1028,13 +1128,15 @@ app.get("/api/export", async (req, res) => {
   try {
     const searches = await db.getAllSearches();
 
-    const data = await Promise.all(searches.map(async (search) => {
-      const searchWithSites = await db.getSearchById(search.id);
-      return {
-        ...search,
-        sites: searchWithSites ? searchWithSites.sites : [],
-      };
-    }));
+    const data = await Promise.all(
+      searches.map(async (search) => {
+        const searchWithSites = await db.getSearchById(search.id);
+        return {
+          ...search,
+          sites: searchWithSites ? searchWithSites.sites : [],
+        };
+      }),
+    );
 
     res.json({ success: true, data });
   } catch (error) {
@@ -1053,14 +1155,14 @@ app.get("/api/export-all", async (req, res) => {
              ai_content_summary, ai_mismatch_reason, classification, relevance_score,
              tags, primary_language, value_proposition
       FROM sites ORDER BY id DESC
-    `
+    `,
     );
 
     // Contacts grouped by site_id
     const allContacts = await db.all(
       `
       SELECT site_id, type, value, source_page FROM contacts ORDER BY id ASC
-    `
+    `,
     );
 
     // Executives grouped by site_id
@@ -1068,7 +1170,7 @@ app.get("/api/export-all", async (req, res) => {
       `
       SELECT site_id, company_name, name, headline, role_category, profile_url, company_url
       FROM company_executives ORDER BY id ASC
-    `
+    `,
     );
 
     // Keywords
@@ -1076,7 +1178,7 @@ app.get("/api/export-all", async (req, res) => {
       `
       SELECT id, keyword, status, max_sites, created_at
       FROM keywords ORDER BY id DESC
-    `
+    `,
     );
 
     // Group contacts and executives by site_id
@@ -1309,7 +1411,8 @@ app.get("/api/contacts/linkedin", async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const search = req.query.search || null;
     const result = await db.getLinkedinProfiles(page, limit, search);
-    res.json({ success: true, data: result });
+    console.log("linkedin results", result.contacts);
+    res.json({ success: true, data: result.contacts });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1538,14 +1641,16 @@ async function scrapeExecutives() {
           SELECT 1 FROM company_executives ce
           WHERE ce.company_url = c.value
         )
-    `
+    `,
     );
 
     console.log(
-      `\n[Executive Scraper]  Found ${companyUrls.length
-      } LinkedIn company URLs to process (skipping ${companyUrls.length === 0
-        ? "all - already scraped!"
-        : "companies with existing executives"
+      `\n[Executive Scraper]  Found ${
+        companyUrls.length
+      } LinkedIn company URLs to process (skipping ${
+        companyUrls.length === 0
+          ? "all - already scraped!"
+          : "companies with existing executives"
       }`,
     );
     executiveScraperStatus.total = companyUrls.length;
@@ -1568,7 +1673,8 @@ async function scrapeExecutives() {
       executiveScraperStatus.progress = i + 1;
 
       console.log(
-        `\n[Executive Scraper] [${i + 1}/${companyUrls.length}] Processing: ${company.linkedin_url
+        `\n[Executive Scraper] [${i + 1}/${companyUrls.length}] Processing: ${
+          company.linkedin_url
         }`,
       );
 
@@ -1967,8 +2073,13 @@ async function runScraper(
       }
     } catch (error) {
       // If context was destroyed, check if page is still accessible
-      if (error.message.includes("context") || error.message.includes("closed")) {
-        console.log("[Scraper] ⚠️  Page context destroyed, attempting to continue...");
+      if (
+        error.message.includes("context") ||
+        error.message.includes("closed")
+      ) {
+        console.log(
+          "[Scraper] ⚠️  Page context destroyed, attempting to continue...",
+        );
         // Don't throw - continue without CAPTCHA detection if page is unstable
         captchaDetected = false;
       } else {
@@ -1992,7 +2103,9 @@ async function runScraper(
 
         // Validate page context before checking CAPTCHA status
         if (page.isClosed()) {
-          throw new Error("Page context destroyed while waiting for CAPTCHA to be solved");
+          throw new Error(
+            "Page context destroyed while waiting for CAPTCHA to be solved",
+          );
         }
 
         // Check if CAPTCHA is gone
@@ -2040,7 +2153,9 @@ async function runScraper(
     } catch (e) {
       // Silently ignore cookie acceptance failures - not critical
       if (e.message.includes("context") || e.message.includes("closed")) {
-        console.log("[Scraper] ⚠️  Page context destroyed during cookie acceptance, continuing...");
+        console.log(
+          "[Scraper] ⚠️  Page context destroyed during cookie acceptance, continuing...",
+        );
       }
     }
 
@@ -2081,10 +2196,15 @@ async function runScraper(
           await page.waitForTimeout(1000);
         } catch (e) {
           if (e.message.includes("context") || e.message.includes("closed")) {
-            throw new Error("Page context destroyed during search results wait");
+            throw new Error(
+              "Page context destroyed during search results wait",
+            );
           }
           // Continue even if scroll fails
-          console.log("[Scraper] ⚠️  Could not wait for search results div:", e.message);
+          console.log(
+            "[Scraper] ⚠️  Could not wait for search results div:",
+            e.message,
+          );
         }
       } else {
         console.log(
@@ -2218,7 +2338,8 @@ async function runScraper(
       }
 
       console.log(
-        `[Scraper] Page ${pageNum + 1}: Found ${pageUrls.length
+        `[Scraper] Page ${pageNum + 1}: Found ${
+          pageUrls.length
         } URLs (Collected: ${urls.length} unique domains)`,
       );
 
@@ -2278,7 +2399,9 @@ async function runScraper(
     });
 
     // Filter out URLs from excluded domains
-    const excludedDomains = (await db.getAllExcludedDomains()).map((d) => d.domain);
+    const excludedDomains = (await db.getAllExcludedDomains()).map(
+      (d) => d.domain,
+    );
     let domainExcludedCount = 0;
     if (excludedDomains.length > 0) {
       const domainExcluded = [];
@@ -2336,7 +2459,7 @@ async function runScraper(
       console.log(
         `[Scraper] Skipped duplicates:`,
         duplicates.slice(0, 5).join(", ") +
-        (duplicates.length > 5 ? "..." : ""),
+          (duplicates.length > 5 ? "..." : ""),
       );
     }
 
@@ -3191,7 +3314,7 @@ app.get("/api/logs", (req, res) => {
     const type = req.query.type || "all";
     const search = req.query.search || null;
 
-    const logs = logger.getFormattedLogs(limit, type, search);
+    const logs = systemLogger.getFormattedLogs(limit, type, search);
 
     res.json({
       success: true,
@@ -3205,7 +3328,7 @@ app.get("/api/logs", (req, res) => {
 // Get log statistics
 app.get("/api/logs/stats", (req, res) => {
   try {
-    const stats = logger.getStats();
+    const stats = systemLogger.getStats();
 
     res.json({
       success: true,
@@ -3220,7 +3343,7 @@ app.get("/api/logs/stats", (req, res) => {
 app.get("/api/logs/recent", (req, res) => {
   try {
     const minutes = parseInt(req.query.minutes) || 5;
-    const activity = logger.getRecentActivity(minutes);
+    const activity = systemLogger.getRecentActivity(minutes);
 
     res.json({
       success: true,
@@ -3234,7 +3357,7 @@ app.get("/api/logs/recent", (req, res) => {
 // Clear logs
 app.post("/api/logs/clear", (req, res) => {
   try {
-    logger.clear();
+    systemLogger.clear();
 
     res.json({
       success: true,
@@ -3248,7 +3371,7 @@ app.post("/api/logs/clear", (req, res) => {
 // Export logs
 app.get("/api/logs/export", (req, res) => {
   try {
-    const logs = logger.export();
+    const logs = systemLogger.export();
 
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
@@ -3264,7 +3387,7 @@ app.get("/api/logs/export", (req, res) => {
 // Get log types info
 app.get("/api/logs/types", (req, res) => {
   try {
-    const types = logger.logTypes;
+    const types = systemLogger.logTypes;
 
     res.json({
       success: true,
@@ -3299,39 +3422,139 @@ async function initializeCountryTimezonesTable() {
     `);
 
     // Check if table has data
-    const count = await db.get("SELECT COUNT(*) as count FROM country_timezones");
+    const count = await db.get(
+      "SELECT COUNT(*) as count FROM country_timezones",
+    );
     if (count.count === 0) {
       // Insert essential seed data
       const seedData = [
-        { code: 'in', timezone: 'Asia/Kolkata', name: 'India', offset: 5.5 },
-        { code: 'us', timezone: 'America/New_York', name: 'United States', offset: -5 },
-        { code: 'uk', timezone: 'Europe/London', name: 'United Kingdom', offset: 0 },
-        { code: 'ca', timezone: 'America/Toronto', name: 'Canada', offset: -5 },
-        { code: 'au', timezone: 'Australia/Sydney', name: 'Australia', offset: 10 },
-        { code: 'de', timezone: 'Europe/Berlin', name: 'Germany', offset: 1 },
-        { code: 'fr', timezone: 'Europe/Paris', name: 'France', offset: 1 },
-        { code: 'ae', timezone: 'Asia/Dubai', name: 'United Arab Emirates', offset: 4 },
-        { code: 'sg', timezone: 'Asia/Singapore', name: 'Singapore', offset: 8 },
-        { code: 'jp', timezone: 'Asia/Tokyo', name: 'Japan', offset: 9 },
-        { code: 'unknown', timezone: 'UTC', name: 'Unknown/Other', offset: 0 },
+        { code: "in", timezone: "Asia/Kolkata", name: "India", offset: 5.5 },
+        {
+          code: "us",
+          timezone: "America/New_York",
+          name: "United States",
+          offset: -5,
+        },
+        {
+          code: "uk",
+          timezone: "Europe/London",
+          name: "United Kingdom",
+          offset: 0,
+        },
+        { code: "ca", timezone: "America/Toronto", name: "Canada", offset: -5 },
+        {
+          code: "au",
+          timezone: "Australia/Sydney",
+          name: "Australia",
+          offset: 10,
+        },
+        { code: "de", timezone: "Europe/Berlin", name: "Germany", offset: 1 },
+        { code: "fr", timezone: "Europe/Paris", name: "France", offset: 1 },
+        {
+          code: "ae",
+          timezone: "Asia/Dubai",
+          name: "United Arab Emirates",
+          offset: 4,
+        },
+        {
+          code: "sg",
+          timezone: "Asia/Singapore",
+          name: "Singapore",
+          offset: 8,
+        },
+        { code: "jp", timezone: "Asia/Tokyo", name: "Japan", offset: 9 },
+        { code: "unknown", timezone: "UTC", name: "Unknown/Other", offset: 0 },
       ];
 
       for (const country of seedData) {
-        await db.run(`
+        await db.run(
+          `
           INSERT INTO country_timezones (country_code, timezone, name, offset_hours)
           VALUES (?, ?, ?, ?)
-        `, [country.code, country.timezone, country.name, country.offset]);
+        `,
+          [country.code, country.timezone, country.name, country.offset],
+        );
       }
 
-      console.log(`  ✓ country_timezones table created with ${seedData.length} countries`);
+      console.log(
+        `  ✓ country_timezones table created with ${seedData.length} countries`,
+      );
     } else {
       console.log(`  ✓ country_timezones table exists (${count.count} rows)`);
     }
   } catch (error) {
-    console.error("  ⚠️  Could not initialize country_timezones table:", error.message);
+    console.error(
+      "  ⚠️  Could not initialize country_timezones table:",
+      error.message,
+    );
     // Don't throw - this is not critical for server startup
   }
 }
+
+// ============================================
+// 404 HANDLER (must be AFTER all routes)
+// ============================================
+// Only handles requests that weren't matched by static files or API routes
+app.use((req, res) => {
+  // Don't log 404s for common browser requests (favicon, etc)
+  if (!req.path.includes("favicon") && !req.path.includes("apple-touch-icon")) {
+    systemLogger.log(
+      "warning",
+      `❓ Route not found: ${req.method} ${req.path}`,
+      {
+        ip: req.ip,
+        url: req.url,
+      },
+    );
+  }
+
+  // For API routes, return JSON 404
+  if (req.path.startsWith("/api/")) {
+    res.status(404).json({
+      success: false,
+      error: `API route not found: ${req.method} ${req.path}`,
+    });
+  } else {
+    // For non-API routes, return HTML 404 page
+    res.status(404).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>404 - Page Not Found</title>
+        <style>
+          body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+          }
+          .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+          }
+          h1 { font-size: 72px; margin: 0; }
+          p { font-size: 18px; opacity: 0.9; }
+          a { color: #ffd700; text-decoration: none; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>404</h1>
+          <p>Page not found</p>
+          <p><a href="/">← Back to Home</a></p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
 
 /**
  * Initialize and start the server
@@ -3345,14 +3568,16 @@ async function startServer() {
     // Step 1: Initialize PostgreSQL connection pool
     const { healthCheck } = require("../database/db-adapter");
 
-    await initializePool(process.env.DATABASE_URL || "postgresql://localhost:5432/wordpress_leads");
+    await initializePool(
+      process.env.DATABASE_URL || "postgresql://localhost:5432/wordpress_leads",
+    );
 
     // Step 2: Verify database connection
     const isHealthy = await healthCheck();
     if (!isHealthy) {
       throw new Error("Database health check failed");
     }
-    logger.db('Connected', { status: 'healthy' });
+    logger.db("Connected", { status: "healthy" });
 
     // Step 3: Initialize email tables
     await emailRouter.initializeEmailTables();
@@ -3370,11 +3595,10 @@ async function startServer() {
 
     // Step 5: Start Express server
     app.listen(PORT, () => {
-      logger.init('Admin panel running', { url: `http://localhost:${PORT}` });
+      logger.init("Admin panel running", { url: `http://localhost:${PORT}` });
     });
-
   } catch (error) {
-    logger.error('INIT', 'Server start failed', { message: error.message });
+    logger.error("INIT", "Server start failed", { message: error.message });
     console.error("\nTroubleshooting:");
     console.error("   1. Ensure PostgreSQL is running");
     console.error("   2. Check DATABASE_URL in .env file");

@@ -6,7 +6,7 @@
  *
  * Endpoints:
  * - GET    /api/linkedin/credentials       - Get all credentials
- * - POST   /api/linkedin/credentials       - Add new credentials
+ * - POST   /        - Add new credentials
  * - PUT    /api/linkedin/credentials/:id   - Update credentials
  * - DELETE /api/linkedin/credentials/:id   - Delete credentials
  * - GET    /api/linkedin/credentials/active - Get active credential
@@ -42,9 +42,9 @@ function initializeLinkedInCredentialsTable() {
  * GET /api/linkedin/credentials
  * Get all LinkedIn credentials
  */
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   try {
-    const credentials = db.all(`
+    const credentials = await db.all(`
       SELECT id, name, email, is_active, last_used, notes, created_at, updated_at
       FROM linkedin_credentials
       ORDER BY is_active DESC, created_at DESC
@@ -67,9 +67,9 @@ router.get("/", (req, res) => {
  * GET /api/linkedin/credentials/active
  * Get the active LinkedIn credential
  */
-router.get("/active", (req, res) => {
+router.get("/active", async (req, res) => {
   try {
-    const credential = db.get(`
+    const credential = await db.get(`
       SELECT id, name, email, is_active, last_used, notes, created_at, updated_at
       FROM linkedin_credentials
       WHERE is_active = 1
@@ -98,10 +98,10 @@ router.get("/active", (req, res) => {
  * GET /api/linkedin/credentials/:id
  * Get a specific LinkedIn credential by ID (includes password for use in scraper)
  */
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const credential = db.get(
+    const credential = await db.get(
       `
       SELECT *
       FROM linkedin_credentials
@@ -128,7 +128,7 @@ router.get("/:id", (req, res) => {
  * POST /api/linkedin/credentials
  * Add new LinkedIn credentials
  */
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { name, email, password, notes } = req.body;
 
@@ -138,7 +138,7 @@ router.post("/", (req, res) => {
         .json({ success: false, error: "Name is required" });
     }
 
-    const result = db.run(
+    const result = await db.run(
       `
       INSERT INTO linkedin_credentials (name, email, password, notes)
       VALUES (?, ?, ?, ?)
@@ -146,7 +146,7 @@ router.post("/", (req, res) => {
       [name, email || null, password || null, notes || null],
     );
 
-    const newCredential = db.get(
+    const newCredential = await db.get(
       `
       SELECT id, name, email, is_active, notes, created_at
       FROM linkedin_credentials
@@ -172,13 +172,13 @@ router.post("/", (req, res) => {
  * PUT /api/linkedin/credentials/:id
  * Update LinkedIn credentials
  */
-router.put("/:id", (req, res) => {
+router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, password, notes, is_active } = req.body;
 
     // Check if credential exists
-    const existing = db.get("SELECT * FROM linkedin_credentials WHERE id = ?", [
+    const existing = await db.get("SELECT * FROM linkedin_credentials WHERE id = ?", [
       id,
     ]);
     if (!existing) {
@@ -215,7 +215,7 @@ router.put("/:id", (req, res) => {
     updates.push("updated_at = CURRENT_TIMESTAMP");
     values.push(id);
 
-    db.run(
+    await db.run(
       `
       UPDATE linkedin_credentials
       SET ${updates.join(", ")}
@@ -224,7 +224,7 @@ router.put("/:id", (req, res) => {
       values,
     );
 
-    const updated = db.get(
+    const updated = await db.get(
       `
       SELECT id, name, email, is_active, last_used, notes, created_at, updated_at
       FROM linkedin_credentials
@@ -250,11 +250,11 @@ router.put("/:id", (req, res) => {
  * DELETE /api/linkedin/credentials/:id
  * Delete LinkedIn credentials
  */
-router.delete("/:id", (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = db.run(
+    const result = await db.run(
       `
       DELETE FROM linkedin_credentials
       WHERE id = ?
@@ -279,12 +279,12 @@ router.delete("/:id", (req, res) => {
  * POST /api/linkedin/credentials/:id/set-active
  * Set a credential as active
  */
-router.post("/:id/set-active", (req, res) => {
+router.post("/:id/set-active", async (req, res) => {
   try {
     const { id } = req.params;
 
     // Check if credential exists
-    const existing = db.get("SELECT * FROM linkedin_credentials WHERE id = ?", [
+    const existing = await db.get("SELECT * FROM linkedin_credentials WHERE id = ?", [
       id,
     ]);
     if (!existing) {
@@ -294,10 +294,10 @@ router.post("/:id/set-active", (req, res) => {
     }
 
     // Deactivate all credentials
-    db.run("UPDATE linkedin_credentials SET is_active = 0");
+    await db.run("UPDATE linkedin_credentials SET is_active = 0");
 
     // Activate selected credential
-    db.run(
+    await db.run(
       "UPDATE linkedin_credentials SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       [id],
     );
@@ -313,11 +313,11 @@ router.post("/:id/set-active", (req, res) => {
  * POST /api/linkedin/credentials/:id/mark-used
  * Mark credential as used (updates last_used timestamp)
  */
-router.post("/:id/mark-used", (req, res) => {
+router.post("/:id/mark-used", async (req, res) => {
   try {
     const { id } = req.params;
 
-    db.run(
+    await db.run(
       `
       UPDATE linkedin_credentials
       SET last_used = CURRENT_TIMESTAMP

@@ -7,12 +7,72 @@
  * - Timezone-aware prioritization (countries in business hours first)
  * - Parallel sending per sender
  * - Round-robin distribution
+ * - STRICT email lifecycle enforcement
  */
 
 const nodemailer = require("nodemailer");
 const db = require("../../database/database.js");
 const timezoneScheduler = require("./timezone-scheduler");
 const logger = require("../../utils/logger"); // Compact logger
+
+/**
+ * Email Lifecycle Status Transitions
+ *
+ * VALID TRANSITIONS:
+ * queued → waiting_business → scheduled → ready → sending → sent/failed
+ *
+ * INVALID TRANSITIONS (blocked):
+ * queued → sent/failed (MUST go through sending state)
+ * Any → sent (MUST go through sending state first)
+ *
+ * STATUS MEANINGS:
+ * - queued: Initial state, waiting to be processed
+ * - waiting_business: Waiting for business hours in recipient's country
+ * - scheduled: Has a specific send time scheduled
+ * - ready: Ready to send (scheduled time reached)
+ * - sending: Currently being sent (transient state)
+ * - sent: Successfully sent
+ * - failed: Failed after max retries
+ */
+
+const VALID_TRANSITIONS = {
+  'queued': ['waiting_business', 'scheduled', 'ready', 'sending'],
+  'waiting_business': ['scheduled', 'ready', 'sending'],
+  'scheduled': ['ready', 'sending'],
+  'ready': ['sending'],
+  'sending': ['sent', 'failed'],
+  'sent': [], // Terminal state
+  'failed': ['queued'] // Can retry failed emails
+};
+
+/**
+ * Validate and execute status transition
+ * Throws error if transition is invalid
+ * @param {number} emailId - Email ID
+ * @param {string} currentStatus - Current status
+ * @param {string} newStatus - New status
+ * @param {string} reason - Reason for transition (for logging)
+ */
+async function transitionStatus(emailId, currentStatus, newStatus, reason = '') {
+  // Check if transition is valid
+  const allowedTransitions = VALID_TRANSITIONS[currentStatus];
+  if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
+    const error = `❌ Invalid status transition: ${currentStatus} → ${newStatus} for email #${emailId}. Reason: ${reason}`;
+    console.error(error);
+    throw new Error(error);
+  }
+
+  // Log the transition
+  console.log(`🔄 Email #${emailId}: ${currentStatus} → ${newStatus}${reason ? ` (${reason})` : ''}`);
+
+  // Execute the transition
+  await db.run(
+    `UPDATE email_queue SET status = $1 WHERE id = $2`,
+    [newStatus, emailId]
+  );
+
+  return true;
+}
 
 /**
  * Validate and reschedule an email if its scheduled time is outside business hours
@@ -26,28 +86,40 @@ async function validateScheduledTime(email) {
   if (!scheduledAt) {
     // No scheduled time - this is legacy data, check current time
     const now = new Date();
-    if (!timezoneScheduler.isBusinessHour(now, countryCode)) {
-      // Reschedule to next business hour
-      const nextValidTime = timezoneScheduler.calculateFirstSendTime(countryCode);
+    const status = timezoneScheduler.getCountryStatus(now, countryCode);
+
+    if (status !== 'open') {
+      // Reschedule to next business hour (handles both weekend and outside hours)
+      const nextValidTime = timezoneScheduler.adjustToBusinessHours(now, countryCode);
       await db.run(
-        "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
+        "UPDATE email_queue SET scheduled_at = $1 WHERE id = $2",
         [nextValidTime.toISOString(), email.id]
       );
-      logger.email('Rescheduled', { to: email.recipient_email, time: nextValidTime.toISOString() });
+      logger.email('Rescheduled', {
+        to: email.recipient_email,
+        time: nextValidTime.toISOString(),
+        reason: status
+      });
       return false;
     }
     return true;
   }
 
-  // Check if the scheduled time is actually within business hours
-  if (!timezoneScheduler.isBusinessHour(scheduledAt, countryCode)) {
-    // Reschedule to next valid business hour
+  // Check if the scheduled time is actually within business hours (including weekend check)
+  const status = timezoneScheduler.getCountryStatus(scheduledAt, countryCode);
+
+  if (status !== 'open') {
+    // Reschedule to next valid business hour (handles both weekend and outside hours)
     const nextValidTime = timezoneScheduler.adjustToBusinessHours(scheduledAt, countryCode);
     await db.run(
-      "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
+      "UPDATE email_queue SET scheduled_at = $1 WHERE id = $2",
       [nextValidTime.toISOString(), email.id]
     );
-    logger.email('Schedule adjusted', { to: email.recipient_email, time: nextValidTime.toISOString() });
+    logger.email('Schedule adjusted', {
+      to: email.recipient_email,
+      time: nextValidTime.toISOString(),
+      reason: status
+    });
     return false;
   }
 
@@ -72,9 +144,9 @@ async function scheduleEmail(email) {
     const previousEmail = await db.get(`
       SELECT sent_at, scheduled_at
       FROM email_queue
-      WHERE contact_id = ?
-        AND campaign_id = ?
-        AND sequence_position = ?
+      WHERE contact_id = $1
+        AND campaign_id = $2
+        AND sequence_position = $3
         AND status = 'sent'
       ORDER BY sent_at DESC
       LIMIT 1
@@ -89,16 +161,21 @@ async function scheduleEmail(email) {
 
     // Get the gap from email_settings for this sequence position
     const gapSetting = await db.get(
-      `SELECT value FROM email_settings WHERE key = ?`,
+      `SELECT value FROM email_settings WHERE key = $1`,
       [`followup_gap_${email.sequence_position - 1}`]
     );
     const gapDays = gapSetting ? parseInt(gapSetting.value) : (email.sequence_position === 2 ? 2 : 5);
 
-    // Calculate follow-up date
-    const scheduledAt = timezoneScheduler.calculateFollowUpDate(baseTime, gapDays, countryCode);
+    // Calculate follow-up date by adding gap days to previous email's sent_at
+    // This ensures each step uses the previous step's scheduled time + gap
+    const followUpDate = new Date(baseTime.getTime());
+    followUpDate.setDate(followUpDate.getDate() + gapDays);
+
+    // Adjust to business hours (handles weekends and off-hours)
+    const scheduledAt = timezoneScheduler.adjustToBusinessHours(followUpDate, countryCode);
 
     await db.run(
-      "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
+      "UPDATE email_queue SET scheduled_at = $1 WHERE id = $2",
       [scheduledAt.toISOString(), email.id]
     );
 
@@ -471,7 +548,8 @@ class EmailQueueWorker {
           batch.push({ email, sender });
           usedSenders.add(sender.id);
           // Mark as sending to prevent duplicates in same batch
-          await db.run("UPDATE email_queue SET status = 'sending' WHERE id = ?", [email.id]);
+          // FIXED: Use proper status transition validation
+          await transitionStatus(email.id, email.status, 'sending', 'Assigned to sender for sending');
         }
       }
 
@@ -661,11 +739,9 @@ class EmailQueueWorker {
 
     if (!reservation.success) {
       if (reservation.reason === 'daily_limit_reached') {
-        // Sender reached limit - mark email as queued for retry later
-        await db.run(
-          `UPDATE email_queue SET status = 'queued' WHERE id = $1`,
-          [email.id]
-        );
+        // FIXED: Use proper status transition validation
+        // sending → queued (sender limit reached, will retry)
+        await transitionStatus(email.id, 'sending', 'queued', 'Sender daily limit reached, will retry later');
         logger.warn('Email', 'Sender limit reached', { senderId: sender.id });
         return { success: false, reason: 'limit_reached' };
       }
@@ -682,11 +758,13 @@ class EmailQueueWorker {
       const result = await this.sendEmail(reservedSender, email);
 
       if (result.success) {
-        // Update queue item as sent
+        // FIXED: Use proper status transition validation
+        await transitionStatus(email.id, 'sending', 'sent', 'Email sent successfully');
+
+        // Update additional fields
         await db.run(
           `UPDATE email_queue
-           SET status = 'sent',
-               sender_id = $1,
+           SET sender_id = $1,
                sent_at = CURRENT_TIMESTAMP,
                attempts = attempts + 1
            WHERE id = $2`,
@@ -735,9 +813,13 @@ class EmailQueueWorker {
         const newAttempts = (email.attempts || 0) + 1;
 
         if (newAttempts >= 3) {
+          // FIXED: Use proper status transition validation
+          await transitionStatus(email.id, 'sending', 'failed', `Max retries reached: ${result.error}`);
+
+          // Update additional fields
           await db.run(
             `UPDATE email_queue
-             SET status = 'failed', error_message = $1, attempts = $2
+             SET error_message = $1, attempts = $2
              WHERE id = $3`,
             [result.error, newAttempts, email.id]
           );
@@ -752,11 +834,16 @@ class EmailQueueWorker {
 
           logger.error('Email', 'Failed after 3 attempts', { to: email.recipient_email, error: result.error });
         } else {
+          // FIXED: Use proper status transition validation
+          await transitionStatus(email.id, 'sending', 'queued', `Retry ${newAttempts}/3: ${result.error}`);
+
           const rescheduleTime = new Date();
           rescheduleTime.setMinutes(rescheduleTime.getMinutes() + 15);
+
+          // Update additional fields
           await db.run(
             `UPDATE email_queue
-             SET status = 'queued', attempts = $1, error_message = $2, scheduled_at = $3
+             SET attempts = $1, error_message = $2, scheduled_at = $3
              WHERE id = $4`,
             [newAttempts, result.error, rescheduleTime.toISOString(), email.id]
           );

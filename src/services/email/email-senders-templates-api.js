@@ -17,6 +17,7 @@ const db = require("../../database/database.js");
 const aiClient = require("../ai/ai-client");
 const aiWorker = require("../ai/ai-processor");
 const timezoneScheduler = require("./timezone-scheduler");
+const emailQueueWorker = require("./email-queue-worker.js");
 
 // ============================================
 // DATABASE TABLES SETUP
@@ -1114,6 +1115,77 @@ router.get("/templates/max-sequence", async (req, res) => {
 });
 
 /**
+ * GET /api/email/templates/tags
+ * Get all unique tags from templates
+ */
+router.get("/templates/tags", async (req, res) => {
+  try {
+    const templates = await db.all(
+      `SELECT DISTINCT tags FROM email_templates WHERE tags IS NOT NULL AND tags != ''`
+    );
+
+    const allTags = new Set();
+    templates.forEach(t => {
+      if (t.tags) {
+        t.tags.split(',').forEach(tag => {
+          const trimmed = tag.trim();
+          if (trimmed) allTags.add(trimmed);
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: Array.from(allTags).sort()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * PUT /api/email/templates/reorder
+ * Reorder templates by updating their sequence numbers
+ */
+router.put("/templates/reorder", async (req, res) => {
+  try {
+    const { tag, orderedIds } = req.body;
+
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+      return res.status(400).json({
+        success: false,
+        error: "orderedIds array is required",
+      });
+    }
+
+    // Update sequence_number for each template based on its position in the array
+    for (let i = 0; i < orderedIds.length; i++) {
+      const templateId = parseInt(orderedIds[i]);
+      const sequenceNumber = i + 1; // Start from 1
+
+      await db.run(
+        `UPDATE email_templates SET sequence_number = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [sequenceNumber, templateId]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `Reordered ${orderedIds.length} templates successfully`,
+    });
+  } catch (error) {
+    console.error("Template reorder error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/email/templates/:id
  * Get single template
  */
@@ -1332,45 +1404,6 @@ router.delete("/templates/:id", async (req, res) => {
 });
 
 /**
- * PUT /api/email/templates/reorder
- * Reorder templates by updating their sequence numbers
- */
-router.put("/templates/reorder", async (req, res) => {
-  try {
-    const { tag, orderedIds } = req.body;
-
-    if (!orderedIds || !Array.isArray(orderedIds)) {
-      return res.status(400).json({
-        success: false,
-        error: "orderedIds array is required",
-      });
-    }
-
-    // Update sequence_number for each template based on its position in the array
-    for (let i = 0; i < orderedIds.length; i++) {
-      const templateId = parseInt(orderedIds[i]);
-      const sequenceNumber = i + 1; // Start from 1
-
-      await db.run(
-        `UPDATE email_templates SET sequence_number = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-        [sequenceNumber, templateId]
-      );
-    }
-
-    res.json({
-      success: true,
-      message: `Reordered ${orderedIds.length} templates successfully`,
-    });
-  } catch (error) {
-    console.error("Template reorder error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-/**
  * GET /api/email/templates/by-tag/:tag
  * Get templates by tag
  */
@@ -1402,12 +1435,26 @@ router.post("/templates/ai/generate", async (req, res) => {
   try {
     const { description, category = "general" } = req.body;
 
+    // Validate input
     if (!description || description.trim() === "") {
       return res.status(400).json({
         success: false,
         error: "Description is required",
       });
     }
+
+    // Check if AI client is initialized
+    if (!aiClient) {
+      console.error('[AI] AI client not initialized');
+      return res.status(500).json({
+        success: false,
+        error: "AI client not initialized. Please check OPENROUTER_API_KEY in .env",
+        details: "Make sure OPENROUTER_API_KEY is set in .env file"
+      });
+    }
+
+    // Log request
+    console.log(`[AI] Generating email template with description: ${description.substring(0, 100)}...`);
 
     // Get max sequence number for naming
     const maxSeqResult = await db.get(
@@ -1444,12 +1491,36 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       { temperature: 0.7 }
     );
 
-    if (!response || !response.subject || !response.html_content) {
+    // Validate response with detailed error messages
+    if (!response) {
+      console.error('[AI] Client returned null response');
       return res.status(500).json({
         success: false,
-        error: "AI response missing required fields. Please try again.",
+        error: "AI client returned empty response. Please check your API key and try again.",
+        details: "Make sure OPENROUTER_API_KEY is set in .env file"
       });
     }
+
+    if (!response.subject || typeof response.subject !== 'string') {
+      console.error('[AI] Response missing or invalid subject:', response);
+      return res.status(500).json({
+        success: false,
+        error: "AI response missing valid subject line. Please try again.",
+        details: "AI response: " + JSON.stringify(response).substring(0, 200)
+      });
+    }
+
+    if (!response.html_content || typeof response.html_content !== 'string') {
+      console.error('[AI] Response missing or invalid html_content:', response);
+      return res.status(500).json({
+        success: false,
+        error: "AI response missing valid HTML content. Please try again.",
+        details: "AI response: " + JSON.stringify(response).substring(0, 200)
+      });
+    }
+
+    // Log success
+    console.log(`[AI] ✓ Generated email template: ${response.subject}`);
 
     res.json({
       success: true,
@@ -1461,10 +1532,34 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       },
     });
   } catch (error) {
-    console.error("AI template generation error:", error);
+    // Log full error for debugging
+    console.error('[AI] Template generation failed:', {
+      error: error.message,
+      stack: error.stack,
+      description: req.body.description?.substring(0, 100)
+    });
+
+    // Check for specific error types
+    if (error.message.includes('API key')) {
+      return res.status(500).json({
+        success: false,
+        error: "Invalid or missing OpenRouter API key",
+        details: "Please check OPENROUTER_API_KEY in your .env file"
+      });
+    }
+
+    if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+      return res.status(500).json({
+        success: false,
+        error: "AI request timed out. Please try again.",
+        details: "The AI service is taking too long to respond. Try a shorter description."
+      });
+    }
+
     res.status(500).json({
       success: false,
-      error: error.message || "AI generation failed. Please check your API key and try again.",
+      error: "Failed to generate template: " + error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -1717,10 +1812,15 @@ router.post("/campaigns", async (req, res) => {
 /**
  * Helper function to queue an email for a campaign
  */
+/**
+ * Queue a single email for a campaign
+ * FIXED: Now includes text_content field and proper status initialization
+ */
 async function queueEmailForCampaign(campaignId, contact, site, templateId) {
   try {
     let subject = "Hello from {{company}}";
     let htmlContent = "<p>Hello {{name}},</p><p>This is a test email.</p>";
+    let textContent = "Hello {{name}},\n\nThis is a test email.";
 
     if (templateId) {
       const template = await db.get(
@@ -1730,6 +1830,7 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
       if (template) {
         subject = template.subject;
         htmlContent = template.html_content;
+        textContent = template.text_content || textContent;
       }
     }
 
@@ -1739,17 +1840,36 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
     // Replace variables
     const finalSubject = replaceTemplateVariables(subject, siteData);
     const finalHtmlContent = replaceTemplateVariables(htmlContent, siteData);
+    const finalTextContent = replaceTemplateVariables(textContent, siteData);
 
     // Extract name from email
     const recipientName = extractNameFromEmail(contact.value);
 
-    await db.run(
-      `INSERT INTO email_queue (campaign_id, contact_id, recipient_email, recipient_name, subject, html_content, country_code)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [campaignId, contact.id, contact.value, recipientName, finalSubject, finalHtmlContent, site.country || 'in']
+    const result = await db.run(
+      `INSERT INTO email_queue (
+        campaign_id,
+        recipient_email, recipient_name,
+        subject, html_content, text_content,
+        country_code, status, created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued', CURRENT_TIMESTAMP)
+      RETURNING id`,
+      [
+        campaignId,
+        contact.value,
+        recipientName,
+        finalSubject,
+        finalHtmlContent,
+        finalTextContent,
+        site.country || 'in'
+      ]
     );
+
+    console.log(`✅ Queued email #${result.lastInsertId} for ${contact.value} (campaign: ${campaignId})`);
+    return result.lastInsertId;
   } catch (error) {
-    console.error("Error queuing email for campaign:", error);
+    console.error("❌ Error queuing email for campaign:", error);
+    throw error;
   }
 }
 
@@ -2102,31 +2222,92 @@ router.get("/send-log", async (req, res) => {
  */
 router.get("/queue/stats", async (req, res) => {
   try {
-    // Get queue status counts
+    // Use the worker's getStats() method which returns the expected structure
+    const stats = await emailQueueWorker.getStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /queue/detailed-stats
+ * Get detailed email queue statistics for a period
+ */
+router.get("/queue/detailed-stats", async (req, res) => {
+  try {
+    const { period = 'today', startDate, endDate } = req.query;
+
+    let dateFilter = '';
+    let params = [];
+
+    if (startDate && endDate) {
+      dateFilter = ` AND sent_at >= ? AND sent_at <= ?`;
+      params = [startDate, endDate];
+    } else if (period === 'today') {
+      dateFilter = ` AND DATE(sent_at) = CURRENT_DATE`;
+    } else if (period === 'week') {
+      dateFilter = ` AND sent_at >= NOW() - INTERVAL '7 days'`;
+    } else if (period === 'month') {
+      dateFilter = ` AND sent_at >= NOW() - INTERVAL '30 days'`;
+    }
+
+    // Get basic stats
     const stats = await db.get(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'queued') as queued,
-        COUNT(*) FILTER (WHERE status = 'sending') as sending,
+        COUNT(*) as total_sent,
         COUNT(*) FILTER (WHERE status = 'sent') as sent,
         COUNT(*) FILTER (WHERE status = 'failed') as failed,
-        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled
+        COUNT(*) FILTER (WHERE status = 'sent') as successful_deliveries
       FROM email_queue
-    `);
+      WHERE sent_at IS NOT NULL ${dateFilter}
+    `, params);
 
-    // Get counts by priority
-    const priorityStats = await db.get(`
+    // Get by template
+    const byTemplate = await db.all(`
       SELECT
-        COUNT(*) FILTER (WHERE scheduled_at IS NOT NULL AND scheduled_at <= NOW()) as ready_to_send,
-        COUNT(*) FILTER (WHERE scheduled_at IS NOT NULL AND scheduled_at > NOW()) as scheduled
-      FROM email_queue
+        et.name as template_name,
+        COUNT(*) as count,
+        COUNT(*) FILTER (WHERE status = 'sent') as sent,
+        COUNT(*) FILTER (WHERE status = 'failed') as failed
+      FROM email_queue eq
+      LEFT JOIN email_templates et ON eq.template_id = et.id
+      WHERE eq.sent_at IS NOT NULL ${dateFilter}
+      GROUP BY et.id, et.name
+      ORDER BY count DESC
+      LIMIT 10
+    `, params);
+
+    // Get hourly breakdown for today
+    let hourlyBreakdown = [];
+    if (period === 'today' || (!startDate && !endDate)) {
+      hourlyBreakdown = await db.all(`
+        SELECT
+          EXTRACT(HOUR FROM sent_at) as hour,
+          COUNT(*) as count,
+          COUNT(*) FILTER (WHERE status = 'sent') as sent,
+          COUNT(*) FILTER (WHERE status = 'failed') as failed
+        FROM email_queue
+        WHERE DATE(sent_at) = CURRENT_DATE
+        GROUP BY EXTRACT(HOUR FROM sent_at)
+        ORDER BY hour
       `);
+    }
 
     res.json({
       success: true,
       data: {
-        ...stats,
-        ...priorityStats,
-        totalQueued: stats.queued + stats.sending + stats.ready_to_send
+        period: startDate && endDate ? 'custom' : period,
+        stats: stats,
+        byTemplate,
+        hourlyBreakdown
       }
     });
   } catch (error) {
@@ -2134,6 +2315,589 @@ router.get("/queue/stats", async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+/**
+ * GET /contact/:id/history
+ * Get email history for a specific contact
+ */
+router.get('/contact/:id/history', async (req, res) => {
+  try {
+    const contactId = req.params.id;
+    const { limit = 50, offset = 0 } = req.query;
+
+    const history = await db.all(`
+      SELECT esl.*, et.name as template_name, ec.name as campaign_name
+      FROM email_send_log esl
+      LEFT JOIN email_templates et ON esl.template_id = et.id
+      LEFT JOIN email_campaigns ec ON esl.campaign_id = ec.id
+      WHERE esl.contact_id = ?
+      ORDER BY esl.sent_at DESC
+      LIMIT ? OFFSET ?
+    `, [contactId, limit, offset]);
+
+    const count = await db.get(`
+      SELECT COUNT(*) as total FROM email_send_log WHERE contact_id = ?
+    `, [contactId]);
+
+    res.json({
+      success: true,
+      data: history,
+      total: count.total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/add-by-tag
+ * Bulk queue emails by tag or specific contact IDs
+ * FIXED: Now supports both tag-based and contact_ids-based queuing
+ */
+router.post('/queue/add-by-tag', async (req, res) => {
+  try {
+    const { tag, template_id, campaign_id, contact_ids } = req.body;
+
+    if (!tag && !contact_ids) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either tag or contact_ids is required'
+      });
+    }
+
+    let contacts = [];
+
+    // If contact_ids provided, use those directly
+    if (contact_ids && Array.isArray(contact_ids) && contact_ids.length > 0) {
+      console.log(`📧 Processing ${contact_ids.length} specific contact IDs`);
+
+      // Create placeholders for PostgreSQL IN clause
+      const placeholders = contact_ids.map((_, i) => `$${i + 1}`).join(',');
+      contacts = await db.all(`
+        SELECT c.id, c.value, c.site_id, s.url, s.country
+        FROM contacts c
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE c.id IN (${placeholders}) AND c.type = 'email'
+      `, contact_ids);
+    } else if (tag) {
+      // Original tag-based logic
+      console.log(`📧 Processing contacts with tag: ${tag}`);
+
+      // Find sites with matching tag
+      const sites = await db.all(`
+        SELECT id, url, country FROM sites WHERE tags LIKE $1
+      `, [`%${tag}%`]);
+
+      if (sites.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No sites found with this tag',
+          queued: 0
+        });
+      }
+
+      // Get contacts from these sites with proper PostgreSQL syntax
+      const siteIds = sites.map(s => s.id);
+
+      // Build IN clause with proper placeholders
+      const sitePlaceholders = siteIds.map((_, i) => `$${i + 1}`).join(',');
+      contacts = await db.all(`
+        SELECT c.id, c.value, c.site_id, s.url, s.country
+        FROM contacts c
+        LEFT JOIN sites s ON c.site_id = s.id
+        WHERE c.site_id IN (${sitePlaceholders}) AND c.type = 'email'
+      `, siteIds);
+    }
+
+    if (contacts.length === 0) {
+      return res.json({
+        success: true,
+        message: contact_ids ? 'No valid email contacts found for given contact IDs' : 'No email contacts found for sites with this tag',
+        queued: 0
+      });
+    }
+
+    console.log(`✅ Found ${contacts.length} contacts to queue`);
+
+    // Get template if specified
+    let template = null;
+    if (template_id) {
+      template = await db.get(
+        `SELECT subject, html_content, text_content FROM email_templates WHERE id = $1`,
+        [template_id]
+      );
+    }
+
+    // Use default template if none specified
+    const subject = template?.subject || 'Hello from {{company}}';
+    const htmlContent = template?.html_content || '<p>Hello {{name}},</p><p>This is a test email.</p>';
+    const textContent = template?.text_content || 'Hello {{name}},\n\nThis is a test email.';
+
+    // Queue emails for each contact with all required fields
+    let queuedCount = 0;
+    const queuedIds = [];
+
+    for (const contact of contacts) {
+      try {
+        // Get site data for template replacement
+        const siteData = await getSiteDataForTemplate(contact.site_id, contact.value);
+
+        // Replace template variables
+        const finalSubject = replaceTemplateVariables(subject, siteData);
+        const finalHtmlContent = replaceTemplateVariables(htmlContent, siteData);
+        const finalTextContent = replaceTemplateVariables(textContent, siteData);
+
+        // Extract name from email
+        const recipientName = extractNameFromEmail(contact.value);
+
+        // Insert with required fields (matching actual schema)
+        const result = await db.run(`
+          INSERT INTO email_queue (
+            campaign_id,
+            recipient_email, recipient_name,
+            subject, html_content, text_content,
+            country_code, status, created_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued', CURRENT_TIMESTAMP)
+          RETURNING id
+        `, [
+          campaign_id,
+          contact.value,
+          recipientName,
+          finalSubject,
+          finalHtmlContent,
+          finalTextContent,
+          contact.country || 'in'
+        ]);
+
+        queuedCount++;
+        queuedIds.push(result.lastInsertId);
+
+        console.log(`✅ Queued email #${result.lastInsertId} for ${contact.value} (tag: ${tag || 'direct'})`);
+      } catch (err) {
+        // Skip duplicates or errors
+        console.error(`❌ Error queueing email for contact ${contact.id}:`, err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully queued ${queuedCount} emails`,
+      queued: queuedCount,
+      queue_ids: queuedIds
+    });
+  } catch (error) {
+    console.error('❌ Error in /queue/add-by-tag:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/bulk/pause
+ * Bulk pause queue items
+ */
+router.post('/queue/bulk/pause', async (req, res) => {
+  try {
+    // Handle both body and query parameters for flexibility
+    let ids;
+    if (req.body && req.body.ids) {
+      ids = req.body.ids;
+    } else if (req.query.ids) {
+      // Parse comma-separated IDs from query string
+      ids = req.query.ids.split(',').map(id => parseInt(id.trim()));
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required (send as body.ids or query string ?ids=1,2,3)'
+      });
+    }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required'
+      });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const result = await db.run(`
+      UPDATE email_queue SET status = 'paused' WHERE id IN (${placeholders})
+    `, ids);
+
+    res.json({
+      success: true,
+      message: `Paused ${result.changes} queue items`,
+      updated: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/bulk/resume
+ * Bulk resume queue items
+ */
+router.post('/queue/bulk/resume', async (req, res) => {
+  try {
+    // Handle both body and query parameters for flexibility
+    let ids;
+    if (req.body && req.body.ids) {
+      ids = req.body.ids;
+    } else if (req.query.ids) {
+      // Parse comma-separated IDs from query string
+      ids = req.query.ids.split(',').map(id => parseInt(id.trim()));
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required (send as body.ids or query string ?ids=1,2,3)'
+      });
+    }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required'
+      });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const result = await db.run(`
+      UPDATE email_queue SET status = 'queued' WHERE id IN (${placeholders})
+    `, ids);
+
+    res.json({
+      success: true,
+      message: `Resumed ${result.changes} queue items`,
+      updated: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/bulk/cancel
+ * Bulk cancel queue items
+ */
+router.post('/queue/bulk/cancel', async (req, res) => {
+  try {
+    // Handle both body and query parameters for flexibility
+    let ids;
+    if (req.body && req.body.ids) {
+      ids = req.body.ids;
+    } else if (req.query.ids) {
+      // Parse comma-separated IDs from query string
+      ids = req.query.ids.split(',').map(id => parseInt(id.trim()));
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required (send as body.ids or query string ?ids=1,2,3)'
+      });
+    }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required'
+      });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const result = await db.run(`
+      UPDATE email_queue SET status = 'cancelled' WHERE id IN (${placeholders})
+    `, ids);
+
+    res.json({
+      success: true,
+      message: `Cancelled ${result.changes} queue items`,
+      updated: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/bulk/retry-failed
+ * Bulk retry failed queue items
+ */
+router.post('/queue/bulk/retry-failed', async (req, res) => {
+  try {
+    // Handle both body and query parameters for flexibility
+    let ids;
+    if (req.body && req.body.ids) {
+      ids = req.body.ids;
+    } else if (req.query.ids) {
+      // Parse comma-separated IDs from query string
+      ids = req.query.ids.split(',').map(id => parseInt(id.trim()));
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required (send as body.ids or query string ?ids=1,2,3)'
+      });
+    }
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'IDs array is required'
+      });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+    const result = await db.run(`
+      UPDATE email_queue
+      SET status = 'queued', error_message = NULL, attempt_count = 0
+      WHERE id IN (${placeholders})
+    `, ids);
+
+    res.json({
+      success: true,
+      message: `Retried ${result.changes} queue items`,
+      updated: result.changes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /queue/history
+ * Get queue history with filters
+ */
+router.get('/queue/history', async (req, res) => {
+  try {
+    const { status, template_id, campaign_id, limit = 50, offset = 0 } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (status) {
+      whereClause += ' AND esl.status = ?';
+      params.push(status);
+    }
+
+    if (template_id) {
+      whereClause += ' AND esl.template_id = ?';
+      params.push(template_id);
+    }
+
+    if (campaign_id) {
+      whereClause += ' AND esl.campaign_id = ?';
+      params.push(campaign_id);
+    }
+
+    params.push(parseInt(limit));
+    params.push(parseInt(offset));
+
+    const history = await db.all(`
+      SELECT esl.*,
+             et.name as template_name,
+             ec.name as campaign_name,
+             es.from_name as sender_name
+      FROM email_send_log esl
+      LEFT JOIN email_templates et ON esl.template_id = et.id
+      LEFT JOIN email_campaigns ec ON esl.campaign_id = ec.id
+      LEFT JOIN email_senders es ON esl.sender_id = es.id
+      ${whereClause}
+      ORDER BY esl.sent_at DESC
+      LIMIT ? OFFSET ?
+    `, params);
+
+    // Get total count
+    const countParams = params.slice(0, -2);
+    const count = await db.get(`
+      SELECT COUNT(*) as total FROM email_send_log esl ${whereClause}
+    `, countParams);
+
+    res.json({
+      success: true,
+      data: history,
+      total: count.total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /senders/:id/test
+ * Test email sender
+ */
+router.post('/senders/:id/test', async (req, res) => {
+  try {
+    const senderId = req.params.id;
+    const { test_email } = req.body;
+
+    // Get sender
+    const sender = await db.get(`
+      SELECT * FROM email_senders WHERE id = ?
+    `, [senderId]);
+
+    if (!sender) {
+      return res.status(404).json({
+        success: false,
+        error: 'Sender not found'
+      });
+    }
+
+    // Use provided test email or sender's email
+    const toEmail = test_email || sender.email;
+
+    // Create nodemailer transporter
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: sender.smtp_host,
+      port: sender.smtp_port,
+      secure: sender.smtp_secure === 1,
+      auth: {
+        user: sender.smtp_user,
+        pass: sender.smtp_password
+      }
+    });
+
+    // Send test email
+    const info = await transporter.sendMail({
+      from: `${sender.from_name} <${sender.email}>`,
+      to: toEmail,
+      subject: 'Test Email',
+      html: '<p>This is a test email from your email sender configuration.</p>'
+    });
+
+    res.json({
+      success: true,
+      message: 'Test email sent successfully',
+      messageId: info.messageId,
+      to: toEmail
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PATCH /templates/:id/toggle
+ * Toggle template active status
+ */
+router.patch('/templates/:id/toggle', async (req, res) => {
+  try {
+    const templateId = req.params.id;
+
+    // Get current status
+    const template = await db.get(`
+      SELECT is_active FROM email_templates WHERE id = ?
+    `, [templateId]);
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found'
+      });
+    }
+
+    // Toggle status
+    const newStatus = template.is_active === 1 ? 0 : 1;
+
+    await db.run(`
+      UPDATE email_templates SET is_active = ? WHERE id = ?
+    `, [newStatus, templateId]);
+
+    res.json({
+      success: true,
+      message: `Template ${newStatus === 1 ? 'activated' : 'deactivated'}`,
+      is_active: newStatus
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /templates/test
+ * Test email template
+ */
+router.post('/templates/test', async (req, res) => {
+  try {
+    const { template_id, test_email, variables = {} } = req.body;
+
+    if (!template_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Template ID is required'
+      });
+    }
+
+    // Get template
+    const template = await db.get(`
+      SELECT * FROM email_templates WHERE id = ?
+    `, [template_id]);
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found'
+      });
+    }
+
+    // Get active sender
+    const sender = await db.get(`
+      SELECT * FROM email_senders WHERE is_active = 1 LIMIT 1
+    `);
+
+    if (!sender) {
+      return res.status(400).json({
+        success: false,
+        error: 'No active email sender found'
+      });
+    }
+
+    // Replace variables in template
+    let htmlContent = template.html_content;
+    let subject = template.subject;
+
+    Object.keys(variables).forEach(key => {
+      const placeholder = `{{${key}}}`;
+      const value = variables[key];
+      htmlContent = htmlContent.replace(new RegExp(placeholder, 'g'), value);
+      subject = subject.replace(new RegExp(placeholder, 'g'), value);
+    });
+
+    // Create nodemailer transporter
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      host: sender.smtp_host,
+      port: sender.smtp_port,
+      secure: sender.smtp_secure === 1,
+      auth: {
+        user: sender.smtp_user,
+        pass: sender.smtp_password
+      }
+    });
+
+    // Send test email
+    const toEmail = test_email || sender.email;
+    const info = await transporter.sendMail({
+      from: `${sender.from_name} <${sender.email}>`,
+      to: toEmail,
+      subject: subject,
+      html: htmlContent
+    });
+
+    res.json({
+      success: true,
+      message: 'Test template email sent successfully',
+      messageId: info.messageId,
+      to: toEmail
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

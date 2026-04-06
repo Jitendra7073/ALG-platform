@@ -60,7 +60,21 @@
       "Bash(node -e \"try { const { all } = require\\('./src/database/database.js'\\); const countries = all\\('SELECT * FROM country_timezones LIMIT 1'\\); console.log\\('DB OK'\\); } catch\\(e\\) { console.log\\('DB Error:', e.message\\); } try { require\\('./src/services/email/timezone-scheduler.js'\\); console.log\\('Scheduler OK'\\); } catch\\(e\\) { console.log\\('Scheduler Error:', e.message\\); }\")",
       "Bash(node test-api-response.js)",
       "Bash(node -c \"src/services/email/timezone-scheduler.js\")",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(curl -s http://localhost:8080/api/email/senders)",
+      "Bash(curl -X PUT http://localhost:8080/api/email/senders/1 -H \"Content-Type: application/json\" -d '{\"name\":\"Test Update\"}')",
+      "Bash(curl -X GET http://localhost:8080/api/email/templates/tags)",
+      "Bash(curl -X PUT http://localhost:8080/api/email/templates/reorder -H \"Content-Type: application/json\" -d '{\"orderedIds\":[1,2]}')",
+      "Bash(curl -X POST http://localhost:8080/api/email/templates/ai/generate -H \"Content-Type: application/json\" -d '{\"description\":\"Test email template\"}')",
+      "Bash(curl -X GET http://localhost:8080/api/email/templates/1)",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('public/index.html', 'utf8'\\); console.log\\('File is valid JavaScript/HTML - size:', content.length, 'characters'\\);\")",
+      "Bash(node -c \"src/services/email/email-senders-templates-api.js\")",
+      "Bash(node -c \"c:\\\\Users\\\\EnactOn Technologies\\\\Desktop\\\\ALG-platform\\\\src\\\\services\\\\email\\\\email-senders-templates-api.js\")",
+      "Bash(node -e \"const db = require\\('./src/database/database.js'\\); \\(async \\(\\) => { try { const result = await db.all\\('SELECT * FROM linkedin_credentials'\\); console.log\\('Result type:', typeof result\\); console.log\\('Is array:', Array.isArray\\(result\\)\\); console.log\\('Result:', result\\); } catch\\(e\\) { console.error\\('Error:', e\\); } }\\)\\(\\);\")",
+      "Bash(node -e \"const { Pool } = require\\('pg'\\); const pool = new Pool\\({ connectionString: process.env.DATABASE_URL || 'postgresql://localhost:5432/wordpress_leads' }\\); \\(async \\(\\) => { try { const result = await pool.query\\('SELECT column_name FROM information_schema.columns WHERE table_name = \\\\'email_send_log\\\\' AND column_name = \\\\'sender_id\\\\''\\); console.log\\('sender_id exists:', result.rows.length > 0\\); if \\(result.rows.length === 0\\) { console.log\\('Adding sender_id column...'\\); await pool.query\\('ALTER TABLE email_send_log ADD COLUMN sender_id INTEGER'\\); console.log\\('✓ sender_id column added'\\); } else { console.log\\('✓ sender_id column already exists'\\); } } catch\\(e\\) { console.error\\('Error:', e.message\\); } finally { await pool.end\\(\\); } }\\)\\(\\);\")",
+      "Bash(node test-email-system.js)",
+      "Bash(node -c \"public/index.html\")",
+      "Bash(pkill -f \"node.*server.js\")"
     ]
   }
 }

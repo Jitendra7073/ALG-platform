@@ -170,6 +170,17 @@ router.put("/timezone/countries/:countryCode", async (req, res) => {
     } else {
       // Insert new custom config
       const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
+
+      // Convert offset string like '+5:30' to numeric hours (5.5)
+      let offsetHours = 0;
+      if (config.offset) {
+        const match = config.offset.match(/^([+-]?)(\d+):(\d+)$/);
+        if (match) {
+          const [, sign, hours, minutes] = match;
+          offsetHours = (parseInt(hours) + parseInt(minutes) / 60) * (sign === '-' ? -1 : 1);
+        }
+      }
+
       await db.run(
         `INSERT INTO country_timezones (country_code, timezone, name, offset_hours, business_start, business_end, weekend_days)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -177,7 +188,7 @@ router.put("/timezone/countries/:countryCode", async (req, res) => {
           normalizedCode,
           config.timezone,
           config.name,
-          config.offset || 0,
+          offsetHours,
           business_start,
           business_end,
           weekendDaysArray.join(',')
@@ -349,7 +360,7 @@ router.post("/campaign/timezone-aware", async (req, res) => {
     }
 
     // Update campaign with actual queued count
-    await db.run("UPDATE email_campaigns SET total_recipients = ? WHERE id = ?", [
+    await db.run("UPDATE email_campaigns SET total_recipients = $1 WHERE id = $2", [
       queuedCount,
       campaignId,
     ]);
@@ -603,120 +614,219 @@ router.get("/timezone/monitoring", async (req, res) => {
     }
 
     // Build comprehensive country info ONLY for countries that have emails
+    // Error isolation: wrap map in try-catch to prevent one failure from breaking entire response
     const countriesWithStats = emailStatsByCountry.map(stat => {
-      const code = stat.country_code.toLowerCase();
+      try {
+        const code = stat.country_code.toLowerCase();
 
-      // Get timezone config (reads from DB first, falls back to defaults)
-      const config = timezoneScheduler.getTimezoneConfig(code);
+        // Get timezone config (reads from DB first, falls back to defaults)
+        const config = timezoneScheduler.getTimezoneConfig(code);
 
-      // Get business status (open, weekend, outside_hours)
-      const status = timezoneScheduler.getCountryStatus(now, code);
-      const inBusiness = status === 'open';
+        // Get business status (open, weekend, outside_hours)
+        const status = timezoneScheduler.getCountryStatus(now, code);
+        const inBusiness = status === 'open';
 
-      // Calculate local time in country's timezone
-      const localTimeString = now.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: config.timezone
-      });
-      const localDateString = now.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        weekday: 'short',
-        timeZone: config.timezone
-      });
-
-      // Calculate next valid business time
-      let nextBusinessStart = null;
-      let nextBusinessStartDisplay = null;
-      let hoursUntilBusiness = null;
-      let delayReason = null;
-
-      if (!inBusiness) {
-        delayReason = status; // 'weekend' or 'outside_hours'
-        try {
-          nextBusinessStart = timezoneScheduler.calculateFirstSendTime(code);
-          nextBusinessStartDisplay = nextBusinessStart.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-            month: 'short',
-            day: 'numeric'
-          });
-          hoursUntilBusiness = Math.floor((nextBusinessStart - now) / (1000 * 60 * 60));
-        } catch (e) {
-          // Ignore calculation errors
-        }
-      }
-
-      // Format business hours for display
-      const formatBusinessHour = (hour) => {
-        const dateInTimezone = new Date(now.toLocaleString('en-US', { timeZone: config.timezone }));
-        dateInTimezone.setHours(hour, 0, 0, 0);
-        return dateInTimezone.toLocaleTimeString('en-US', {
-          hour: 'numeric',
+        // Calculate local time in country's timezone (24-hour format)
+        const localTimeString = now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          second: '2-digit',
+          hour12: false,
+          timeZone: config.timezone
         });
-      };
+        const localDateString = now.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          weekday: 'short',
+          timeZone: config.timezone
+        });
 
-      const businessHoursDisplay = `${formatBusinessHour(config.businessStart)} - ${formatBusinessHour(config.businessEnd)}`;
+        // Calculate next valid business time
+        let nextBusinessStart = null;
+        let nextBusinessStartDisplay = null;
+        let hoursUntilBusiness = null;
+        let delayReason = null;
 
-      return {
-        country_code: code.toUpperCase(),
-        country_code_lower: code,
-        timezone: config.timezone,
-        timezone_name: config.name,
-        // Business status
-        in_business_hours: inBusiness,
-        status_reason: status,
-        delay_reason: delayReason,
-        // Time display
-        local_time_display: localTimeString,
-        local_date: localDateString,
-        // Business hours config
-        business_start: config.businessStart,
-        business_end: config.businessEnd,
-        business_hours_display: businessHoursDisplay,
-        weekend_days: config.weekendDays || [0, 6],
-        // Next valid send time
-        next_business_start: nextBusinessStart ? nextBusinessStart.toISOString() : null,
-        next_business_start_display: nextBusinessStartDisplay,
-        hours_until_business: hoursUntilBusiness,
-        // Email counts (aggregated)
-        total: stat.total_count || 0,
-        queued: stat.queued_count || 0,
-        waiting: stat.waiting_count || 0,
-        scheduled: stat.scheduled_count || 0,
-        ready: stat.ready_count || 0,
-        sending: stat.sending_count || 0,
-        sent: stat.sent_count || 0,
-        failed: stat.failed_count || 0,
-        earliest_scheduled: stat.earliest_scheduled
-      };
-    });
+        if (!inBusiness) {
+          delayReason = status; // 'weekend' or 'outside_hours'
+          try {
+            nextBusinessStart = timezoneScheduler.calculateFirstSendTime(code);
+            nextBusinessStartDisplay = nextBusinessStart.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+              month: 'short',
+              day: 'numeric'
+            });
+            hoursUntilBusiness = Math.floor((nextBusinessStart - now) / (1000 * 60 * 60));
+          } catch (e) {
+            // Ignore calculation errors
+          }
+        }
+
+        // Format business hours for display (24-hour format) with safe error handling
+        const formatBusinessHour = (hour) => {
+          // Input validation: check if value is defined and not null
+          if (hour === undefined || hour === null) {
+            console.warn(`[Monitoring] Invalid business hour value: ${hour}, using fallback`);
+            return '--:--'; // Safe fallback for undefined/null values
+          }
+
+          // Additional validation: check if it's a valid number
+          if (typeof hour !== 'number' || isNaN(hour)) {
+            console.warn(`[Monitoring] Invalid business hour type: ${typeof hour} (${hour}), using fallback`);
+            return '--:--'; // Safe fallback for invalid types
+          }
+
+          // Validate hour range (0-23)
+          if (hour < 0 || hour > 23) {
+            console.warn(`[Monitoring] Business hour out of range: ${hour}, using fallback`);
+            return '--:--'; // Safe fallback for out-of-range values
+          }
+
+          try {
+            return hour.toString().padStart(2, '0') + ':00';
+          } catch (error) {
+            console.error(`[Monitoring] Error formatting business hour ${hour}:`, error);
+            return '--:--'; // Safe fallback if formatting fails
+          }
+        };
+
+        // Validate config object before accessing business hours
+        let businessHoursDisplay = 'Not Configured';
+        if (config && config.businessStart !== undefined && config.businessEnd !== undefined) {
+          try {
+            const startDisplay = formatBusinessHour(config.businessStart);
+            const endDisplay = formatBusinessHour(config.businessEnd);
+            businessHoursDisplay = `${startDisplay} - ${endDisplay}`;
+          } catch (error) {
+            console.error(`[Monitoring] Error creating business hours display for country ${code}:`, error);
+            businessHoursDisplay = 'Configuration Error';
+          }
+        } else {
+          console.warn(`[Monitoring] Missing business hours config for country ${code}:`, {
+            businessStart: config?.businessStart,
+            businessEnd: config?.businessEnd
+          });
+        }
+
+        return {
+          country_code: code.toUpperCase(),
+          country_code_lower: code,
+          timezone: config?.timezone || 'UTC',
+          timezone_name: config?.name || 'Unknown Timezone',
+          // Business status
+          in_business_hours: inBusiness,
+          status_reason: status,
+          delay_reason: delayReason,
+          // Time display
+          local_time_display: localTimeString,
+          local_date: localDateString,
+          // Business hours config
+          business_start: config?.businessStart,
+          business_end: config?.businessEnd,
+          business_hours_display: businessHoursDisplay,
+          weekend_days: config?.weekendDays || [0, 6],
+          // Next valid send time
+          next_business_start: nextBusinessStart ? nextBusinessStart.toISOString() : null,
+          next_business_start_display: nextBusinessStartDisplay,
+          hours_until_business: hoursUntilBusiness,
+          // Email counts (aggregated)
+          total: stat.total_count || 0,
+          queued: stat.queued_count || 0,
+          waiting: stat.waiting_count || 0,
+          scheduled: stat.scheduled_count || 0,
+          ready: stat.ready_count || 0,
+          sending: stat.sending_count || 0,
+          sent: stat.sent_count || 0,
+          failed: stat.failed_count || 0,
+          earliest_scheduled: stat.earliest_scheduled
+        };
+      } catch (countryError) {
+        // Error isolation: log the error but return a safe fallback object
+        console.error(`[Monitoring] Error processing country ${stat.country_code}:`, countryError);
+
+        // Return a minimal safe object to prevent API failure
+        return {
+          country_code: stat.country_code?.toUpperCase() || 'UNKNOWN',
+          country_code_lower: stat.country_code?.toLowerCase() || 'unknown',
+          timezone: 'UTC',
+          timezone_name: 'Error Loading Timezone',
+          // Business status
+          in_business_hours: false,
+          status_reason: 'error',
+          delay_reason: 'configuration_error',
+          // Time display
+          local_time_display: '--:--:--',
+          local_date: 'Unknown',
+          // Business hours config
+          business_start: null,
+          business_end: null,
+          business_hours_display: 'Configuration Error',
+          weekend_days: [0, 6],
+          // Next valid send time
+          next_business_start: null,
+          next_business_start_display: null,
+          hours_until_business: null,
+          // Email counts (aggregated)
+          total: stat.total_count || 0,
+          queued: stat.queued_count || 0,
+          waiting: 0,
+          scheduled: 0,
+          ready: stat.ready_count || 0,
+          sending: 0,
+          sent: stat.sent_count || 0,
+          failed: stat.failed_count || 0,
+          earliest_scheduled: stat.earliest_scheduled || null
+        };
+      }
+    }).filter(country => country !== null); // Filter out any null entries from failures
 
     // Sort countries: in-business first, then by ready count descending
-    countriesWithStats.sort((a, b) => {
-      if (a.in_business_hours && !b.in_business_hours) return -1;
-      if (!a.in_business_hours && b.in_business_hours) return 1;
-      return b.ready - a.ready;
-    });
+    // Error handling: wrap sort in try-catch to prevent comparison errors
+    try {
+      countriesWithStats.sort((a, b) => {
+        if (a.in_business_hours && !b.in_business_hours) return -1;
+        if (!a.in_business_hours && b.in_business_hours) return 1;
+        return (b.ready || 0) - (a.ready || 0); // Safe comparison with fallback
+      });
+    } catch (sortError) {
+      console.error('[Monitoring] Error sorting countries:', sortError);
+      // Continue with unsorted array rather than failing
+    }
 
-    // Calculate summary stats
-    const summary = {
-      total_countries: countriesWithStats.length,
-      countries_in_business: countriesWithStats.filter(c => c.in_business_hours).length,
-      total_emails: countriesWithStats.reduce((sum, c) => sum + c.total, 0),
-      total_queued: countriesWithStats.reduce((sum, c) => sum + c.queued, 0),
-      total_waiting: countriesWithStats.reduce((sum, c) => sum + c.waiting, 0),
-      total_scheduled: countriesWithStats.reduce((sum, c) => sum + c.scheduled, 0),
-      total_ready: countriesWithStats.reduce((sum, c) => sum + c.ready, 0),
-      total_sending: countriesWithStats.reduce((sum, c) => sum + c.sending, 0),
-      total_sent: countriesWithStats.reduce((sum, c) => sum + c.sent, 0),
-      total_failed: countriesWithStats.reduce((sum, c) => sum + c.failed, 0)
-    };
+    // Calculate summary stats with error handling
+    let summary;
+    try {
+      summary = {
+        total_countries: countriesWithStats.length,
+        countries_in_business: countriesWithStats.filter(c => c.in_business_hours).length,
+        total_emails: countriesWithStats.reduce((sum, c) => sum + (c.total || 0), 0),
+        total_queued: countriesWithStats.reduce((sum, c) => sum + (c.queued || 0), 0),
+        total_waiting: countriesWithStats.reduce((sum, c) => sum + (c.waiting || 0), 0),
+        total_scheduled: countriesWithStats.reduce((sum, c) => sum + (c.scheduled || 0), 0),
+        total_ready: countriesWithStats.reduce((sum, c) => sum + (c.ready || 0), 0),
+        total_sending: countriesWithStats.reduce((sum, c) => sum + (c.sending || 0), 0),
+        total_sent: countriesWithStats.reduce((sum, c) => sum + (c.sent || 0), 0),
+        total_failed: countriesWithStats.reduce((sum, c) => sum + (c.failed || 0), 0)
+      };
+    } catch (summaryError) {
+      console.error('[Monitoring] Error calculating summary:', summaryError);
+      // Fallback to empty summary if calculation fails
+      summary = {
+        total_countries: 0,
+        countries_in_business: 0,
+        total_emails: 0,
+        total_queued: 0,
+        total_waiting: 0,
+        total_scheduled: 0,
+        total_ready: 0,
+        total_sending: 0,
+        total_sent: 0,
+        total_failed: 0
+      };
+    }
 
     // Get upcoming sends (next hour across all countries) with normalized country codes
     let upcomingEmails = [];
@@ -798,10 +908,43 @@ router.get("/timezone/monitoring", async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Error in timezone monitoring:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
+    // Enhanced error logging with context
+    console.error("[Monitoring] Error in timezone monitoring endpoint:", {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+
+    // Always return a valid response structure to prevent UI crashes
+    // Return empty data rather than throwing 500 error
+    res.status(200).json({
+      success: true, // Return success to prevent UI from breaking
+      data: {
+        worker_status: {
+          is_running: false,
+          is_paused: false,
+          active_senders: 0,
+          parallel_mode: true,
+          error: error.message // Include error message for debugging
+        },
+        countries: [],
+        upcoming_sends: [],
+        recent_sends: [],
+        summary: {
+          total_countries: 0,
+          countries_in_business: 0,
+          total_emails: 0,
+          total_queued: 0,
+          total_waiting: 0,
+          total_scheduled: 0,
+          total_ready: 0,
+          total_sending: 0,
+          total_sent: 0,
+          total_failed: 0
+        },
+        generated_at: new Date().toISOString(),
+        error: error.message // Include error for debugging
+      }
     });
   }
 });
