@@ -20,8 +20,11 @@ const logger = require("../utils/logger"); // Compact logger
 const systemLogger = require("../utils/system-logger.js"); // System logger for UI logs (has getFormattedLogs)
 
 const app = express();
-const PORT = 8080;
-const userDataDir = "C:\\automation_chrome";
+const PORT = process.env.PORT || 8080;
+
+// Export for Vercel deployment
+apiServer = app;
+const userDataDir = process.env.CHROME_USER_DATA_DIR || (process.platform === 'win32' ? 'C:\\automation_chrome' : '/tmp/automation_chrome');
 
 // NOTE: Workers will be started AFTER database pool initialization (see bottom of file)
 
@@ -3594,7 +3597,10 @@ async function startServer() {
     await initializeCountryTimezonesTable();
 
     // Step 4: Start background workers
-    aiWorker.start();
+    // Skip background workers in Vercel
+    const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV;
+    if (!isVercel) {
+      aiWorker.start();
     aiRetryManager.start();
     emailQueueWorker.start();
 
@@ -3612,5 +3618,19 @@ async function startServer() {
   }
 }
 
-// Auto-start the server
-startServer();
+// ============================================
+// VERCEL DEPLOYMENT SUPPORT
+// ============================================
+
+// Check if running in Vercel serverless environment
+const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production' && process.env.VERCEL_ENV;
+
+if (isVercel) {
+  // Vercel deployment: Export app for serverless functions
+  console.log('🚀 Running in Vercel environment - Exporting Express app');
+  module.exports = apiServer;
+} else {
+  // Local development: Auto-start the server
+  console.log('💻 Running in local development mode - Auto-starting server');
+  startServer();
+}
