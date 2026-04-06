@@ -154,30 +154,15 @@ class AIProcessor {
    */
   start() {
     if (this.isRunning) {
-      logger.warning("AI Processor already running");
-      return;
+      return; // Silent return
     }
 
     if (!aiClient.isConfigured()) {
-      logger.error(
-        "AI Processor: OPENROUTER_API_KEY not set. Worker disabled.",
-      );
-      return;
+      return; // Silent return - no API key
     }
 
     this.isRunning = true;
-    logger.system("AI Processor started");
-    logger.ai(`Model: ${aiClient.getStats().model}`);
-    logger.ai(`Poll Interval: ${POLL_INTERVAL_MS / 1000}s`);
-    logger.ai(`Batch Size: ${BATCH_SIZE}`);
-
-    // Check backlog immediately on start
-    const pending = this.getPendingCount();
-    if (pending > 0) {
-      logger.ai(`Found ${pending} WordPress sites pending AI verification`);
-    } else {
-      logger.ai("No pending sites. Watching for new scrapes...");
-    }
+    // Silent start - no console spam
 
     // Start polling loop
     this.startPolling();
@@ -205,19 +190,16 @@ class AIProcessor {
 
     // Skip if already processing a batch (conflict prevention)
     if (this.isProcessing) {
-      console.log("     Skipping poll - batch still processing");
-      return;
+      return; // Silent skip
     }
 
     this.stats.lastPollAt = new Date().toISOString();
     const pendingCount = this.getPendingCount();
 
     if (pendingCount === 0) {
-      // Silent - don't log when nothing to do
-      return;
+      return; // Silent - no work to do
     }
 
-    console.log(`\n🔍 Poll: Found ${pendingCount} pending sites`);
     await this.processBatch();
   }
 
@@ -236,7 +218,7 @@ class AIProcessor {
         return;
       }
 
-      logger.ai(`Processing batch of ${pendingSites.length} sites...`);
+      // Silent batch processing
 
       for (const site of pendingSites) {
         if (!this.isRunning) break;
@@ -247,18 +229,8 @@ class AIProcessor {
       }
 
       this.stats.lastProcessedAt = new Date().toISOString();
-
-      // Check if more sites are waiting
-      const remaining = this.getPendingCount();
-      if (remaining > 0) {
-        console.log(
-          `   📋 ${remaining} more sites pending - will process next poll`,
-        );
-      } else {
-        console.log("   ✓ All pending sites processed");
-      }
     } catch (error) {
-      console.error(" AI Processor batch error:", error.message);
+      // Silent error handling
     } finally {
       this.isProcessing = false;
     }
@@ -275,18 +247,14 @@ class AIProcessor {
       clearInterval(this.pollIntervalId);
       this.pollIntervalId = null;
     }
-
-    logger.system("AI Processor stopped");
-    this.printStats();
+    // Silent stop
   }
 
   /**
    * Print processing statistics
    */
   printStats() {
-    logger.ai(
-      `Processor Stats - Total: ${this.stats.totalProcessed}, Relevant: ${this.stats.relevant}, Not Relevant: ${this.stats.notRelevant}, Failed: ${this.stats.failed}`,
-    );
+    // Silent stats - only available via API
   }
 
   /**
@@ -403,8 +371,6 @@ class AIProcessor {
     const startTime = Date.now();
 
     try {
-      process.stdout.write(`   → [${site.id}] ${this.truncateUrl(site.url)} `);
-
       // Pre-AI keyword validation: Check if keyword appears in page metadata
       const keywordValidated = this.validateKeywordPresence(site);
 
@@ -444,8 +410,6 @@ class AIProcessor {
 
         this.stats.totalProcessed++;
         this.stats.notRelevant++;
-
-        console.log(`⚡ FILTERED (${keywordValidated.reason})`);
         return;
       }
 
@@ -487,45 +451,8 @@ class AIProcessor {
       } else {
         this.stats.notRelevant++;
       }
-
-      // Log result with WordPress verification and content relevance
-      const wpIcon = result.wordpressVerification?.isWordPress
-        ? " WP"
-        : "🔴 Not WP";
-      const wpConfidence = result.wordpressVerification?.confidence || "medium";
-      const relevantIcon = result.contentRelevance?.isRelevant ? "" : "⚠️";
-      const category = result.contentRelevance?.actualCategory || "Unknown";
-
-      if (result.contentRelevance?.isRelevant) {
-        logger.success(
-          `[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} (${elapsed}ms)`,
-        );
-      } else {
-        logger.warning(
-          `[${site.id}] ${wpIcon} (${wpConfidence}) | ${category} - Not relevant (${elapsed}ms)`,
-        );
-      }
-
-      // Log WordPress indicators if not WordPress
-      if (
-        !result.wordpressVerification?.isWordPress &&
-        result.wordpressVerification?.indicators?.length > 0
-      ) {
-        logger.ai(
-          `↳ WP Indicators: ${result.wordpressVerification.indicators[0]}`,
-        );
-      }
-
-      // Log mismatch reason if not relevant
-      if (
-        !result.contentRelevance?.isRelevant &&
-        result.contentRelevance?.mismatchReason
-      ) {
-        logger.ai(`↳ ${result.contentRelevance.mismatchReason}`);
-      }
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      logger.error(`[${site.id}] Failed: ${error.message}`);
       this.stats.totalProcessed++;
       this.stats.failed++;
       this.updateSiteStatus(site.id, "failed", error.message);

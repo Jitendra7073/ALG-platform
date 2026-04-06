@@ -60,7 +60,24 @@
       "Bash(node -e \"try { const { all } = require\\('./src/database/database.js'\\); const countries = all\\('SELECT * FROM country_timezones LIMIT 1'\\); console.log\\('DB OK'\\); } catch\\(e\\) { console.log\\('DB Error:', e.message\\); } try { require\\('./src/services/email/timezone-scheduler.js'\\); console.log\\('Scheduler OK'\\); } catch\\(e\\) { console.log\\('Scheduler Error:', e.message\\); }\")",
       "Bash(node test-api-response.js)",
       "Bash(node -c \"src/services/email/timezone-scheduler.js\")",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(npx create-next-app@latest email-system --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --use-npm)",
+      "Bash(npx shadcn@latest init -y -d)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest add card table dialog input label select textarea dropdown-menu toast badge avatar separator scroll-area tabs switch alert form checkbox -y)",
+      "Bash(npx shadcn@latest add card table dialog input label select textarea dropdown-menu sonner badge avatar separator scroll-area tabs switch alert form checkbox -y)",
+      "Bash(npx shadcn@latest add command popover tooltip -y)",
+      "Bash(npx shadcn@latest add skeleton -y)",
+      "Bash(npx shadcn@latest add progress -y)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker compose:*)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(grep -r \"from '../lib'\" *.ts */*.ts)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(rm:*)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s http://localhost:3002/api/health)"
     ]
   }
 }

@@ -124,8 +124,7 @@ function getTimezoneConfig(countryCode) {
       };
     }
   } catch (error) {
-    // If database query fails, use default config
-    console.debug('Could not fetch custom timezone config from database:', error.message);
+    // Silently use default config if database query fails
   }
 
   return defaultConfig;

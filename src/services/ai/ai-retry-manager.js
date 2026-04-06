@@ -34,15 +34,11 @@ class AIRetryManager {
    */
   start() {
     if (this.isRunning) {
-      logger.warning("AI Retry Manager already running");
-      return;
+      return; // Silent return
     }
 
     this.isRunning = true;
-    logger.system("AI Retry Manager started");
-    logger.retry(`Check Interval: ${this.checkIntervalMs / 1000}s`);
-    logger.retry(`Processing Timeout: ${this.processingTimeoutMs / 1000}s`);
-    logger.retry(`Max Retry Attempts: ${this.maxRetryAttempts}`);
+    // Silent start - no console spam
 
     // Check immediately on start
     this.checkAndRetryStuckSites();
@@ -64,9 +60,7 @@ class AIRetryManager {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-
-    console.log(" AI Retry Manager: Stopped");
-    this.printStats();
+    // Silent stop
   }
 
   /**
@@ -82,39 +76,23 @@ class AIRetryManager {
       // Check for sites stuck in "processing" status
       const stuckProcessingSites = this.findStuckProcessingSites();
       if (stuckProcessingSites.length > 0) {
-        logger.retry(
-          `Found ${stuckProcessingSites.length} sites stuck in "processing" status`,
-        );
         await this.handleStuckProcessingSites(stuckProcessingSites);
       }
 
       // Check for failed sites that can be retried
       const retryableFailedSites = this.findRetryableFailedSites();
       if (retryableFailedSites.length > 0) {
-        logger.retry(
-          `Found ${retryableFailedSites.length} failed sites eligible for retry`,
-        );
         await this.retryFailedSites(retryableFailedSites);
       }
 
       // Check for very old pending sites
       const oldPendingSites = this.findOldPendingSites();
       if (oldPendingSites.length > 0) {
-        logger.retry(
-          `Found ${oldPendingSites.length} pending sites that were never processed`,
-        );
         await this.handleOldPendingSites(oldPendingSites);
       }
-
-      if (
-        stuckProcessingSites.length === 0 &&
-        retryableFailedSites.length === 0 &&
-        oldPendingSites.length === 0
-      ) {
-        // Silent - no issues found
-      }
+      // Silent - no issues found or handled
     } catch (error) {
-      console.error(" AI Retry Manager error:", error.message);
+      // Silent error handling
     }
   }
 
@@ -209,10 +187,6 @@ class AIRetryManager {
     const database = db.initDatabase();
     try {
       for (const site of sites) {
-        console.log(
-          `    Resetting stuck site [${site.id}] ${this.truncateUrl(site.url)}`,
-        );
-
         // Reset to pending for retry
         database
           .prepare(
@@ -229,8 +203,7 @@ class AIRetryManager {
         this.stats.stuckSitesFound++;
         this.stats.sitesRequeued++;
       }
-
-      console.log(`    Reset ${sites.length} stuck sites to pending`);
+      // Silent handling
     } finally {
       database.close();
     }
@@ -247,16 +220,9 @@ class AIRetryManager {
         const newRetryCount = currentRetryCount + 1;
 
         if (newRetryCount > this.maxRetryAttempts) {
-          console.log(
-            `   ⏭️  Giving up on [${site.id}] after ${this.maxRetryAttempts} attempts`,
-          );
           this.stats.sitesGivenUp++;
           continue;
         }
-
-        console.log(
-          `    Retrying [${site.id}] (attempt ${newRetryCount}/${this.maxRetryAttempts}) - ${this.truncateUrl(site.url)}`,
-        );
 
         // Reset to pending for retry
         database
@@ -275,8 +241,7 @@ class AIRetryManager {
 
         this.stats.sitesRequeued++;
       }
-
-      console.log(`    Re-queued ${sites.length} failed sites`);
+      // Silent handling
     } finally {
       database.close();
     }
@@ -288,8 +253,6 @@ class AIRetryManager {
   async handleOldPendingSites(sites) {
     const database = db.initDatabase();
     try {
-      console.log(`    Re-queuing ${sites.length} old pending sites...`);
-
       for (const site of sites) {
         // Update last_retried_at to prevent immediate re-processing
         database
@@ -304,10 +267,7 @@ class AIRetryManager {
 
         this.stats.sitesRequeued++;
       }
-
-      console.log(
-        `    Marked ${sites.length} old pending sites for re-processing`,
-      );
+      // Silent handling
     } finally {
       database.close();
     }
@@ -391,19 +351,7 @@ class AIRetryManager {
    * Print statistics
    */
   printStats() {
-    console.log("\n AI Retry Manager Stats:");
-    console.log(`   Total Checks: ${this.stats.totalChecks}`);
-    console.log(`   Stuck Sites Found: ${this.stats.stuckSitesFound}`);
-    console.log(`   Sites Re-queued: ${this.stats.sitesRequeued}`);
-    console.log(`   Sites Given Up: ${this.stats.sitesGivenUp}`);
-    console.log(`   Last Check: ${this.stats.lastCheckAt || "Never"}`);
-
-    const currentStats = this.getStuckSiteStats();
-    console.log("\n   Current Stuck Sites:");
-    console.log(`   - Stuck in Processing: ${currentStats.stuckInProcessing}`);
-    console.log(`   - Retryable Failed: ${currentStats.retryableFailed}`);
-    console.log(`   - Old Pending: ${currentStats.oldPending}`);
-    console.log(`   - Total Stuck: ${currentStats.totalStuck}`);
+    // Silent stats - only available via API
   }
 
   /**
@@ -434,7 +382,6 @@ class AIRetryManager {
           .get(siteId);
 
         if (!site) {
-          console.log(`   ⚠️  Site ${siteId} not found`);
           continue;
         }
 
@@ -454,13 +401,9 @@ class AIRetryManager {
           )
           .run(currentRetryCount, siteId);
 
-        console.log(
-          `    Re-queued site [${site.id}] ${this.truncateUrl(site.url)}`,
-        );
         requeued++;
       }
 
-      console.log(`\n Manually re-queued ${requeued} sites`);
       return requeued;
     } finally {
       database.close();

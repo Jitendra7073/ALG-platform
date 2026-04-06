@@ -5,12 +5,19 @@
  * Usage: node src/scripts/setup/setup-timezones.js
  */
 
-const db = require("../../database/database.js");
+const Database = require("better-sqlite3");
+const path = require("path");
+
+// Database file location (in project root)
+const DB_PATH = path.join(__dirname, "../../../wordpress-detector.db");
 
 console.log("Setting up country_timezones table...\n");
 
+// Get the raw database instance for transaction support
+const db = new Database(DB_PATH);
+
 // Create the table
-db.run(`
+db.exec(`
   CREATE TABLE IF NOT EXISTS country_timezones (
     country_code TEXT PRIMARY KEY,
     timezone TEXT NOT NULL,
@@ -105,11 +112,11 @@ insertMany(timezoneData);
 
 console.log(`✅ Inserted ${timezoneData.length} countries with timezone data`);
 console.log("\n📊 Sample data:");
-const sample = db.all(`
+const sample = db.prepare(`
   SELECT country_code, name, timezone, offset_hours
   FROM country_timezones
   LIMIT 5
-`);
+`).all();
 sample.forEach((row) => {
   console.log(`   ${row.country_code.toUpperCase()}: ${row.name} (${row.timezone}, UTC${row.offset_hours >= 0 ? '+' : ''}${row.offset_hours})`);
 });
@@ -119,3 +126,6 @@ console.log("\n💡 Usage:");
 console.log("   - Query: SELECT * FROM country_timezones WHERE country_code = 'in'");
 console.log("   - API: GET /api/email/timezone/countries");
 console.log("   - Stats: GET /api/email/timezone/stats\n");
+
+// Close database connection
+db.close();

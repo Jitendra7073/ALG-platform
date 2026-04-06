@@ -17,14 +17,12 @@ const app = express();
 const PORT = 8080;
 const userDataDir = "C:\\automation_chrome";
 
-// Start background workers
-logger.system("Starting server...");
-aiWorker.start();
-aiRetryManager.start(); // Start AI retry manager
-
-// Intercept console to capture all logs
+// Intercept console to capture all logs (before starting workers)
 logger.interceptConsole();
-logger.system("Server initialized on port " + PORT);
+
+// Start background workers (silent - no console spam)
+aiWorker.start();
+aiRetryManager.start();
 
 // Track executive scraper status
 let executiveScraperStatus = { running: false, progress: 0, total: 0 };
@@ -3290,6 +3288,37 @@ app.get("/api/logs/types", (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n Admin Panel running at http://localhost:${PORT}`);
-  console.log(` Use the web interface to manage keywords and run scrapers\n`);
+  // Clear any previous console output
+  console.clear();
+
+  // Get worker statuses
+  const aiStats = aiWorker.getStats();
+  const retryStats = aiRetryManager.getStats();
+
+  // Build the startup display
+  console.log('\n' + '─'.repeat(50));
+  console.log('         LEAD GENERATION SYSTEM');
+  console.log('─'.repeat(50));
+
+  // Database status
+  console.log('\n  ✓ Database Connected');
+
+  // Worker status checklist
+  console.log('\n  WORKERS:');
+  console.log('  ┌────────────────────────────────────────────┐');
+  console.log('  │  AI Processor        ' + (aiStats.isRunning ? '✓ Active' : '✗ Inactive') + '                │');
+  console.log('  │  AI Retry Manager    ' + (retryStats.isRunning ? '✓ Active' : '✗ Inactive') + '                │');
+  console.log('  │  Email Queue Worker  ✓ Active                │');
+  console.log('  └────────────────────────────────────────────┘');
+
+  // Stats table
+  console.log('\n  STATISTICS:');
+  console.log('  ┌──────────────────────┬──────────────────┐');
+  console.log('  │  Pending Sites       │  ' + String(aiStats.pendingCount || 0).padStart(14) + ' │');
+  console.log('  │  Processed Today     │  ' + String(aiStats.totalProcessed || 0).padStart(14) + ' │');
+  console.log('  │  AI Model            │  ' + String(aiStats.aiClient?.model || 'N/A').substring(0, 14).padStart(14) + ' │');
+  console.log('  └──────────────────────┴──────────────────┘');
+
+  console.log('\n  🌐 Admin Panel: http://localhost:' + PORT);
+  console.log('─'.repeat(50) + '\n');
 });

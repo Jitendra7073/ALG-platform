@@ -2359,6 +2359,31 @@
       opacity: 0.5;
     }
 
+    .sync-all-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #10b981;
+      color: white;
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .sync-all-btn:hover {
+      background: #059669;
+      transform: translateY(-1px);
+    }
+
+    .sync-all-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -2564,6 +2589,15 @@
       color: var(--text-primary);
     }
 
+    .bulk-action-btn.success {
+      background: #10b981;
+      color: white;
+    }
+
+    .bulk-action-btn.success:hover {
+      background: #059669;
+    }
+
     /* Checkbox styling */
     .select-all-checkbox,
     .site-checkbox {
@@ -2663,6 +2697,14 @@
 
     .action-menu-item.warning:hover {
       background: rgba(245, 158, 11, 0.1);
+    }
+
+    .action-menu-item.success {
+      color: #10b981;
+    }
+
+    .action-menu-item.success:hover {
+      background: rgba(16, 185, 129, 0.1);
     }
 
     .action-menu-item.danger {
@@ -8147,6 +8189,12 @@
         <div class="search-box">
           <input type="search" id="emails-search" placeholder="Search emails..." oninput="handleEmailSearch()" />
         </div>
+        <button class="sync-all-btn" onclick="syncAllVisibleEmails()" title="Sync all visible emails to Email System">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          Sync All
+        </button>
       </div>
 
       <!-- Bulk Actions Bar -->
@@ -8160,6 +8208,12 @@
               <path d="M12 5v14M5 12h14" />
             </svg>
             Add to Queue
+          </button>
+          <button class="bulk-action-btn success" onclick="bulkPublishToEmailSystem()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Sync to Email System
           </button>
           <button class="bulk-action-btn secondary" onclick="clearEmailSelection()">Cancel</button>
         </div>
@@ -15204,6 +15258,9 @@
         if (json.success) {
           let emails = json.data.emails;
 
+          // Store emails globally for sync function access
+          window.currentEmails = emails;
+
           // Populate region filter dynamically from the emails data
           populateRegionFilter(emails);
 
@@ -15463,6 +15520,12 @@
                   </svg>
                   Add to Queue
                 </button>
+                <button class="action-menu-item success" onclick="publishSingleToEmailSystem(${e.id}); closeEmailActionMenu(${e.id});">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Sync to Email System
+                </button>
                 <button class="action-menu-item danger" onclick="deleteContact(${e.id}, 'emails'); closeEmailActionMenu(${e.id});">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -15578,6 +15641,178 @@
         selectAll.indeterminate = false;
       }
       updateEmailSelectionUI();
+    }
+
+    // ========================================
+    // SYNC TO EMAIL SYSTEM FUNCTIONS
+    // ========================================
+
+    // Bulk publish selected emails to the new Email System
+    async function bulkPublishToEmailSystem() {
+      if (selectedEmailIds.size === 0) {
+        showToast('Please select at least one email', 'warning');
+        return;
+      }
+
+      const count = selectedEmailIds.size;
+      const confirmed = confirm(
+        `Sync ${count} email${count > 1 ? 's' : ''} to the Email System?\n\n` +
+        `This will publish the selected contacts to the centralized email database.`
+      );
+
+      if (!confirmed) return;
+
+      // Get all email data from the current view
+      const emailRows = document.querySelectorAll('.email-row-check');
+      const contacts = [];
+
+      emailRows.forEach(row => {
+        if (row.checked) {
+          const contactId = parseInt(row.getAttribute('data-id'));
+          // Find the email data from the current displayed emails
+          const emailData = window.currentEmails?.find(e => e.id === contactId);
+          if (emailData) {
+            contacts.push({
+              site_id: emailData.site_id || null,
+              email: emailData.email,
+              site_url: emailData.site_url || '',
+              country: emailData.country || '',
+              category: emailData.ai_actual_category || '',
+              is_wordpress: emailData.is_wordpress || 0
+            });
+          }
+        }
+      });
+
+      if (contacts.length === 0) {
+        showToast('No email data found to sync', 'error');
+        return;
+      }
+
+      try {
+        showToast(`Syncing ${contacts.length} contacts to Email System...`, 'info');
+
+        const response = await fetch('http://localhost:3000/api/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contacts }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(
+            `Successfully synced ${result.synced_count || contacts.length} contacts to Email System!`,
+            'success'
+          );
+          // Clear selection after successful sync
+          clearEmailSelection();
+        } else {
+          showToast(`Failed to sync: ${result.error || 'Unknown error'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Error publishing to email system:', error);
+        showToast(
+          'Failed to connect to Email System. Make sure the service is running on port 3000.',
+          'error'
+        );
+      }
+    }
+
+    // Publish single email to Email System
+    async function publishSingleToEmailSystem(contactId) {
+      try {
+        // Find the email data
+        const emailData = window.currentEmails?.find(e => e.id === contactId);
+        if (!emailData) {
+          showToast('Email data not found', 'error');
+          return;
+        }
+
+        const contacts = [{
+          site_id: emailData.site_id || null,
+          email: emailData.email,
+          site_url: emailData.site_url || '',
+          country: emailData.country || '',
+          category: emailData.ai_actual_category || '',
+          is_wordpress: emailData.is_wordpress || 0
+        }];
+
+        const response = await fetch('http://localhost:3000/api/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contacts }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast('Contact synced to Email System!', 'success');
+        } else {
+          showToast(`Failed to sync: ${result.error || 'Unknown error'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Error publishing single contact:', error);
+        showToast('Failed to connect to Email System', 'error');
+      }
+    }
+
+    // Sync all currently visible emails to Email System
+    async function syncAllVisibleEmails() {
+      if (!window.currentEmails || window.currentEmails.length === 0) {
+        showToast('No emails to sync', 'warning');
+        return;
+      }
+
+      const count = window.currentEmails.length;
+      const confirmed = confirm(
+        `Sync all ${count} visible email${count > 1 ? 's' : ''} to the Email System?\n\n` +
+        `This will publish all currently displayed contacts to the centralized email database.`
+      );
+
+      if (!confirmed) return;
+
+      const contacts = window.currentEmails.map(e => ({
+        site_id: e.site_id || null,
+        email: e.email,
+        site_url: e.site_url || '',
+        country: e.country || '',
+        category: e.ai_actual_category || '',
+        is_wordpress: e.is_wordpress || 0
+      }));
+
+      try {
+        showToast(`Syncing ${contacts.length} contacts to Email System...`, 'info');
+
+        const response = await fetch('http://localhost:3000/api/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contacts }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(
+            `Successfully synced ${result.synced_count || contacts.length} contacts to Email System!`,
+            'success'
+          );
+        } else {
+          showToast(`Failed to sync: ${result.error || 'Unknown error'}`, 'error');
+        }
+      } catch (error) {
+        console.error('Error publishing to email system:', error);
+        showToast(
+          'Failed to connect to Email System. Make sure the service is running on port 3000.',
+          'error'
+        );
+      }
     }
 
     // ========================================

@@ -20,7 +20,6 @@ function validateScheduledTime(email) {
         "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
         [nextValidTime.toISOString(), email.id]
       );
-      console.log(`  Rescheduled ${email.recipient_email} to ${nextValidTime.toISOString()} (outside business hours)`);
       return false;
     }
     return true;
@@ -34,7 +33,6 @@ function validateScheduledTime(email) {
       "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
       [nextValidTime.toISOString(), email.id]
     );
-    console.log(`  Adjusted schedule for ${email.recipient_email} to ${nextValidTime.toISOString()} (was outside business hours)`);
     return false;
   }
 
@@ -67,7 +65,6 @@ function scheduleEmail(email) {
     `, [email.contact_id, email.campaign_id, email.sequence_position - 1]);
 
     if (!previousEmail) {
-      console.log(`  [Schedule] ${email.recipient_email} (follow-up ${email.sequence_position}): no previous sent email found - skipping`);
       return false; // Don't schedule follow-ups if previous step wasn't sent
     }
 
@@ -89,8 +86,6 @@ function scheduleEmail(email) {
       [scheduledAt.toISOString(), email.id]
     );
 
-    console.log(`  [Schedule] ${email.recipient_email} (follow-up ${email.sequence_position}): base=${previousEmail.sent_at}, gap=${gapDays}d, scheduled=${scheduledAt.toISOString()}`);
-
     // Check if scheduled time has arrived
     return scheduledAt <= now;
   }
@@ -102,8 +97,6 @@ function scheduleEmail(email) {
     "UPDATE email_queue SET scheduled_at = ? WHERE id = ?",
     [firstSendTime.toISOString(), email.id]
   );
-
-  console.log(`  [Schedule] ${email.recipient_email}: scheduled for ${firstSendTime.toISOString()}`);
 
   // Check if scheduled time has arrived
   return firstSendTime <= now;
@@ -137,40 +130,14 @@ class EmailQueueWorker {
    */
   start() {
     if (this.isProcessing && this.checkInterval) {
-      console.log("⚠️  Worker already running");
-      return;
+      return; // Silent return
     }
 
     this.isProcessing = true;
-    console.log(" Email Queue Worker started (Enhanced)");
-    console.log(" ✓ Polling interval: 30 seconds");
-    console.log(" ✓ Batch size: 5 emails");
-    console.log(" ✓ Per-email delay: 60 seconds");
-    console.log(" ✓ Cycle cooldown: 10-13 minutes");
-    console.log(" ✓ Timezone-aware prioritization: ENABLED");
-    console.log(" ✓ Parallel sending: " + (this.parallelMode ? "ENABLED" : "DISABLED"));
+    // Silent start - no console spam
 
     // Create worker_errors table if not exists
     this.createErrorTable();
-
-    // Check for active senders
-    const senders = this.getActiveSenders();
-    if (senders.length === 0) {
-      console.warn("⚠️  WARNING: No active email senders found!");
-      console.warn("   Emails will be queued but not sent until senders are activated.");
-    } else {
-      console.log(` ✓ Found ${senders.length} active sender(s)`);
-    }
-
-    // Show countries currently in business hours
-    try {
-      const countriesInBusiness = timezoneScheduler.getCountriesInBusiness();
-      if (countriesInBusiness.length > 0) {
-        console.log(` ✓ Currently in business hours: ${countriesInBusiness.map(c => c.name).join(", ")}`);
-      }
-    } catch (e) {
-      // Ignore if timezone scheduler fails
-    }
 
     // Process immediately
     this.processQueue();
@@ -181,11 +148,8 @@ class EmailQueueWorker {
       if (!this.isProcessing && !this.isPaused) {
         this.isProcessing = true;
         this.processQueue();
-      } else if (!this.isPaused) {
-        // If currently processing, this is a no-op (processQueue will handle its own loop)
-        // This ensures the worker doesn't get stuck if isProcessing is incorrectly set
-        console.log("🔄 Health check: Worker is processing...");
       }
+      // Silent health check
     }, 30000);
   }
 
@@ -199,7 +163,7 @@ class EmailQueueWorker {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
     }
-    console.log("  Email Queue Worker stopped");
+    // Silent stop
   }
 
   /**
@@ -785,23 +749,17 @@ class EmailQueueWorker {
 
       if (!email) {
         // No emails to process (or no scheduled ones ready)
-        console.log(" No emails ready to send. Waiting for next check...");
-        return;
+        return; // Silent return
       }
 
-      console.log("\n📧 Processing email...");
-      console.log(`   To: ${email.recipient_email}`);
-      console.log(`   Subject: ${email.subject}`);
+      // Silent processing
 
       // Get next sender
       const sender = this.getNextSender();
 
       if (!sender) {
-        console.log("  All senders at daily limit or no active senders. Will retry...");
-        return;
+        return; // Silent return - no active senders
       }
-
-      console.log(`   From: ${sender.name} (${sender.email})`);
 
       // Send the email
       await this.processSingleEmail(email, sender);
@@ -812,12 +770,7 @@ class EmailQueueWorker {
         const delay = this.calculateDelay();
 
         if (takingBreak) {
-          const delayMinutes = Math.ceil(delay / 60000);
-          console.log(`\n🎉 Batch of ${this.batchSize} consecutive emails processed. Taking a breath break!`);
-          console.log(`⏰ Waiting ${delayMinutes} minutes before continuing...\n`);
           await this.completeCycle();
-        } else {
-          console.log(`⏰ Waiting ${delay / 1000} seconds before next email...\n`);
         }
 
         await this.sleep(delay);
@@ -829,9 +782,6 @@ class EmailQueueWorker {
       }
     } catch (error) {
       // Global error handler - catch any unexpected errors
-      console.error("💀 CRITICAL ERROR in processQueue:", error.message);
-      console.error("Stack trace:", error.stack);
-
       // Log error to database for debugging
       try {
         db.run(
@@ -840,7 +790,7 @@ class EmailQueueWorker {
           ["processQueue", error.message, error.stack]
         );
       } catch (logError) {
-        console.error("Could not log error to database:", logError.message);
+        // Silently ignore logging errors
       }
 
       // DON'T set isProcessing = false - let the interval keep trying
@@ -911,9 +861,9 @@ class EmailQueueWorker {
           created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      console.log("✓ Worker errors table initialized");
+      // Silent initialization
     } catch (error) {
-      console.warn("⚠️  Could not create worker_errors table:", error.message);
+      // Silent error handling
     }
   }
 

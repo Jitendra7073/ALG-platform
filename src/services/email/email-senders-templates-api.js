@@ -239,7 +239,7 @@ function initializeEmailTables() {
   // Sync follow-up gap settings based on current template counts
   syncFollowupGapSettings();
 
-  console.log(" Email system tables initialized");
+  // Silent initialization
 }
 
 /**

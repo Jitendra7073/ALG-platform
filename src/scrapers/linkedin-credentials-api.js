@@ -33,7 +33,7 @@ function initializeLinkedInCredentialsTable() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
-  console.log(" LinkedIn credentials table initialized");
+  // Silent initialization
 }
 
 // Initialize table on module load
