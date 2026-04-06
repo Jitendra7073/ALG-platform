@@ -21059,22 +21059,48 @@
       }
     }
 
-    async function sendNowQueueItem(queueId, contactId, email) {
-      if (!confirm("Send this email now? It will skip the scheduled date and send immediately.")) return;
+    async function sendNowQueueItem(queueId) {
+      if (!confirm("⚡ Send this email now?\n\nThis will bypass the scheduled time and send immediately.")) return;
+
+      const btn = document.getElementById(`send-now-btn-${queueId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Sending...";
+      }
+
       try {
-        const res = await fetch(`${API_BASE}/email/queue/send-now/${queueId}`, { method: "POST" });
+        const res = await fetch(`${API_BASE}/email/queue/${queueId}/send-now`, { method: "POST" });
         const json = await res.json();
         if (json.success) {
-          showToast("Email moved to immediate queue — will send shortly ⚡", "success");
-          openContactHistory(contactId, email);
-          refreshEmailQueueStats();
-          loadEmails();
+          showToast(`✅ Email sent successfully to ${json.data.recipient}!`, "success");
+
+          // Refresh the queue detail view
+          const titleEl = document.getElementById("qd-modal-title");
+          if (titleEl) {
+            const title = titleEl.textContent;
+            if (title.includes("Queued Items")) {
+              await showQueueDetail("queued");
+            } else if (title.includes("Scheduled Items")) {
+              await showQueueDetail("scheduled");
+            }
+          }
+
+          // Refresh stats
+          await Promise.all([
+            refreshEmailQueueStats(),
+            refreshQueueStats()
+          ]);
         } else {
-          showToast(json.error || "Failed to send now", "error");
+          showToast(json.error || "Failed to send email", "error");
         }
       } catch (e) {
         console.error("Send now error:", e);
         showToast("Could not reach server. Make sure it's running.", "error");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Send Now";
+        }
       }
     }
 
@@ -21206,6 +21232,16 @@
                     font-weight: 600;
                     white-space: nowrap;
                   ">📅 ${dt.toLocaleString()}</span>
+                  <button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" title="Send immediately" style="
+                    background: rgba(5,150,105,0.1);
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: var(--success);
+                  ">⚡ Send Now</button>
                 </div>
               `;
           })
@@ -21272,8 +21308,19 @@
                     white-space: nowrap;
                   ">${sc.icon} ${item.status.charAt(0).toUpperCase() + item.status.slice(1)
               }</span>
-                  ${item.status === "queued" || item.status === "sending"
-                ? `<button onclick="pauseQueueItem(${item.id})" title="Pause this item" style="
+                  ${item.status === "queued"
+                ? `<button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" title="Send immediately" style="
+                      background: rgba(5,150,105,0.1);
+                      border: none;
+                      padding: 4px 10px;
+                      border-radius: 6px;
+                      cursor: pointer;
+                      font-size: 11px;
+                      font-weight: 600;
+                      color: var(--success);
+                      margin-right: 4px;
+                    ">⚡ Send Now</button>
+                    <button onclick="pauseQueueItem(${item.id})" title="Pause this item" style="
                       background: rgba(217,119,6,0.1);
                       border: none;
                       padding: 4px 10px;
@@ -21294,7 +21341,9 @@
                       font-weight: 600;
                       color: var(--success);
                     ">▶ Resume</button>`
-                  : ""
+                  : item.status === "sending"
+                    ? `<span style="font-size: 11px; color: var(--text-muted);">Sending...</span>`
+                    : ""
               }
                 </div>
               `;
@@ -21393,6 +21442,28 @@
                 </div>
                 <div style="font-size: 11px; color: #b91c1c; background: rgba(220,38,38,0.05); padding: 6px 10px; border-radius: 6px; margin-top: 4px;">
                   ⚠️ ${escapeHtml(item.error_message || "Unknown error")}
+                </div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                  <button id="send-now-btn-${item.id}" onclick="sendNowQueueItem(${item.id})" title="Send immediately" style="
+                    background: rgba(5,150,105,0.1);
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: var(--success);
+                  ">⚡ Send Now</button>
+                  <button onclick="retryHistoryQueueItem(${item.id})" title="Retry with queue" style="
+                    background: rgba(102,126,234,0.1);
+                    border: none;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #667eea;
+                  ">🔄 Retry</button>
                 </div>
               </div>
             `,

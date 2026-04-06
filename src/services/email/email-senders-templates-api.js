@@ -1879,14 +1879,51 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
     // Extract name from email
     const recipientName = extractNameFromEmail(contact.value);
 
+    // CRITICAL FIX: Check business hours and set scheduled time accordingly
+    const countryCode = site.country || 'in';
+    const now = new Date();
+    const isInBusinessHours = await timezoneScheduler.isBusinessHour(now, countryCode);
+
+    let scheduledAt;
+    let emailStatus = 'queued';
+
+    if (isInBusinessHours) {
+      // During business hours - schedule immediately for sending
+      scheduledAt = now;
+      console.log(`⏰ ${contact.value} is in business hours - will send immediately`);
+    } else {
+      // After business hours - schedule for next business day
+      try {
+        const calculatedTime = await timezoneScheduler.calculateFirstSendTime(countryCode);
+
+        // Ensure we have a valid Date object
+        if (calculatedTime && typeof calculatedTime.getTime === 'function') {
+          scheduledAt = calculatedTime;
+          console.log(`📅 ${contact.value} is outside business hours - scheduled for ${scheduledAt.toISOString()}`);
+        } else {
+          // Fallback to current time + 1 hour if calculation fails
+          console.warn(`⚠️ Time calculation failed for ${contact.value}, using fallback`);
+          const fallbackTime = new Date(now.getTime() + (60 * 60 * 1000));
+          scheduledAt = fallbackTime;
+          console.log(`📅 ${contact.value} fallback scheduled for ${scheduledAt.toISOString()}`);
+        }
+      } catch (error) {
+        console.error(`❌ Error calculating business hours for ${contact.value}:`, error.message);
+        // Fallback to current time + 1 hour
+        const fallbackTime = new Date(now.getTime() + (60 * 60 * 1000));
+        scheduledAt = fallbackTime;
+        console.log(`📅 ${contact.value} fallback scheduled for ${scheduledAt.toISOString()}`);
+      }
+    }
+
     const result = await db.run(
       `INSERT INTO email_queue (
         campaign_id,
         recipient_email, recipient_name,
         subject, html_content, text_content,
-        country_code, status, created_at
+        country_code, status, scheduled_at, created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       RETURNING id`,
       [
         campaignId,
@@ -1895,7 +1932,9 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
         finalSubject,
         finalHtmlContent,
         finalTextContent,
-        site.country || 'in'
+        countryCode,
+        emailStatus,
+        scheduledAt.toISOString()
       ]
     );
 
@@ -2060,6 +2099,163 @@ router.post("/queue/:id/retry", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/email/queue/:id/send-now
+ * Immediately send a specific queued email (bypasses scheduling)
+ */
+router.post("/queue/:id/send-now", async (req, res) => {
+  try {
+    const emailId = req.params.id;
+
+    // Get the email from queue
+    const email = await db.get(
+      `SELECT eq.*, s.country as site_country
+       FROM email_queue eq
+       LEFT JOIN contacts c ON eq.contact_id = c.id
+       LEFT JOIN sites s ON c.site_id = s.id
+       WHERE eq.id = $1`,
+      [emailId]
+    );
+
+    if (!email) {
+      return res.status(404).json({
+        success: false,
+        error: "Email not found in queue"
+      });
+    }
+
+    // Check if email is already sent or currently being sent
+    if (email.status === 'sent') {
+      return res.json({
+        success: false,
+        error: "Email has already been sent"
+      });
+    }
+
+    if (email.status === 'sending') {
+      return res.json({
+        success: false,
+        error: "Email is currently being sent"
+      });
+    }
+
+    // Get active sender
+    const senders = await db.all(
+      `SELECT * FROM email_senders WHERE is_active = 1 ORDER BY sent_today ASC LIMIT 1`
+    );
+
+    if (!senders || senders.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No active email senders available"
+      });
+    }
+
+    const sender = senders[0];
+
+    // Check daily limit
+    if (sender.sent_today >= sender.daily_limit) {
+      return res.status(400).json({
+        success: false,
+        error: `Sender daily limit reached (${sender.sent_today}/${sender.daily_limit})`
+      });
+    }
+
+    // Mark as sending
+    await db.run(
+      `UPDATE email_queue SET status = 'sending', scheduled_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [emailId]
+    );
+
+    // Send the email immediately
+    const nodemailer = require("nodemailer");
+    let transporter;
+
+    if (sender.service === "custom") {
+      transporter = nodemailer.createTransport({
+        host: sender.smtp_host,
+        port: sender.smtp_port,
+        secure: sender.smtp_port === 465,
+        auth: {
+          user: sender.smtp_user || sender.email,
+          pass: sender.password,
+        },
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service: sender.service,
+        auth: {
+          user: sender.smtp_user || sender.email,
+          pass: sender.password,
+        },
+      });
+    }
+
+    // Send email
+    const mailOptions = {
+      from: sender.email,
+      to: email.recipient_email,
+      subject: email.subject,
+      html: email.html_content,
+      text: email.text_content,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    // Update queue as sent
+    await db.run(
+      `UPDATE email_queue
+       SET status = 'sent',
+           sender_id = $1,
+           sent_at = CURRENT_TIMESTAMP,
+           attempts = attempts + 1
+       WHERE id = $2`,
+      [sender.id, emailId]
+    );
+
+    // Update sender daily counter
+    await db.run(
+      `UPDATE email_senders SET sent_today = sent_today + 1 WHERE id = $1`,
+      [sender.id]
+    );
+
+    // Update campaign counter if applicable
+    if (email.campaign_id) {
+      await db.run(
+        `UPDATE email_campaigns SET sent_count = sent_count + 1 WHERE id = $1`,
+        [email.campaign_id]
+      );
+    }
+
+    console.log(`✅ Manually sent email #${emailId} to ${email.recipient_email}`);
+
+    res.json({
+      success: true,
+      message: "Email sent successfully",
+      data: {
+        messageId: info.messageId,
+        recipient: email.recipient_email,
+        sender: sender.email,
+        sentAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    // Mark as failed
+    await db.run(
+      `UPDATE email_queue SET status = 'queued', error_message = $1 WHERE id = $2`,
+      [error.message, req.params.id]
+    ).catch(() => {});
+
+    console.error(`❌ Manual send failed for email #${req.params.id}:`, error.message);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -2459,15 +2655,52 @@ router.post('/queue/add-by-tag', async (req, res) => {
         // Extract name from email
         const recipientName = extractNameFromEmail(contact.value);
 
-        // Insert with required fields (matching actual schema)
+        // CRITICAL FIX: Check business hours and set scheduled time accordingly
+        const countryCode = contact.country || 'in';
+        const now = new Date();
+        const isInBusinessHours = await timezoneScheduler.isBusinessHour(now, countryCode);
+
+        let scheduledAt;
+        let emailStatus = 'queued';
+
+        if (isInBusinessHours) {
+          // During business hours - schedule immediately for sending
+          scheduledAt = now;
+          console.log(`⏰ ${contact.value} is in business hours - will send immediately`);
+        } else {
+          // After business hours - schedule for next business day
+          try {
+            const calculatedTime = await timezoneScheduler.calculateFirstSendTime(countryCode);
+
+            // Ensure we have a valid Date object
+            if (calculatedTime && typeof calculatedTime.getTime === 'function') {
+              scheduledAt = calculatedTime;
+              console.log(`📅 ${contact.value} is outside business hours - scheduled for ${scheduledAt.toISOString()}`);
+            } else {
+              // Fallback to current time + 1 hour if calculation fails
+              console.warn(`⚠️ Time calculation failed for ${contact.value}, using fallback`);
+              const fallbackTime = new Date(now.getTime() + (60 * 60 * 1000));
+              scheduledAt = fallbackTime;
+              console.log(`📅 ${contact.value} fallback scheduled for ${scheduledAt.toISOString()}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error calculating business hours for ${contact.value}:`, error.message);
+            // Fallback to current time + 1 hour
+            const fallbackTime = new Date(now.getTime() + (60 * 60 * 1000));
+            scheduledAt = fallbackTime;
+            console.log(`📅 ${contact.value} fallback scheduled for ${scheduledAt.toISOString()}`);
+          }
+        }
+
+        // Insert with business hours awareness
         const result = await db.run(`
           INSERT INTO email_queue (
             campaign_id,
             recipient_email, recipient_name,
             subject, html_content, text_content,
-            country_code, status, created_at
+            country_code, status, scheduled_at, created_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued', CURRENT_TIMESTAMP)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
           RETURNING id
         `, [
           campaign_id,
@@ -2476,13 +2709,15 @@ router.post('/queue/add-by-tag', async (req, res) => {
           finalSubject,
           finalHtmlContent,
           finalTextContent,
-          contact.country || 'in'
+          countryCode,
+          emailStatus,
+          scheduledAt.toISOString()
         ]);
 
         queuedCount++;
         queuedIds.push(result.lastInsertId);
 
-        console.log(`✅ Queued email #${result.lastInsertId} for ${contact.value} (tag: ${tag || 'direct'})`);
+        console.log(`✅ Queued email #${result.lastInsertId} for ${contact.value} (scheduled: ${scheduledAt.toISOString()})`);
       } catch (err) {
         // Skip duplicates or errors
         console.error(`❌ Error queueing email for contact ${contact.id}:`, err.message);
@@ -2657,7 +2892,7 @@ router.post('/queue/bulk/retry-failed', async (req, res) => {
     const placeholders = ids.map(() => '?').join(',');
     const result = await db.run(`
       UPDATE email_queue
-      SET status = 'queued', error_message = NULL, attempt_count = 0
+      SET status = 'queued', error_message = NULL, attempts = 0
       WHERE id IN (${placeholders})
     `, ids);
 
@@ -2673,52 +2908,164 @@ router.post('/queue/bulk/retry-failed', async (req, res) => {
 
 /**
  * GET /queue/history
- * Get queue history with filters
+ * Get queue history with filters (FIXED: Now queries email_queue table properly)
  */
 router.get('/queue/history', async (req, res) => {
   try {
-    const { status, template_id, campaign_id, limit = 50, offset = 0 } = req.query;
+    const {
+      status,
+      template_id,
+      campaign_id,
+      limit = 50,
+      offset = 0,
+      startDate,
+      endDate,
+      startDateTime,
+      endDateTime,
+      search,
+      dateType = 'sent', // 'sent', 'queue', 'scheduled'
+      minGapHours,
+      maxGapHours
+    } = req.query;
 
-    let whereClause = 'WHERE 1=1';
-    const params = [];
+    // Determine which table to query based on dateType
+    const useQueueTable = dateType === 'queue' || dateType === 'scheduled' ||
+                          (!status && ['queued', 'sending', 'paused', 'failed', 'cancelled'].includes(status));
 
-    if (status) {
-      whereClause += ' AND esl.status = ?';
-      params.push(status);
+    let query, countQuery, params, countParams;
+
+    if (useQueueTable) {
+      // Query email_queue table for active/failed emails
+      let whereClause = 'WHERE 1=1';
+      params = [];
+
+      // Status filter
+      if (status && status !== 'all') {
+        whereClause += ' AND eq.status = ?';
+        params.push(status);
+      }
+
+      // Search filter
+      if (search) {
+        whereClause += ' AND (eq.recipient_email LIKE ? OR eq.subject LIKE ?)';
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern);
+      }
+
+      // Date filters for queue items
+      if (startDateTime && endDateTime) {
+        whereClause += ' AND eq.created_at >= ? AND eq.created_at <= ?';
+        params.push(startDateTime, endDateTime);
+      } else if (startDate && endDate) {
+        whereClause += ' AND DATE(eq.created_at) >= ? AND DATE(eq.created_at) <= ?';
+        params.push(startDate, endDate);
+      }
+
+      // Template filter
+      if (template_id) {
+        // For queue items, we need to join with campaigns to get template
+        whereClause += ' AND eq.campaign_id = (SELECT id FROM email_campaigns WHERE template_id = ? LIMIT 1)';
+        params.push(template_id);
+      }
+
+      // Campaign filter
+      if (campaign_id) {
+        whereClause += ' AND eq.campaign_id = ?';
+        params.push(campaign_id);
+      }
+
+      // Add limit and offset
+      params.push(parseInt(limit));
+      params.push(parseInt(offset));
+
+      query = `
+        SELECT eq.*,
+               s.url as site_url,
+               es.name as sender_name,
+               es.email as sender_email,
+               ec.name as campaign_name
+        FROM email_queue eq
+        LEFT JOIN contacts c ON eq.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        LEFT JOIN email_senders es ON eq.sender_id = es.id
+        LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+        ${whereClause}
+        ORDER BY eq.created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      // Count query
+      countParams = params.slice(0, -2);
+      countQuery = `SELECT COUNT(*) as total FROM email_queue eq ${whereClause}`;
+
+    } else {
+      // Query email_send_log table for sent emails
+      let whereClause = 'WHERE 1=1';
+      params = [];
+
+      // Status filter (for sent items)
+      if (status && status !== 'all') {
+        whereClause += ' AND esl.status = ?';
+        params.push(status);
+      }
+
+      // Search filter
+      if (search) {
+        whereClause += ' AND (esl.recipient_email LIKE ? OR esl.subject LIKE ?)';
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern);
+      }
+
+      // Date filters for sent items
+      if (startDateTime && endDateTime) {
+        whereClause += ' AND esl.sent_at >= ? AND esl.sent_at <= ?';
+        params.push(startDateTime, endDateTime);
+      } else if (startDate && endDate) {
+        whereClause += ' AND DATE(esl.sent_at) >= ? AND DATE(esl.sent_at) <= ?';
+        params.push(startDate, endDate);
+      }
+
+      // Template filter
+      if (template_id) {
+        whereClause += ' AND esl.template_id = ?';
+        params.push(template_id);
+      }
+
+      // Campaign filter
+      if (campaign_id) {
+        whereClause += ' AND esl.campaign_id = ?';
+        params.push(campaign_id);
+      }
+
+      // Add limit and offset
+      params.push(parseInt(limit));
+      params.push(parseInt(offset));
+
+      query = `
+        SELECT esl.*,
+               s.url as site_url,
+               et.name as template_name,
+               ec.name as campaign_name,
+               es.name as sender_name,
+               es.email as sender_email
+        FROM email_send_log esl
+        LEFT JOIN email_templates et ON esl.template_id = et.id
+        LEFT JOIN email_campaigns ec ON esl.campaign_id = ec.id
+        LEFT JOIN email_senders es ON esl.sender_id = es.id
+        LEFT JOIN contacts c ON esl.contact_id = c.id
+        LEFT JOIN sites s ON c.site_id = s.id
+        ${whereClause}
+        ORDER BY esl.sent_at DESC
+        LIMIT ? OFFSET ?
+      `;
+
+      // Count query
+      countParams = params.slice(0, -2);
+      countQuery = `SELECT COUNT(*) as total FROM email_send_log esl ${whereClause}`;
     }
 
-    if (template_id) {
-      whereClause += ' AND esl.template_id = ?';
-      params.push(template_id);
-    }
-
-    if (campaign_id) {
-      whereClause += ' AND esl.campaign_id = ?';
-      params.push(campaign_id);
-    }
-
-    params.push(parseInt(limit));
-    params.push(parseInt(offset));
-
-    const history = await db.all(`
-      SELECT esl.*,
-             et.name as template_name,
-             ec.name as campaign_name,
-             es.from_name as sender_name
-      FROM email_send_log esl
-      LEFT JOIN email_templates et ON esl.template_id = et.id
-      LEFT JOIN email_campaigns ec ON esl.campaign_id = ec.id
-      LEFT JOIN email_senders es ON esl.sender_id = es.id
-      ${whereClause}
-      ORDER BY esl.sent_at DESC
-      LIMIT ? OFFSET ?
-    `, params);
-
-    // Get total count
-    const countParams = params.slice(0, -2);
-    const count = await db.get(`
-      SELECT COUNT(*) as total FROM email_send_log esl ${whereClause}
-    `, countParams);
+    const history = await db.all(query, params);
+    const count = await db.get(countQuery, countParams);
 
     res.json({
       success: true,
@@ -2726,6 +3073,231 @@ router.get('/queue/history', async (req, res) => {
       total: count.total,
       limit: parseInt(limit),
       offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('Queue history error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// QUEUE ITEMS ENDPOINTS
+// ============================================
+
+/**
+ * GET /queue/items
+ * Get queue items with filtering (for queue detail modals)
+ */
+router.get('/queue/items', async (req, res) => {
+  try {
+    const { status, limit = 50, offset = 0, today } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    // Status filter
+    if (status && status !== 'all') {
+      if (status === 'scheduled') {
+        // For scheduled items, show queued items with scheduled_at in future
+        whereClause += ' AND eq.status = ? AND eq.scheduled_at IS NOT NULL AND eq.scheduled_at > CURRENT_TIMESTAMP';
+        params.push('queued');
+      } else if (status === 'sent') {
+        // For sent items, we need to query email_send_log instead
+        let sentWhereClause = 'WHERE 1=1';
+        const sentParams = [];
+
+        if (today === 'true') {
+          sentWhereClause += ' AND DATE(esl.sent_at) = CURRENT_DATE';
+        }
+
+        sentParams.push(parseInt(limit));
+        sentParams.push(parseInt(offset));
+
+        const sentItems = await db.all(`
+          SELECT esl.*,
+                 s.url as site_url,
+                 es.name as sender_name,
+                 es.email as sender_email,
+                 ec.name as campaign_name,
+                 et.name as template_name
+          FROM email_send_log esl
+          LEFT JOIN contacts c ON esl.contact_id = c.id
+          LEFT JOIN sites s ON c.site_id = s.id
+          LEFT JOIN email_senders es ON esl.sender_id = es.id
+          LEFT JOIN email_campaigns ec ON esl.campaign_id = ec.id
+          LEFT JOIN email_templates et ON esl.template_id = et.id
+          ${sentWhereClause}
+          ORDER BY esl.sent_at DESC
+          LIMIT ? OFFSET ?
+        `, sentParams);
+
+        const sentCount = await db.get(`
+          SELECT COUNT(*) as total FROM email_send_log esl ${sentWhereClause}
+        `);
+
+        return res.json({
+          success: true,
+          data: sentItems,
+          total: sentCount.total
+        });
+      } else {
+        // For other statuses (queued, failed, paused, etc.)
+        whereClause += ' AND eq.status = ?';
+        params.push(status);
+      }
+    }
+
+    params.push(parseInt(limit));
+    params.push(parseInt(offset));
+
+    const items = await db.all(`
+      SELECT eq.*,
+             s.url as site_url,
+             s.country,
+             es.name as sender_name,
+             es.email as sender_email,
+             ec.name as campaign_name
+      FROM email_queue eq
+      LEFT JOIN contacts c ON eq.contact_id = c.id
+      LEFT JOIN sites s ON c.site_id = s.id
+      LEFT JOIN email_senders es ON eq.sender_id = es.id
+      LEFT JOIN email_campaigns ec ON eq.campaign_id = ec.id
+      ${whereClause}
+      ORDER BY eq.created_at ASC
+      LIMIT ? OFFSET ?
+    `, params);
+
+    // Get total count
+    const countParams = params.slice(0, -2);
+    const count = await db.get(`
+      SELECT COUNT(*) as total FROM email_queue eq ${whereClause}
+    `, countParams);
+
+    res.json({
+      success: true,
+      data: items,
+      total: count.total
+    });
+  } catch (error) {
+    console.error('Queue items error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// INDIVIDUAL QUEUE ITEM ACTIONS
+// ============================================
+
+/**
+ * PATCH /queue/items/:id/pause
+ * Pause a specific queue item
+ */
+router.patch('/queue/items/:id/pause', async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    const result = await db.run(
+      `UPDATE email_queue SET status = 'paused' WHERE id = ?`,
+      [itemId]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Queue item not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Queue item paused'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * PATCH /queue/items/:id/resume
+ * Resume a paused queue item
+ */
+router.patch('/queue/items/:id/resume', async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    const result = await db.run(
+      `UPDATE email_queue SET status = 'queued' WHERE id = ?`,
+      [itemId]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Queue item not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Queue item resumed'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /queue/items/:id/cancel
+ * Cancel/delete a queue item
+ */
+router.delete('/queue/items/:id/cancel', async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    const result = await db.run(
+      `DELETE FROM email_queue WHERE id = ?`,
+      [itemId]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Queue item not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Queue item cancelled'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /queue/items/:id/retry
+ * Retry a failed queue item
+ */
+router.post('/queue/items/:id/retry', async (req, res) => {
+  try {
+    const itemId = req.params.id;
+
+    const result = await db.run(
+      `UPDATE email_queue SET status = 'queued', error_message = NULL, attempts = 0 WHERE id = ?`,
+      [itemId]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Queue item not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Queue item queued for retry'
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

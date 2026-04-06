@@ -338,12 +338,29 @@ router.post("/campaign/timezone-aware", async (req, res) => {
       const batchSendTime = new Date(batch.send_time);
       const delayMs = batchSendTime.getTime() - now.getTime();
 
-      // Queue all contacts - worker will handle scheduling based on country and business rules
+      // CRITICAL FIX: Check if current time is within business hours for immediate sending
+      const now = new Date();
+      const isInBusinessHours = await timezoneScheduler.isBusinessHour(now, batch.country);
+
+      let scheduledAt;
+      let emailStatus = 'queued';
+
+      if (isInBusinessHours) {
+        // During business hours - schedule immediately for sending
+        scheduledAt = now;
+        console.log(`⏰ Batch for ${batch.country} is in business hours - will send immediately`);
+      } else {
+        // After business hours - use the calculated optimal time
+        scheduledAt = batchSendTime;
+        console.log(`📅 Batch for ${batch.country} is outside business hours - scheduled for ${scheduledAt.toISOString()}`);
+      }
+
+      // Queue all contacts with proper scheduled time
       for (const contact of batch.contacts) {
         await db.run(
           `
-          INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, country_code)
-          VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)
+          INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, country_code, scheduled_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
           [
             campaignId,
@@ -352,7 +369,9 @@ router.post("/campaign/timezone-aware", async (req, res) => {
             "Subject placeholder", // subject - will be replaced by template
             "<html>Body placeholder</html>", // html_content
             "Body placeholder", // text_content
+            emailStatus,
             batch.country,
+            scheduledAt,
           ],
         );
         queuedCount++;

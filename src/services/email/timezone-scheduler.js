@@ -431,73 +431,92 @@ function getSmartSendTimeForContact(contactId, db) {
  * If the date is outside business hours, moves it to the next valid business hour
  */
 async function adjustToBusinessHours(date, countryCode) {
-  const config = await getTimezoneConfig(countryCode);
-  let adjustedDate = new Date(date.getTime());
+  try {
+    const config = await getTimezoneConfig(countryCode);
 
-  // Check if we're outside business hours in the target timezone
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: config.timezone,
-    hour: 'numeric',
-    hour12: false,
-    weekday: 'long'
-  });
-
-  const parts = formatter.formatToParts(adjustedDate);
-  const hourPart = parts.find(p => p.type === 'hour');
-  const dayPart = parts.find(p => p.type === 'weekday');
-  const hour = hourPart ? parseInt(hourPart.value) : 0;
-  const dayName = dayPart ? dayPart.value.toLowerCase() : '';
-
-  const dayMap = {
-    'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
-    'thursday': 4, 'friday': 5, 'saturday': 6
-  };
-  const day = dayMap[dayName];
-
-  // If it's a weekend, move to next business day morning
-  if (config.weekendDays.includes(day)) {
-    // Find the next non-weekend day
-    while (true) {
-      adjustedDate.setDate(adjustedDate.getDate() + 1);
-      const newParts = formatter.formatToParts(adjustedDate);
-      const newDayPart = newParts.find(p => p.type === 'weekday');
-      const newDayName = newDayPart ? newDayPart.value.toLowerCase() : '';
-      const newDay = dayMap[newDayName];
-
-      if (!config.weekendDays.includes(newDay)) {
-        // Set to business start time
-        adjustedDate.setHours(config.businessStart, 0, 0, 0);
-        break;
-      }
+    // Validate input date
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      console.warn('Invalid date input to adjustToBusinessHours, using current time');
+      date = new Date();
     }
-  } else if (hour < config.businessStart) {
-    // Before business hours - move to start time today
-    adjustedDate.setHours(config.businessStart, 0, 0, 0);
-  } else if (hour >= config.businessEnd) {
-    // After business hours - move to start time tomorrow
-    adjustedDate.setDate(adjustedDate.getDate() + 1);
-    adjustedDate.setHours(config.businessStart, 0, 0, 0);
 
-    // Check if tomorrow is a weekend
-    const tomorrowParts = formatter.formatToParts(adjustedDate);
-    const tomorrowDayPart = tomorrowParts.find(p => p.type === 'weekday');
-    const tomorrowDayName = tomorrowDayPart ? tomorrowDayPart.value.toLowerCase() : '';
-    const tomorrowDay = dayMap[tomorrowDayName];
+    let adjustedDate = new Date(date.getTime());
 
-    if (config.weekendDays.includes(tomorrowDay)) {
-      // Skip to Monday (or next business day)
-      while (config.weekendDays.includes(tomorrowDay)) {
+    // Check if we're outside business hours in the target timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: config.timezone,
+      hour: 'numeric',
+      hour12: false,
+      weekday: 'long'
+    });
+
+    const parts = formatter.formatToParts(adjustedDate);
+    const hourPart = parts.find(p => p.type === 'hour');
+    const dayPart = parts.find(p => p.type === 'weekday');
+    const hour = hourPart ? parseInt(hourPart.value) : 0;
+    const dayName = dayPart ? dayPart.value.toLowerCase() : '';
+
+    const dayMap = {
+      'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
+      'thursday': 4, 'friday': 5, 'saturday': 6
+    };
+    const day = dayMap[dayName];
+
+    // If it's a weekend, move to next business day morning
+    if (config.weekendDays.includes(day)) {
+      // Find the next non-weekend day
+      while (true) {
         adjustedDate.setDate(adjustedDate.getDate() + 1);
-        const checkParts = formatter.formatToParts(adjustedDate);
-        const checkDayPart = checkParts.find(p => p.type === 'weekday');
-        const checkDayName = checkDayPart ? checkDayPart.value.toLowerCase() : '';
-        const checkDay = dayMap[checkDayName];
-        if (!config.weekendDays.includes(checkDay)) break;
+        const newParts = formatter.formatToParts(adjustedDate);
+        const newDayPart = newParts.find(p => p.type === 'weekday');
+        const newDayName = newDayPart ? newDayPart.value.toLowerCase() : '';
+        const newDay = dayMap[newDayName];
+
+        if (!config.weekendDays.includes(newDay)) {
+          // Set to business start time
+          adjustedDate.setHours(config.businessStart, 0, 0, 0);
+          break;
+        }
+      }
+    } else if (hour < config.businessStart) {
+      // Before business hours - move to start time today
+      adjustedDate.setHours(config.businessStart, 0, 0, 0);
+    } else if (hour >= config.businessEnd) {
+      // After business hours - move to start time tomorrow
+      adjustedDate.setDate(adjustedDate.getDate() + 1);
+      adjustedDate.setHours(config.businessStart, 0, 0, 0);
+
+      // Check if tomorrow is a weekend
+      const tomorrowParts = formatter.formatToParts(adjustedDate);
+      const tomorrowDayPart = tomorrowParts.find(p => p.type === 'weekday');
+      const tomorrowDayName = tomorrowDayPart ? tomorrowDayPart.value.toLowerCase() : '';
+      const tomorrowDay = dayMap[tomorrowDayName];
+
+      if (config.weekendDays.includes(tomorrowDay)) {
+        // Skip to Monday (or next business day)
+        while (config.weekendDays.includes(tomorrowDay)) {
+          adjustedDate.setDate(adjustedDate.getDate() + 1);
+          const checkParts = formatter.formatToParts(adjustedDate);
+          const checkDayPart = checkParts.find(p => p.type === 'weekday');
+          const checkDayName = checkDayPart ? checkDayPart.value.toLowerCase() : '';
+          const checkDay = dayMap[checkDayName];
+          if (!config.weekendDays.includes(checkDay)) break;
+        }
       }
     }
-  }
 
-  return adjustedDate;
+    // Validate the result before returning
+    if (isNaN(adjustedDate.getTime()) || !(adjustedDate instanceof Date)) {
+      console.error('adjustToBusinessHours produced invalid date, returning fallback');
+      return new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
+    }
+
+    return adjustedDate;
+  } catch (error) {
+    console.error('Error in adjustToBusinessHours:', error);
+    // Return fallback time: 1 hour from now
+    return new Date(Date.now() + (60 * 60 * 1000));
+  }
 }
 
 /**
@@ -520,8 +539,29 @@ async function calculateFollowUpDate(baseDate, daysToAdd, countryCode) {
  * Returns the next business hour if currently outside business hours
  */
 async function calculateFirstSendTime(countryCode) {
-  const now = new Date();
-  return await adjustToBusinessHours(now, countryCode);
+  try {
+    const now = new Date();
+
+    // Validate input
+    if (!countryCode) {
+      console.warn('No country code provided to calculateFirstSendTime, using default');
+      countryCode = 'in';
+    }
+
+    const result = await adjustToBusinessHours(now, countryCode);
+
+    // Ensure we got a valid Date object back
+    if (result && typeof result.getTime === 'function' && !isNaN(result.getTime())) {
+      return result;
+    } else {
+      console.error('calculateFirstSendTime returned invalid date, using fallback');
+      return new Date(Date.now() + (60 * 60 * 1000)); // 1 hour from now
+    }
+  } catch (error) {
+    console.error('Error in calculateFirstSendTime:', error);
+    // Return fallback time: 1 hour from now
+    return new Date(Date.now() + (60 * 60 * 1000));
+  }
 }
 
 module.exports = {
