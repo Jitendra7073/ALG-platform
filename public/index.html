@@ -22256,15 +22256,15 @@
 
         gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div class="loading-spinner"></div>Loading timezone data...</div>';
 
-        // Fetch timezone statistics
-        const countriesRes = await fetch(`${API_BASE}/email/timezone/countries`);
-        const countriesData = await statsRes.json();
+        // Fetch timezone statistics with monitoring data
+        const countriesRes = await fetch(`${API_BASE}/email/timezone/monitoring`);
+        const countriesData = await countriesRes.json();
 
         if (!countriesData.success) {
           throw new Error(countriesData.error || 'Failed to load timezone data');
         }
 
-        const countries = countriesData.data || [];
+        const countries = countriesData.data.countries || [];
 
         if (distribution.length === 0) {
           gridEl.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);"><div style="font-size: 24px; margin-bottom: 8px;"></div>No timezone data available yet</div>';

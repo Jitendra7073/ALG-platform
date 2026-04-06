@@ -53,7 +53,7 @@ router.get("/", async (req, res) => {
     // Mask passwords in response
     const maskedCredentials = credentials.map((cred) => ({
       ...cred,
-      password: cred.password ? "********" : null,
+      password: "********", // Always mask password in response
     }));
 
     res.json({ success: true, data: maskedCredentials });
@@ -138,33 +138,44 @@ router.post("/", async (req, res) => {
         .json({ success: false, error: "Name is required" });
     }
 
+    // Insert the credential
     const result = await db.run(
-      `
-      INSERT INTO linkedin_credentials (name, email, password, notes)
-      VALUES (?, ?, ?, ?)
-    `,
-      [name, email || null, password || null, notes || null],
+      `INSERT INTO linkedin_credentials (name, email, password, notes)
+       VALUES (?, ?, ?, ?)`,
+      [name, email || null, password || null, notes || null]
     );
 
+    // Get the created credential
     const newCredential = await db.get(
-      `
-      SELECT id, name, email, is_active, notes, created_at
-      FROM linkedin_credentials
-      WHERE id = ?
-    `,
-      [result.lastInsertId],
+      `SELECT id, name, email, is_active, notes, created_at
+       FROM linkedin_credentials
+       WHERE id = ?`,
+      [result.lastInsertId]
     );
 
-    res.status(201).json({
+    if (!newCredential) {
+      return res.status(500).json({
+        success: false,
+        error: "Failed to retrieve created credential"
+      });
+    }
+
+    // Create response with masked password
+    const response = {
       success: true,
       data: {
         ...newCredential,
-        password: newCredential.password ? "********" : null,
-      },
-    });
+        password: "********"
+      }
+    };
+
+    return res.status(201).json(response);
   } catch (error) {
     console.error("Error adding LinkedIn credentials:", error);
-    res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
 
@@ -237,7 +248,7 @@ router.put("/:id", async (req, res) => {
       success: true,
       data: {
         ...updated,
-        password: updated.password ? "********" : null,
+        password: "********", // Always mask password in response
       },
     });
   } catch (error) {

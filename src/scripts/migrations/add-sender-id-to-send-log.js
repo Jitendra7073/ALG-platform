@@ -1,55 +1,53 @@
-/**
- * Migration: Add sender_id column to email_send_log table
- * This fixes the error: "column esl.sender_id does not exist"
- */
+const { initDatabase } = require('../../database/database.js');
 
-const path = require('path');
-
-async function runMigration() {
-  const { initDatabase } = require('../database/database.js');
-  const db = initDatabase();
-
+async function migrate() {
   try {
-    console.log('Checking email_send_log table structure...');
-
-    // Check if sender_id column exists
-    const tableInfo = await db.get(`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'email_send_log'
+    console.log('🔄 Starting migration: Add sender_id to email_send_log...');
+    
+    const db = initDatabase();
+    
+    // Check if column already exists
+    const checkResult = await db.get(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'email_send_log' 
       AND column_name = 'sender_id'
     `);
-
-    if (!tableInfo) {
-      console.log('⚠️  sender_id column missing. Adding it now...');
-
-      await db.run(`
-        ALTER TABLE email_send_log
-        ADD COLUMN sender_id INTEGER
-      `);
-
-      console.log('✅ sender_id column added to email_send_log table');
-    } else {
-      console.log('✅ sender_id column already exists in email_send_log table');
+    
+    if (checkResult) {
+      console.log('✅ Column sender_id already exists in email_send_log');
+      return;
     }
-
-    // Verify the column was added
-    const columns = await db.all(`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name = 'email_send_log'
+    
+    // Add the missing column
+    await db.run(`
+      ALTER TABLE email_send_log 
+      ADD COLUMN sender_id INTEGER
     `);
-
-    console.log('Current email_send_log columns:', columns.map(c => c.column_name));
-
+    
+    console.log('✅ Successfully added sender_id column to email_send_log');
+    
+    // Verify the column was added
+    const verifyResult = await db.get(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'email_send_log' 
+      AND column_name = 'sender_id'
+    `);
+    
+    if (verifyResult) {
+      console.log('✅ Verification successful: sender_id column exists');
+    } else {
+      console.log('❌ Verification failed: sender_id column not found');
+    }
+    
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
     throw error;
   }
 }
 
-// Run migration
-runMigration()
+migrate()
   .then(() => {
     console.log('✅ Migration completed successfully');
     process.exit(0);

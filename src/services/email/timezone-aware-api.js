@@ -81,7 +81,7 @@ router.get("/timezone/countries/:countryCode", async (req, res) => {
     const normalizedCode = countryCode.toLowerCase();
 
     // Get from country_timezones table or use defaults
-    const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
+    const config = await timezoneScheduler.getTimezoneConfig(normalizedCode);
 
     // Check if there's a custom config in the database
     const customConfig = await db.get(
@@ -169,7 +169,7 @@ router.put("/timezone/countries/:countryCode", async (req, res) => {
       );
     } else {
       // Insert new custom config
-      const config = timezoneScheduler.getTimezoneConfig(normalizedCode);
+      const config = await timezoneScheduler.getTimezoneConfig(normalizedCode);
 
       // Convert offset string like '+5:30' to numeric hours (5.5)
       let offsetHours = 0;
@@ -289,12 +289,12 @@ router.post("/campaign/timezone-aware", async (req, res) => {
     const timezoneBatches = {};
     const now = new Date();
 
-    contacts.forEach((contact) => {
+    for (const contact of contacts) {
       const countryCode = (contact.country || "in").toLowerCase();
-      const tzConfig = timezoneScheduler.getTimezoneConfig(countryCode);
+      const tzConfig = await timezoneScheduler.getTimezoneConfig(countryCode);
 
       // Calculate optimal send time for this contact
-      const optimalTime = timezoneScheduler.calculateOptimalSendTime(
+      const optimalTime = await timezoneScheduler.calculateOptimalSendTime(
         countryCode,
         now,
       );
@@ -316,7 +316,7 @@ router.post("/campaign/timezone-aware", async (req, res) => {
       }
 
       timezoneBatches[batchKey].contacts.push(contact);
-    });
+    }
 
     // Create campaign
     const campaignResult = await db.run(
@@ -343,7 +343,7 @@ router.post("/campaign/timezone-aware", async (req, res) => {
         await db.run(
           `
           INSERT INTO email_queue (campaign_id, recipient_email, recipient_name, subject, html_content, text_content, status, country_code)
-          VALUES (?, ?, ?, ?, ?, 'queued', ?)
+          VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)
         `,
           [
             campaignId,
@@ -418,7 +418,7 @@ router.get("/timezone/optimal-times/:contactId", async (req, res) => {
     }
 
     const countryCode = (contact.country || "in").toLowerCase();
-    const tzConfig = timezoneScheduler.getTimezoneConfig(countryCode);
+    const tzConfig = await timezoneScheduler.getTimezoneConfig(countryCode);
 
     // Calculate next 5 optimal send times
     const optimalTimes = [];
@@ -428,7 +428,7 @@ router.get("/timezone/optimal-times/:contactId", async (req, res) => {
       const nextDay = new Date(baseTime);
       nextDay.setDate(nextDay.getDate() + i);
 
-      const optimalTime = timezoneScheduler.calculateOptimalSendTime(
+      const optimalTime = await timezoneScheduler.calculateOptimalSendTime(
         countryCode,
         nextDay,
       );
@@ -615,15 +615,15 @@ router.get("/timezone/monitoring", async (req, res) => {
 
     // Build comprehensive country info ONLY for countries that have emails
     // Error isolation: wrap map in try-catch to prevent one failure from breaking entire response
-    const countriesWithStats = emailStatsByCountry.map(stat => {
+    const countries = await Promise.all(emailStatsByCountry.map(async (stat) => {
       try {
         const code = stat.country_code.toLowerCase();
 
         // Get timezone config (reads from DB first, falls back to defaults)
-        const config = timezoneScheduler.getTimezoneConfig(code);
+        const config = await timezoneScheduler.getTimezoneConfig(code);
 
         // Get business status (open, weekend, outside_hours)
-        const status = timezoneScheduler.getCountryStatus(now, code);
+        const status = await timezoneScheduler.getCountryStatus(now, code);
         const inBusiness = status === 'open';
 
         // Calculate local time in country's timezone (24-hour format)
@@ -781,12 +781,15 @@ router.get("/timezone/monitoring", async (req, res) => {
           earliest_scheduled: stat.earliest_scheduled || null
         };
       }
-    }).filter(country => country !== null); // Filter out any null entries from failures
+    }));
+
+    // Filter out any null entries from failures
+    const filteredCountries = countries.filter(country => country !== null);
 
     // Sort countries: in-business first, then by ready count descending
     // Error handling: wrap sort in try-catch to prevent comparison errors
     try {
-      countriesWithStats.sort((a, b) => {
+      filteredCountries.sort((a, b) => {
         if (a.in_business_hours && !b.in_business_hours) return -1;
         if (!a.in_business_hours && b.in_business_hours) return 1;
         return (b.ready || 0) - (a.ready || 0); // Safe comparison with fallback
@@ -800,16 +803,16 @@ router.get("/timezone/monitoring", async (req, res) => {
     let summary;
     try {
       summary = {
-        total_countries: countriesWithStats.length,
-        countries_in_business: countriesWithStats.filter(c => c.in_business_hours).length,
-        total_emails: countriesWithStats.reduce((sum, c) => sum + (c.total || 0), 0),
-        total_queued: countriesWithStats.reduce((sum, c) => sum + (c.queued || 0), 0),
-        total_waiting: countriesWithStats.reduce((sum, c) => sum + (c.waiting || 0), 0),
-        total_scheduled: countriesWithStats.reduce((sum, c) => sum + (c.scheduled || 0), 0),
-        total_ready: countriesWithStats.reduce((sum, c) => sum + (c.ready || 0), 0),
-        total_sending: countriesWithStats.reduce((sum, c) => sum + (c.sending || 0), 0),
-        total_sent: countriesWithStats.reduce((sum, c) => sum + (c.sent || 0), 0),
-        total_failed: countriesWithStats.reduce((sum, c) => sum + (c.failed || 0), 0)
+        total_countries: filteredCountries.length,
+        countries_in_business: filteredCountries.filter(c => c.in_business_hours).length,
+        total_emails: filteredCountries.reduce((sum, c) => sum + (c.total || 0), 0),
+        total_queued: filteredCountries.reduce((sum, c) => sum + (c.queued || 0), 0),
+        total_waiting: filteredCountries.reduce((sum, c) => sum + (c.waiting || 0), 0),
+        total_scheduled: filteredCountries.reduce((sum, c) => sum + (c.scheduled || 0), 0),
+        total_ready: filteredCountries.reduce((sum, c) => sum + (c.ready || 0), 0),
+        total_sending: filteredCountries.reduce((sum, c) => sum + (c.sending || 0), 0),
+        total_sent: filteredCountries.reduce((sum, c) => sum + (c.sent || 0), 0),
+        total_failed: filteredCountries.reduce((sum, c) => sum + (c.failed || 0), 0)
       };
     } catch (summaryError) {
       console.error('[Monitoring] Error calculating summary:', summaryError);
@@ -900,7 +903,7 @@ router.get("/timezone/monitoring", async (req, res) => {
           active_senders: healthStatus.activeSenders,
           parallel_mode: healthStatus.parallelMode
         },
-        countries: countriesWithStats,
+        countries: filteredCountries,
         upcoming_sends: upcomingEmails,
         recent_sends: recentSends,
         summary: summary,
@@ -1137,8 +1140,8 @@ router.get("/timezone/monitoring/country/:countryCode", async (req, res) => {
     });
 
     // Get country info for display
-    const config = timezoneScheduler.getTimezoneConfig(normalizedCountryCode);
-    const countryStatus = timezoneScheduler.getCountryStatus(now, normalizedCountryCode);
+    const config = await timezoneScheduler.getTimezoneConfig(normalizedCountryCode);
+    const countryStatus = await timezoneScheduler.getCountryStatus(now, normalizedCountryCode);
     const inBusiness = countryStatus === 'open';
 
     // Calculate aggregated stats for ALL emails (not just current page)
@@ -1523,7 +1526,7 @@ router.post("/timezone/update-country", async (req, res) => {
     } else {
       // Get config from timezone-scheduler for new countries
       const timezoneScheduler = require('../timezone-scheduler');
-      const defaultConfig = timezoneScheduler.getTimezoneConfig(country_code) || timezoneScheduler.getTimezoneConfig('us');
+      const defaultConfig = await timezoneScheduler.getTimezoneConfig(country_code) || await timezoneScheduler.getTimezoneConfig('us');
 
       // Insert new record
       await db.run(
@@ -1597,10 +1600,13 @@ router.get("/timezone/stats", async (req, res) => {
       );
 
       // Fallback to scheduler config if database doesn't have it
-      const tzScheduler = timezoneScheduler.getTimezoneConfig(countryCode);
+      const tzScheduler = await timezoneScheduler.getTimezoneConfig(countryCode);
 
       const timezone = tzConfigDb?.timezone || tzScheduler.timezone;
       const timezoneName = tzConfigDb?.name || tzScheduler.name;
+      const businessStart = tzConfigDb?.business_start ?? tzScheduler.businessStart;
+      const businessEnd = tzConfigDb?.business_end ?? tzScheduler.businessEnd;
+      const weekendDays = tzConfigDb?.weekend_days ?? tzScheduler.weekendDays.join(',');
 
       // Calculate local time properly with fractional offsets (e.g., 5.5 for India)
       const offsetHours =
@@ -1614,6 +1620,10 @@ router.get("/timezone/stats", async (req, res) => {
         timezone: timezone,
         timezone_name: timezoneName,
         local_time: localTime.toISOString(),
+        business_start: businessStart,
+        business_end: businessEnd,
+        weekend_days: weekendDays,
+        country_code_lower: countryCode,
       };
     }));
 

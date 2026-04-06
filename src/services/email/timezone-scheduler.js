@@ -99,15 +99,17 @@ const countryTimezones = {
 /**
  * Get timezone configuration for a country
  * Checks database first for custom settings, falls back to defaults
+ * NOTE: This function is now async to support PostgreSQL
  */
-function getTimezoneConfig(countryCode) {
+async function getTimezoneConfig(countryCode) {
   const code = countryCode.toLowerCase();
   const defaultConfig = countryTimezones[code] || countryTimezones['us'];
 
   // Try to get custom settings from database
   try {
-    const db = require('../../database/database.js');
-    const customConfig = db.get(
+    const { initDatabase } = require('../../database/database.js');
+    const db = initDatabase();
+    const customConfig = await db.get(
       'SELECT * FROM country_timezones WHERE country_code = ?',
       [code]
     );
@@ -134,8 +136,8 @@ function getTimezoneConfig(countryCode) {
 /**
  * Check if a given time is during business hours in a specific timezone
  */
-function isBusinessHour(date, countryCode) {
-  const config = getTimezoneConfig(countryCode);
+async function isBusinessHour(date, countryCode) {
+  const config = await getTimezoneConfig(countryCode);
 
   // Get hour in the recipient's timezone using Intl API with formatToParts
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -180,8 +182,8 @@ function isBusinessHour(date, countryCode) {
 /**
  * Calculate the next optimal send time for a recipient
  */
-function calculateOptimalSendTime(countryCode, baseTime = new Date()) {
-  const config = getTimezoneConfig(countryCode);
+async function calculateOptimalSendTime(countryCode, baseTime = new Date()) {
+  const config = await getTimezoneConfig(countryCode);
 
   // Start from the next hour to avoid past times
   let checkDate = new Date(baseTime.getTime() + 60 * 60 * 1000); // At least 1 hour from now
@@ -194,7 +196,7 @@ function calculateOptimalSendTime(countryCode, baseTime = new Date()) {
   for (let i = 0; i < maxAttempts; i++) {
     const testDate = new Date(checkDate.getTime() + i * hourIncrement);
 
-    if (isBusinessHour(testDate, countryCode)) {
+    if (await isBusinessHour(testDate, countryCode)) {
       // This is a business hour - check if it's a preferred time
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: config.timezone,
@@ -324,8 +326,8 @@ function getCountriesInBusiness() {
  * Get the status reason for a country (why it's not in business hours)
  * Returns: 'weekend' | 'outside_hours' | 'open'
  */
-function getCountryStatus(date, countryCode) {
-  const config = getTimezoneConfig(countryCode);
+async function getCountryStatus(date, countryCode) {
+  const config = await getTimezoneConfig(countryCode);
 
   // Get hour in the recipient's timezone using Intl API with formatToParts
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -373,13 +375,13 @@ function getCountryStatus(date, countryCode) {
 /**
  * Batch schedule emails by timezone groups
  */
-function batchScheduleEmailsByTimezone(emails) {
+async function batchScheduleEmailsByTimezone(emails) {
   const timezoneBatches = {};
 
-  emails.forEach(email => {
+  for (const email of emails) {
     const countryCode = email.country || 'us';
-    const config = getTimezoneConfig(countryCode);
-    const optimalTime = calculateOptimalSendTime(countryCode);
+    const config = await getTimezoneConfig(countryCode);
+    const optimalTime = await calculateOptimalSendTime(countryCode);
 
     // Group by date (to batch emails for same timezone/date)
     const dateKey = optimalTime.toISOString().split('T')[0];
@@ -398,7 +400,7 @@ function batchScheduleEmailsByTimezone(emails) {
       ...email,
       scheduled_at: optimalTime.toISOString()
     });
-  });
+  }
 
   return Object.values(timezoneBatches);
 }
@@ -428,8 +430,8 @@ function getSmartSendTimeForContact(contactId, db) {
  * Adjust a date to fall within business hours
  * If the date is outside business hours, moves it to the next valid business hour
  */
-function adjustToBusinessHours(date, countryCode) {
-  const config = getTimezoneConfig(countryCode);
+async function adjustToBusinessHours(date, countryCode) {
+  const config = await getTimezoneConfig(countryCode);
   let adjustedDate = new Date(date.getTime());
 
   // Check if we're outside business hours in the target timezone
@@ -502,24 +504,24 @@ function adjustToBusinessHours(date, countryCode) {
  * Calculate follow-up date by adding calendar days, then adjusting to business hours
  * This ensures follow-ups respect the configured delay but skip weekends/hours
  */
-function calculateFollowUpDate(baseDate, daysToAdd, countryCode) {
-  const config = getTimezoneConfig(countryCode);
+async function calculateFollowUpDate(baseDate, daysToAdd, countryCode) {
+  const config = await getTimezoneConfig(countryCode);
 
   // Add the calendar days
   const followUpDate = new Date(baseDate.getTime());
   followUpDate.setDate(followUpDate.getDate() + daysToAdd);
 
   // Now adjust to business hours (handles weekends and off-hours)
-  return adjustToBusinessHours(followUpDate, countryCode);
+  return await adjustToBusinessHours(followUpDate, countryCode);
 }
 
 /**
  * Calculate the first available send time for a recipient
  * Returns the next business hour if currently outside business hours
  */
-function calculateFirstSendTime(countryCode) {
+async function calculateFirstSendTime(countryCode) {
   const now = new Date();
-  return adjustToBusinessHours(now, countryCode);
+  return await adjustToBusinessHours(now, countryCode);
 }
 
 module.exports = {

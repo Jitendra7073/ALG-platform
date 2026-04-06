@@ -36,6 +36,7 @@ async function initializeEmailTables() {
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
+        from_name TEXT,
         service TEXT DEFAULT 'gmail',
         smtp_host TEXT,
         smtp_port INTEGER,
@@ -61,6 +62,20 @@ async function initializeEmailTables() {
       }
     } catch (e) {
       // Column already exists or migration failed
+    }
+
+    // Migration: Add from_name column if not exists
+    try {
+      const fromNameExists = await db.get(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'email_senders' AND column_name = 'from_name'
+      `);
+      if (!fromNameExists) {
+        await db.run("ALTER TABLE email_senders ADD COLUMN from_name TEXT");
+        console.log("✅ Added from_name column to email_senders table");
+      }
+    } catch (e) {
+      console.log("ℹ️ from_name column migration check:", e.message);
     }
 
     // Email Templates Table
@@ -181,13 +196,32 @@ async function initializeEmailTables() {
         contact_email TEXT NOT NULL,
         template_id INTEGER,
         campaign_id INTEGER,
+        sender_id INTEGER,
         send_type TEXT DEFAULT 'main',
         status TEXT DEFAULT 'sent',
         sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (contact_id) REFERENCES contacts(id),
-        FOREIGN KEY (template_id) REFERENCES email_templates(id)
+        FOREIGN KEY (template_id) REFERENCES email_templates(id),
+        FOREIGN KEY (sender_id) REFERENCES email_senders(id)
       )
     `);
+
+    // Migration: Add sender_id column if not exists
+    try {
+      const columnExists = await db.get(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'email_send_log'
+        AND column_name = 'sender_id'
+      `);
+      if (!columnExists) {
+        await db.run("ALTER TABLE email_send_log ADD COLUMN sender_id INTEGER");
+        console.log("✅ Added sender_id column to email_send_log table");
+      }
+    } catch (e) {
+      // Column already exists or migration failed
+      console.log("ℹ️ sender_id column migration check:", e.message);
+    }
 
     // Seed default settings if they don't exist
     const defaults = [
@@ -1724,7 +1758,7 @@ router.post("/campaigns", async (req, res) => {
     // Create campaign
     const result = await db.run(
       `INSERT INTO email_campaigns (name, template_id, target_type, status)
-       VALUES ($1, $2, $3, 'queued') RETURNING id`,
+       VALUES (?, ?, ?, 'queued') RETURNING id`,
       [name, template_id || null, target_type]
     );
 
@@ -1746,7 +1780,7 @@ router.post("/campaigns", async (req, res) => {
       for (const site of sites) {
         // Get emails for this site
         const contacts = await db.all(
-          `SELECT * FROM contacts WHERE site_id = $1 AND type = 'email'`,
+          `SELECT * FROM contacts WHERE site_id = ? AND type = 'email'`,
           [site.id]
         );
 
@@ -1758,7 +1792,7 @@ router.post("/campaigns", async (req, res) => {
     } else if (target_type === "sites" && Array.isArray(target_ids)) {
       // Queue for specific sites
       for (const siteId of target_ids) {
-        const site = await db.get(`SELECT id, url, country FROM sites WHERE id = $1`, [siteId]);
+        const site = await db.get(`SELECT id, url, country FROM sites WHERE id = ?`, [siteId]);
         if (site) {
           const contacts = await db.all(
             `SELECT * FROM contacts WHERE site_id = $1 AND type = 'email'`,
@@ -1775,7 +1809,7 @@ router.post("/campaigns", async (req, res) => {
       // Queue for specific contacts
       for (const contactId of target_ids) {
         const contact = await db.get(
-          `SELECT c.*, s.country FROM contacts c LEFT JOIN sites s ON c.site_id = s.id WHERE c.id = $1`,
+          `SELECT c.*, s.country FROM contacts c LEFT JOIN sites s ON c.site_id = s.id WHERE c.id = ?`,
           [contactId]
         );
         if (contact && contact.type === 'email') {
@@ -1788,7 +1822,7 @@ router.post("/campaigns", async (req, res) => {
 
     // Update campaign with recipient count
     await db.run(
-      `UPDATE email_campaigns SET total_recipients = $1 WHERE id = $2`,
+      `UPDATE email_campaigns SET total_recipients = ? WHERE id = ?`,
       [queuedCount, campaignId]
     );
 
@@ -1824,7 +1858,7 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
 
     if (templateId) {
       const template = await db.get(
-        `SELECT subject, html_content, text_content FROM email_templates WHERE id = $1`,
+        `SELECT subject, html_content, text_content FROM email_templates WHERE id = ?`,
         [templateId]
       );
       if (template) {
@@ -1852,7 +1886,7 @@ async function queueEmailForCampaign(campaignId, contact, site, templateId) {
         subject, html_content, text_content,
         country_code, status, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued', CURRENT_TIMESTAMP)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', CURRENT_TIMESTAMP)
       RETURNING id`,
       [
         campaignId,
@@ -2240,6 +2274,7 @@ router.get("/queue/stats", async (req, res) => {
 /**
  * GET /queue/detailed-stats
  * Get detailed email queue statistics for a period
+ * NOTE: Currently under maintenance - returns basic stats only
  */
 router.get("/queue/detailed-stats", async (req, res) => {
   try {
@@ -2259,7 +2294,7 @@ router.get("/queue/detailed-stats", async (req, res) => {
       dateFilter = ` AND sent_at >= NOW() - INTERVAL '30 days'`;
     }
 
-    // Get basic stats
+    // Get basic stats only (skip complex joins for now)
     const stats = await db.get(`
       SELECT
         COUNT(*) as total_sent,
@@ -2270,45 +2305,15 @@ router.get("/queue/detailed-stats", async (req, res) => {
       WHERE sent_at IS NOT NULL ${dateFilter}
     `, params);
 
-    // Get by template
-    const byTemplate = await db.all(`
-      SELECT
-        et.name as template_name,
-        COUNT(*) as count,
-        COUNT(*) FILTER (WHERE status = 'sent') as sent,
-        COUNT(*) FILTER (WHERE status = 'failed') as failed
-      FROM email_queue eq
-      LEFT JOIN email_templates et ON eq.template_id = et.id
-      WHERE eq.sent_at IS NOT NULL ${dateFilter}
-      GROUP BY et.id, et.name
-      ORDER BY count DESC
-      LIMIT 10
-    `, params);
-
-    // Get hourly breakdown for today
-    let hourlyBreakdown = [];
-    if (period === 'today' || (!startDate && !endDate)) {
-      hourlyBreakdown = await db.all(`
-        SELECT
-          EXTRACT(HOUR FROM sent_at) as hour,
-          COUNT(*) as count,
-          COUNT(*) FILTER (WHERE status = 'sent') as sent,
-          COUNT(*) FILTER (WHERE status = 'failed') as failed
-        FROM email_queue
-        WHERE DATE(sent_at) = CURRENT_DATE
-        GROUP BY EXTRACT(HOUR FROM sent_at)
-        ORDER BY hour
-      `);
-    }
-
     res.json({
       success: true,
       data: {
         period: startDate && endDate ? 'custom' : period,
         stats: stats,
-        byTemplate,
-        hourlyBreakdown
-      }
+        byTemplate: [],
+        hourlyBreakdown: []
+      },
+      message: "Template statistics temporarily disabled - use queue history for detailed analytics"
     });
   } catch (error) {
     res.status(500).json({

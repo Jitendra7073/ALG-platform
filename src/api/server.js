@@ -225,7 +225,12 @@ app.use((req, res, next) => {
       });
     }
 
-    return originalJson(data);
+    try {
+      return originalJson(data);
+    } catch (logError) {
+      console.error('Error in response logging:', logError);
+      return originalJson(data);
+    }
   };
 
   next();
