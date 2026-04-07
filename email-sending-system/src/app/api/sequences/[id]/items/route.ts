@@ -38,7 +38,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { template_id, delay_days, delay_hours } = body;
+    const { template_id, delay_days, send_time } = body;
 
     // Validate inputs
     if (!template_id) {
@@ -74,6 +74,19 @@ export async function POST(
       );
     }
 
+    // Check if template already exists in this sequence
+    const duplicateCheck = await executeQuery(
+      'SELECT id FROM email_sequence_items WHERE sequence_id = $1 AND template_id = $2',
+      [id, template_id]
+    );
+
+    if (duplicateCheck.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'Template already exists in this sequence' },
+        { status: 400 }
+      );
+    }
+
     // Get the next position
     const positionQuery = `
       SELECT COALESCE(MAX(position), 0) + 1 as next_position
@@ -85,20 +98,20 @@ export async function POST(
 
     // Insert the new item
     const insertQuery = `
-      INSERT INTO email_sequence_items (sequence_id, template_id, position, delay_days, delay_hours)
+      INSERT INTO email_sequence_items (sequence_id, template_id, position, delay_days, send_time)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING *
     `;
 
-    const params = [
+    const queryParams = [
       id,
       template_id,
       nextPosition,
       delay_days || 0,
-      delay_hours || 0
+      send_time || '09:00'
     ];
 
-    const result = await executeQuery(insertQuery, params);
+    const result = await executeQuery(insertQuery, queryParams);
 
     return NextResponse.json({ success: true, data: result[0] }, { status: 201 });
   } catch (error: any) {
@@ -115,7 +128,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { item_id, position, delay_days, delay_hours } = body;
+    const { item_id, position, delay_days, send_time } = body;
 
     if (!item_id) {
       return NextResponse.json(
@@ -193,10 +206,10 @@ export async function PUT(
         await executeQuery(`
           UPDATE email_sequence_items
           SET delay_days = COALESCE($1, delay_days),
-              delay_hours = COALESCE($2, delay_hours),
+              send_time = COALESCE($2, send_time),
               updated_at = CURRENT_TIMESTAMP
           WHERE id = $3
-        `, [delay_days, delay_hours, item_id]);
+        `, [delay_days, send_time, item_id]);
 
         await executeQuery('COMMIT');
 
@@ -221,14 +234,14 @@ export async function PUT(
       const query = `
         UPDATE email_sequence_items
         SET delay_days = COALESCE($1, delay_days),
-            delay_hours = COALESCE($2, delay_hours),
+            send_time = COALESCE($2, send_time),
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $3 AND sequence_id = $4
         RETURNING *
       `;
 
-      const params = [delay_days, delay_hours, item_id, id];
-      const result = await executeQuery(query, params);
+      const queryParams = [delay_days, send_time, item_id, id];
+      const result = await executeQuery(query, queryParams);
 
       return NextResponse.json({ success: true, data: result[0] });
     }

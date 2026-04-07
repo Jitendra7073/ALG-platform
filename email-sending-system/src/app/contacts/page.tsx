@@ -14,6 +14,18 @@ import {
   Send,
   FileText,
   AlertCircle,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Globe,
+  AlertTriangle,
+  Sparkles,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
 import {
   Table,
@@ -45,23 +57,73 @@ interface Contact {
   id: number;
   type: "email" | "phone" | "linkedin";
   value: string;
+  site_id?: number;
   site_url?: string;
   country?: string;
   source_page?: string;
   created_at: string;
 }
 
-interface Template {
+interface Site {
   id: number;
+  url: string;
+  country: string;
+}
+
+interface ContactWithCountry extends Contact {
+  countryInfo?: CountryTimezone;
+  countryName?: string;
+  businessHoursStatus?: 'within_hours' | 'outside_hours' | 'weekend';
+  nextBusinessHours?: Date;
+}
+
+interface Sequence {
+  id: string;
   name: string;
-  subject: string;
-  category: string;
-  description?: string;
+  description: string | null;
   is_active: boolean;
+  items: SequenceItem[];
   created_at: string;
 }
 
+interface SequenceItem {
+  id: string;
+  template_id: string;
+  template_name: string;
+  template_subject: string;
+  position: number;
+  delay_days: number | null;
+  delay_hours: number | null;
+  send_time?: string;
+}
+
+interface CountryTimezone {
+  id: string;
+  country_code: string;
+  country_name: string;
+  default_timezone: string;
+  business_hours_start: string;
+  business_hours_end: string;
+  weekend_days: string[];
+  region?: string;
+}
+
+interface QueuedEmail {
+  contact_id: number;
+  contact_email: string;
+  template_id: string;
+  template_name: string;
+  template_subject: string;
+  position: number;
+  scheduled_at: Date;
+  status: 'ready' | 'weekend' | 'outside_hours';
+  reason?: string;
+}
+
 type ContactType = "all" | "email" | "phone" | "linkedin";
+type DeliveryOption = 'immediate' | 'next_business_hours' | 'custom';
+
+type WizardStep = 'contacts' | 'sequence' | 'validate' | 'review' | 'confirm';
 
 export default function ContactsPage() {
   const [contacts, setContacts] = React.useState<Contact[]>([]);
@@ -73,18 +135,30 @@ export default function ContactsPage() {
     limit: 20,
     totalPages: 1,
   });
-  const [activeTab, setActiveTab] = React.useState<ContactType>("all");
+  const [activeTab, setActiveTab] = React.useState<ContactType>("email");
   const [selectedIds, setSelectedIds] = React.useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
   const [bulkActionLoading, setBulkActionLoading] = React.useState(false);
   const [sendingEmails, setSendingEmails] = React.useState(false);
 
-  // Template modal state
-  const [showTemplateModal, setShowTemplateModal] = React.useState(false);
-  const [templates, setTemplates] = React.useState<Template[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = React.useState<Template | null>(null);
-  const [templatesLoading, setTemplatesLoading] = React.useState(false);
-  const [templateError, setTemplateError] = React.useState<string | null>(null);
+  // Sequence modal state
+  const [showSequenceModal, setShowSequenceModal] = React.useState(false);
+  const [sequences, setSequences] = React.useState<Sequence[]>([]);
+  const [selectedSequence, setSelectedSequence] = React.useState<Sequence | null>(null);
+  const [sequencesLoading, setSequencesLoading] = React.useState(false);
+  const [sequenceError, setSequenceError] = React.useState<string | null>(null);
+
+  // Wizard state
+  const [showWizard, setShowWizard] = React.useState(false);
+  const [wizardStep, setWizardStep] = React.useState<WizardStep>('contacts');
+  const [wizardContacts, setWizardContacts] = React.useState<ContactWithCountry[]>([]);
+  const [wizardLoading, setWizardLoading] = React.useState(false);
+  const [selectedSequenceForWizard, setSelectedSequenceForWizard] = React.useState<Sequence | null>(null);
+  const [queuedEmails, setQueuedEmails] = React.useState<QueuedEmail[]>([]);
+  const [deliveryOption, setDeliveryOption] = React.useState<DeliveryOption>('immediate');
+  const [customDateTime, setCustomDateTime] = React.useState<string>('');
+  const [countryTimezones, setCountryTimezones] = React.useState<Record<string, CountryTimezone>>({});
+  const [businessHoursWarnings, setBusinessHoursWarnings] = React.useState<string[]>([]);
 
   const fetchContacts = async (page = 1, type: ContactType = "all") => {
     setLoading(true);
@@ -137,25 +211,232 @@ export default function ContactsPage() {
     setSelectedIds(newSelected);
   };
 
-  const fetchTemplates = async () => {
-    setTemplatesLoading(true);
-    setTemplateError(null);
+  // Wizard functions
+  const loadContactsWithCountry = async () => {
+    setWizardLoading(true);
     try {
-      const response = await fetch('/api/templates');
+      // Get country timezones
+      const countriesRes = await fetch('/api/countries');
+      const countriesJson = await countriesRes.json();
+      if (countriesJson.success) {
+        const timezoneMap: Record<string, CountryTimezone> = {};
+        countriesJson.data.forEach((c: CountryTimezone) => {
+          timezoneMap[c.country_code] = c;
+        });
+        setCountryTimezones(timezoneMap);
+      }
+
+      // Get contacts with their site country
+      const selectedContacts = contacts.filter(c => selectedIds.has(c.id));
+      const enrichedContacts: ContactWithCountry[] = selectedContacts.map(contact => {
+        const countryInfo = contact.country ? timezoneMap[contact.country] : undefined;
+        return {
+          ...contact,
+          countryInfo,
+          countryName: countryInfo?.country_name,
+          businessHoursStatus: undefined,
+          nextBusinessHours: undefined
+        };
+      });
+
+      setWizardContacts(enrichedContacts);
+    } catch (err: any) {
+      console.error('Error loading contacts:', err);
+    } finally {
+      setWizardLoading(false);
+    }
+  };
+
+  const validateBusinessHours = () => {
+    const now = new Date();
+    const warnings: string[] = [];
+    const updatedContacts = [...wizardContacts];
+
+    updatedContacts.forEach(contact => {
+      if (!contact.countryInfo) return;
+
+      const info = contact.countryInfo;
+      const countryTime = now.toLocaleString('en-US', { timeZone: info.default_timezone });
+      const countryDate = new Date(countryTime);
+
+      // Check if weekend
+      const dayName = countryDate.toLocaleString('en-US', { weekday: 'long' });
+      const isWeekend = info.weekend_days.includes(dayName);
+
+      if (isWeekend) {
+        contact.businessHoursStatus = 'weekend';
+        warnings.push(`${contact.value} (${contact.countryName}) is in weekend`);
+      } else {
+        // Check business hours
+        const [hours, minutes] = info.business_hours_start.split(':').map(Number);
+        const [endHours, endMinutes] = info.business_hours_end.split(':').map(Number);
+        const currentHour = countryDate.getHours();
+        const currentMinute = countryDate.getMinutes();
+
+        const isWithinHours = currentHour >= hours && currentHour < endHours;
+
+        if (!isWithinHours) {
+          contact.businessHoursStatus = 'outside_hours';
+          // Calculate next business hours
+          const nextStart = new Date(countryDate);
+          if (currentHour < hours) {
+            nextStart.setHours(hours, minutes, 0, 0);
+          } else {
+            nextStart.setDate(nextStart.getDate() + 1);
+            nextStart.setHours(hours, minutes, 0, 0);
+          }
+          contact.nextBusinessHours = nextStart;
+          warnings.push(`${contact.value} (${contact.countryName}) is outside business hours (${currentHour}:${currentMinute.toString().padStart(2, '0')} local time)`);
+        } else {
+          contact.businessHoursStatus = 'within_hours';
+        }
+      }
+    });
+
+    setWizardContacts(updatedContacts);
+    setBusinessHoursWarnings(warnings);
+  };
+
+  const calculateScheduledEmails = (): QueuedEmail[] => {
+    const emails: QueuedEmail[] = [];
+    const now = new Date();
+
+    if (!selectedSequenceForWizard) return emails;
+
+    selectedSequenceForWizard.items.forEach(item => {
+      wizardContacts.forEach(contact => {
+        if (contact.type !== 'email') return;
+
+        let scheduledAt = new Date(now);
+        let status: QueuedEmail['status'] = 'ready';
+        let reason = '';
+
+        // Add delay days
+        if (item.delay_days) {
+          scheduledAt.setDate(scheduledAt.getDate() + item.delay_days);
+        }
+        if (item.delay_hours) {
+          scheduledAt.setHours(scheduledAt.getHours() + item.delay_hours);
+        }
+
+        // Apply delivery option
+        if (deliveryOption === 'next_business_hours') {
+          if (contact.businessHoursStatus === 'outside_hours' && contact.nextBusinessHours) {
+            scheduledAt = contact.nextBusinessHours;
+          } else if (contact.businessHoursStatus === 'weekend') {
+            // Move to Monday
+            while (scheduledAt.toLocaleString('en-US', { weekday: 'long' }) !== 'Monday') {
+              scheduledAt.setDate(scheduledAt.getDate() + 1);
+            }
+            // Set to business hours
+            if (contact.countryInfo) {
+              const [hours] = contact.countryInfo.business_hours_start.split(':').map(Number);
+              scheduledAt.setHours(hours, 0, 0, 0);
+            }
+          }
+        } else if (deliveryOption === 'custom' && customDateTime) {
+          scheduledAt = new Date(customDateTime);
+        }
+
+        // Skip weekends if configured
+        if (contact.countryInfo) {
+          const dayName = scheduledAt.toLocaleString('en-US', { weekday: 'long' });
+          if (contact.countryInfo.weekend_days.includes(dayName)) {
+            // Move to next business day (Monday)
+            while (scheduledAt.toLocaleString('en-US', { weekday: 'long' }) !== 'Monday') {
+              scheduledAt.setDate(scheduledAt.getDate() + 1);
+            }
+          }
+        }
+
+        emails.push({
+          contact_id: contact.id,
+          contact_email: contact.value,
+          template_id: item.template_id,
+          template_name: item.template_name || `Template ${item.position}`,
+          template_subject: item.template_subject || 'No subject',
+          position: item.position,
+          scheduled_at: scheduledAt,
+          status,
+          reason
+        });
+      });
+    });
+
+    return emails;
+  };
+
+  const handleWizardNext = () => {
+    if (wizardStep === 'contacts') {
+      setWizardStep('sequence');
+    } else if (wizardStep === 'sequence') {
+      validateBusinessHours();
+      setWizardStep('validate');
+    } else if (wizardStep === 'validate') {
+      const emails = calculateScheduledEmails();
+      setQueuedEmails(emails);
+      setWizardStep('review');
+    } else if (wizardStep === 'review') {
+      submitToQueue();
+    }
+  };
+
+  const handleWizardBack = () => {
+    if (wizardStep === 'sequence') setWizardStep('contacts');
+    else if (wizardStep === 'validate') setWizardStep('sequence');
+    else if (wizardStep === 'review') setWizardStep('validate');
+  };
+
+  const submitToQueue = async () => {
+    setWizardLoading(true);
+    try {
+      const response = await fetch('/api/queue/schedule-sequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sequence_id: selectedSequenceForWizard?.id,
+          emails: queuedEmails,
+          delivery_option: deliveryOption,
+          custom_date_time: customDateTime
+        })
+      });
+
       const json = await response.json();
 
       if (json.success) {
-        setTemplates(json.data);
-        setShowTemplateModal(true);
+        setShowWizard(false);
+        alert(`✅ Successfully queued ${queuedEmails.length} emails for ${wizardContacts.length} contacts`);
+        setSelectedIds(new Set());
+        fetchContacts(meta.page, activeTab);
       } else {
-        setTemplateError(json.error || 'Failed to fetch templates');
-        setShowTemplateModal(true);
+        alert(json.error || 'Failed to queue emails');
       }
     } catch (err: any) {
-      setTemplateError(err.message);
-      setShowTemplateModal(true);
+      alert('Error: ' + err.message);
     } finally {
-      setTemplatesLoading(false);
+      setWizardLoading(false);
+    }
+  };
+
+  const fetchSequences = async () => {
+    setSequencesLoading(true);
+    setSequenceError(null);
+    try {
+      const response = await fetch('/api/sequences');
+      const json = await response.json();
+
+      if (json.success) {
+        setSequences(json.data);
+        setShowSequenceModal(true);
+      } else {
+        setSequenceError(json.error || 'Failed to fetch sequences');
+        setShowSequenceModal(true);
+      }
+    } catch (err: any) {
+      setSequenceError(err.message);
+      setShowSequenceModal(true);
+    } finally {
+      setSequencesLoading(false);
     }
   };
 
@@ -163,8 +444,16 @@ export default function ContactsPage() {
     if (selectedIds.size === 0) return;
 
     if (action === "queue") {
-      // First fetch templates and show modal
-      await fetchTemplates();
+      // Start the wizard
+      setShowWizard(true);
+      setWizardStep('contacts');
+      setQueuedEmails([]);
+      setDeliveryOption('immediate');
+      setCustomDateTime('');
+      setBusinessHoursWarnings([]);
+
+      // Fetch contacts with country info
+      await loadContactsWithCountry();
       return;
     }
 
@@ -198,12 +487,12 @@ export default function ContactsPage() {
   };
 
   const handleConfirmAddToQueue = async () => {
-    if (!selectedTemplate) {
-      alert('Please select a template first');
+    if (!selectedSequence) {
+      alert('Please select a sequence first');
       return;
     }
 
-    setShowTemplateModal(false);
+    setShowSequenceModal(false);
     setBulkActionLoading(true);
 
     try {
@@ -212,16 +501,17 @@ export default function ContactsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contact_ids: Array.from(selectedIds),
-          template_id: selectedTemplate.id
+          sequence_id: selectedSequence.id
         })
       });
 
       const json = await response.json();
 
       if (json.success) {
-        alert(`✅ ${json.message}\n\nCampaign ID: ${json.data.campaign_id}\nQueued: ${json.data.total_queued} emails\nTemplate: ${selectedTemplate.name}`);
+        const itemCount = selectedSequence.items?.length || 0;
+        alert(`✅ ${json.message}\n\nCampaign ID: ${json.data.campaign_id}\nQueued: ${json.data.total_queued} emails\nSequence: ${selectedSequence.name}\nEmails per contact: ${itemCount}`);
         setSelectedIds(new Set());
-        setSelectedTemplate(null);
+        setSelectedSequence(null);
         fetchContacts(meta.page, activeTab);
       } else {
         setError(json.error || 'Failed to add contacts to queue');
@@ -234,17 +524,17 @@ export default function ContactsPage() {
   };
 
   const handleSendEmails = async () => {
-    if (!selectedTemplate) {
-      alert('Please select a template first');
+    if (!selectedSequence) {
+      alert('Please select a sequence first');
       return;
     }
 
-    setShowTemplateModal(false);
+    setShowSequenceModal(false);
     setBulkActionLoading(true);
 
     try {
       // First get an active sender from the database
-      const senderResponse = await fetch('/api/email-senders?is_active=true');
+      const senderResponse = await fetch('/api/senders?is_active=true');
       const senderJson = await senderResponse.json();
 
       if (!senderJson.success || !senderJson.data || senderJson.data.length === 0) {
@@ -254,13 +544,13 @@ export default function ContactsPage() {
 
       const sender = senderJson.data[0];
 
-      // Send emails using the selected template and sender
+      // Send emails using the selected sequence (first template)
       const response = await fetch('/api/contacts/send-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contact_ids: Array.from(selectedIds),
-          template_id: selectedTemplate.id,
+          sequence_id: selectedSequence.id,
           sender_id: sender.id
         })
       });
@@ -268,9 +558,9 @@ export default function ContactsPage() {
       const json = await response.json();
 
       if (json.success) {
-        alert(`✅ ${json.message}\n\nSent: ${json.data.sent_count} emails\nFailed: ${json.data.failed_count || 0}\nTemplate: ${selectedTemplate.name}\nSender: ${sender.from_name || sender.from_email}`);
+        alert(`✅ ${json.message}\n\nSent: ${json.data.sent_count} emails\nFailed: ${json.data.failed_count || 0}\nSequence: ${selectedSequence.name}\nSender: ${sender.from_name || sender.from_email}`);
         setSelectedIds(new Set());
-        setSelectedTemplate(null);
+        setSelectedSequence(null);
         fetchContacts(meta.page, activeTab);
       } else {
         setError(json.error || 'Failed to send emails');
@@ -592,75 +882,86 @@ export default function ContactsPage() {
         )}
       </Card>
 
-      {/* Template Selection Modal */}
-      <Dialog open={showTemplateModal} onOpenChange={setShowTemplateModal}>
+      {/* Sequence Selection Modal */}
+      <Dialog open={showSequenceModal} onOpenChange={setShowSequenceModal}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Select Email Template</DialogTitle>
+            <DialogTitle>Select Email Sequence</DialogTitle>
             <DialogDescription>
-              Choose a template to use for sending emails to {selectedIds.size} selected contact(s)
+              Choose a sequence to add {selectedIds.size} selected contact(s) to the queue
             </DialogDescription>
           </DialogHeader>
 
-          {templatesLoading ? (
+          {sequencesLoading ? (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="mt-2 text-sm text-muted-foreground">Loading templates...</p>
+              <p className="mt-2 text-sm text-muted-foreground">Loading sequences...</p>
             </div>
-          ) : templateError ? (
+          ) : sequenceError ? (
             <div className="flex flex-col items-center justify-center py-8">
               <AlertCircle className="h-12 w-12 text-destructive mb-2" />
-              <p className="text-lg font-semibold">Error Loading Templates</p>
-              <p className="text-sm text-muted-foreground text-center mt-2">{templateError}</p>
+              <p className="text-lg font-semibold">Error Loading Sequences</p>
+              <p className="text-sm text-muted-foreground text-center mt-2">{sequenceError}</p>
             </div>
-                  ) : templates.length === 0 ? (
+          ) : sequences.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <FileText className="h-12 w-12 text-muted-foreground mb-2" />
-              <p className="text-lg font-semibold">No Templates Found</p>
+              <Mail className="h-12 w-12 text-muted-foreground mb-2" />
+              <p className="text-lg font-semibold">No Sequences Found</p>
               <p className="text-sm text-muted-foreground text-center mt-2 max-w-md">
-                Create templates locally and sync your changes to reflect here. All templates are fetched from the Supabase database.
+                Create sequences first to add contacts to email queues. Go to the Sequences page to create one.
               </p>
             </div>
           ) : (
             <div className="space-y-3 py-4">
-              {templates.map((template) => (
+              {sequences.map((sequence) => (
                 <div
-                  key={template.id}
+                  key={sequence.id}
                   className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                    selectedTemplate?.id === template.id
+                    selectedSequence?.id === sequence.id
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                       : 'border-border hover:border-primary/50 hover:bg-muted/50'
                   }`}
-                  onClick={() => setSelectedTemplate(template)}
+                  onClick={() => setSelectedSequence(sequence)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{template.name}</h3>
-                        {!template.is_active && (
+                        <h3 className="font-semibold">{sequence.name}</h3>
+                        {!sequence.is_active && (
                           <span className="text-xs bg-muted-foreground/20 text-muted-foreground px-2 py-0.5 rounded">
                             Inactive
                           </span>
                         )}
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded capitalize">
-                          {template.category}
+                        <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded">
+                          {sequence.items?.length || 0} emails
                         </span>
                       </div>
-                      <p className="text-sm font-medium mt-1">{template.subject}</p>
-                      {template.description && (
-                        <p className="text-sm text-muted-foreground mt-2">{template.description}</p>
+                      {sequence.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{sequence.description}</p>
                       )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Created: {new Date(template.created_at).toLocaleDateString()}
-                      </p>
+                      {sequence.items && sequence.items.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {sequence.items.slice(0, 4).map((item, idx) => (
+                            <span key={item.id} className="text-xs bg-muted px-2 py-1 rounded">
+                              {idx + 1}. {item.template_name || 'Unknown'}
+                              {item.delay_days && ` (+${item.delay_days}d)`}
+                            </span>
+                          ))}
+                          {sequence.items.length > 4 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{sequence.items.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="ml-4">
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        selectedTemplate?.id === template.id
+                        selectedSequence?.id === sequence.id
                           ? 'border-primary bg-primary'
                           : 'border-muted-foreground'
                       }`}>
-                        {selectedTemplate?.id === template.id && (
+                        {selectedSequence?.id === sequence.id && (
                           <div className="w-2.5 h-2.5 rounded-full bg-white" />
                         )}
                       </div>
@@ -675,8 +976,8 @@ export default function ContactsPage() {
             <Button
               variant="outline"
               onClick={() => {
-                setShowTemplateModal(false);
-                setSelectedTemplate(null);
+                setShowSequenceModal(false);
+                setSelectedSequence(null);
               }}
               disabled={bulkActionLoading}
             >
@@ -684,7 +985,7 @@ export default function ContactsPage() {
             </Button>
             <Button
               onClick={handleConfirmAddToQueue}
-              disabled={!selectedTemplate || bulkActionLoading || templates.length === 0}
+              disabled={!selectedSequence || bulkActionLoading || sequences.length === 0}
               variant="outline"
               className="gap-2"
             >
@@ -700,7 +1001,7 @@ export default function ContactsPage() {
                 </>
               )}
             </Button>
-            {selectedTemplate && (
+            {selectedSequence && (
               <Button
                 onClick={handleSendEmails}
                 disabled={bulkActionLoading}
@@ -720,6 +1021,404 @@ export default function ContactsPage() {
               </Button>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sequence Wizard Modal */}
+      <Dialog open={showWizard} onOpenChange={setShowWizard}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {wizardStep === 'contacts' && 'Step 1: Selected Contacts'}
+              {wizardStep === 'sequence' && 'Step 2: Select Sequence'}
+              {wizardStep === 'validate' && 'Step 3: Validate Business Hours'}
+              {wizardStep === 'review' && 'Step 4: Review & Confirm'}
+              {wizardStep === 'confirm' && 'Confirming...'}
+            </DialogTitle>
+            <DialogDescription>
+              {wizardStep === 'contacts' && `Managing ${selectedIds.size} selected contact(s)`}
+              {wizardStep === 'sequence' && 'Choose an email sequence to send'}
+              {wizardStep === 'validate' && 'Check business hours and delivery timing'}
+              {wizardStep === 'review' && `Review ${queuedEmails.length} queued emails before confirming`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Step 1: Contacts */}
+          {wizardStep === 'contacts' && (
+            <div className="space-y-4 py-4">
+              {wizardLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">
+                    {wizardContacts.length} email contacts ready to process
+                  </div>
+                  {wizardContacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Mail className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <div className="text-sm font-medium">{contact.value}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {contact.country || 'Unknown Region'}
+                          </div>
+                        </div>
+                      </div>
+                      {contact.countryName && (
+                        <span className="text-xs bg-muted px-2 py-1 rounded">
+                          {contact.countryName}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowWizard(false)}>Cancel</Button>
+                <Button onClick={handleWizardNext} disabled={wizardContacts.length === 0}>
+                  Next <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* Step 2: Select Sequence */}
+          {wizardStep === 'sequence' && (
+            <div className="space-y-4 py-4">
+              {sequencesLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sequences.map((sequence) => (
+                    <div
+                      key={sequence.id}
+                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                        selectedSequenceForWizard?.id === sequence.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setSelectedSequenceForWizard(sequence)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-semibold">{sequence.name}</h3>
+                          {sequence.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{sequence.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs bg-blue-500/10 text-blue-500 px-2 py-1 rounded">
+                              {sequence.items?.length || 0} emails
+                            </span>
+                            {sequence.items?.slice(0, 3).map((item, idx) => (
+                              <span key={item.id} className="text-xs bg-muted px-2 py-1 rounded">
+                                {idx + 1}. {item.template_name}
+                                {item.delay_days && ` (+${item.delay_days}d)`}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {selectedSequenceForWizard?.id === sequence.id && (
+                          <CheckCircle2 className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={handleWizardBack}>Back</Button>
+                <Button onClick={handleWizardNext} disabled={!selectedSequenceForWizard}>
+                  Next <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* Step 3: Validate Business Hours */}
+          {wizardStep === 'validate' && (
+            <div className="space-y-4 py-4">
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <h3 className="font-semibold text-sm">Business Hours Validation</h3>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Checking business hours for each contact based on their country timezone...
+                </p>
+
+                {businessHoursWarnings.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Some contacts are outside business hours</span>
+                    </div>
+                    <div className="space-y-1">
+                      {businessHoursWarnings.map((warning, idx) => (
+                        <div key={idx} className="text-xs text-muted-foreground bg-background p-2 rounded">
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Delivery Options */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Delivery Options</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    className={`p-3 border rounded-lg text-left transition-colors ${
+                      deliveryOption === 'immediate'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                    onClick={() => setDeliveryOption('immediate')}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Send className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Immediate</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Send immediately if within hours</p>
+                  </button>
+
+                  <button
+                    className={`p-3 border rounded-lg text-left transition-colors ${
+                      deliveryOption === 'next_business_hours'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                    onClick={() => setDeliveryOption('next_business_hours')}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Next Business Hours</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Wait until business hours start</p>
+                  </button>
+
+                  <button
+                    className={`p-3 border rounded-lg text-left transition-colors ${
+                      deliveryOption === 'custom'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:bg-muted'
+                    }`}
+                    onClick={() => setDeliveryOption('custom')}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Custom Date/Time</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Choose specific date and time</p>
+                  </button>
+                </div>
+
+                {deliveryOption === 'custom' && (
+                  <input
+                    type="datetime-local"
+                    className="w-full px-3 py-2 border rounded-lg"
+                    value={customDateTime}
+                    onChange={(e) => setCustomDateTime(e.target.value)}
+                  />
+                )}
+              </div>
+
+              {/* Contacts Status */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Contact Status</h4>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {wizardContacts.map((contact) => (
+                    <div key={contact.id} className="flex items-center justify-between p-2 border rounded text-sm">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{contact.value}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {contact.countryName && (
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded">{contact.countryName}</span>
+                        )}
+                        {contact.businessHoursStatus === 'within_hours' && (
+                          <span className="text-xs bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded">Within Hours</span>
+                        )}
+                        {contact.businessHoursStatus === 'outside_hours' && (
+                          <span className="text-xs bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded">Outside Hours</span>
+                        )}
+                        {contact.businessHoursStatus === 'weekend' && (
+                          <span className="text-xs bg-orange-500/10 text-orange-600 px-2 py-0.5 rounded">Weekend</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={handleWizardBack}>Back</Button>
+                <Button onClick={handleWizardNext}>
+                  Review <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {/* Step 4: Review */}
+          {wizardStep === 'review' && (
+            <div className="space-y-4 py-4">
+              <div className="bg-muted/50 p-4 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold text-sm">Review Schedule</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Sequence</p>
+                    <p className="font-medium">{selectedSequenceForWizard?.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Total Emails</p>
+                    <p className="font-medium">{queuedEmails.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Contacts</p>
+                    <p className="font-medium">{wizardContacts.length}</p>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm">
+                  <p className="text-muted-foreground">Delivery: <span className="font-medium text-foreground">
+                    {deliveryOption === 'immediate' ? 'Immediate (if within hours)' : deliveryOption === 'next_business_hours' ? 'Next Business Hours' : 'Custom Date/Time'}
+                  </span></p>
+                </div>
+              </div>
+
+              {/* Timeline Preview */}
+              <div className="max-h-80 overflow-y-auto space-y-3">
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Schedule Timeline
+                </h4>
+
+                {/* Group emails by contact */}
+                {(() => {
+                  const groupedByEmail = new Map<string, typeof queuedEmails>();
+                  queuedEmails.forEach(email => {
+                    if (!groupedByEmail.has(email.contact_email)) {
+                      groupedByEmail.set(email.contact_email, []);
+                    }
+                    groupedByEmail.get(email.contact_email)!.push(email);
+                  });
+
+                  // Sort each group by position
+                  for (const emails of groupedByEmail.values()) {
+                    emails.sort((a, b) => a.position - b.position);
+                  }
+
+                  return Array.from(groupedByEmail.entries()).map(([email, emails]) => {
+                    const sentCount = emails.filter(e => e.status === 'ready').length;
+                    const totalCount = emails.length;
+
+                    return (
+                      <div key={email} className="border rounded-lg bg-background overflow-hidden">
+                        <div className="p-3 bg-muted/30 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-sm">{email}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{sentCount}/{totalCount} emails</span>
+                            <div className="h-1.5 w-20 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{ width: `${totalCount > 0 ? (sentCount / totalCount) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Timeline */}
+                        <div className="p-3">
+                          <div className="relative">
+                            {emails.map((emailItem, idx) => {
+                              const isLast = idx === emails.length - 1;
+                              const scheduleDate = emailItem.scheduled_at;
+                              const now = new Date();
+                              const isPast = scheduleDate < now;
+
+                              return (
+                                <div key={`${emailItem.contact_id}-${emailItem.position}`} className="relative flex gap-3 pb-3 last:pb-0">
+                                  {/* Timeline dot */}
+                                  <div className="relative z-10 flex flex-col items-center">
+                                    {emailItem.status === 'ready' ? (
+                                      <div className="h-6 w-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                        <CheckCircle2 className="h-3 w-3 text-white" />
+                                      </div>
+                                    ) : emailItem.status === 'weekend' ? (
+                                      <div className="h-6 w-6 rounded-full bg-orange-500 flex items-center justify-center">
+                                        <AlertCircle className="h-3 w-3 text-white" />
+                                      </div>
+                                    ) : (
+                                      <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                        <Clock className="h-3 w-3 text-white" />
+                                      </div>
+                                    )}
+                                    {!isLast && <div className="w-0.5 h-full bg-border min-h-6" />}
+                                  </div>
+
+                                  {/* Email content */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-medium text-muted-foreground">
+                                            Email {emailItem.position}
+                                          </span>
+                                          {emailItem.status === 'ready' && (
+                                            <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-1.5 py-0.5 rounded text-xs">Ready</span>
+                                          )}
+                                          {emailItem.status === 'weekend' && (
+                                            <span className="bg-orange-500/10 text-orange-600 border border-orange-500/20 px-1.5 py-0.5 rounded text-xs">Weekend</span>
+                                          )}
+                                          {emailItem.status === 'outside_hours' && (
+                                            <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 px-1.5 py-0.5 rounded text-xs">Outside Hours</span>
+                                          )}
+                                        </div>
+                                        <p className="text-sm font-medium truncate">{emailItem.template_subject}</p>
+                                        {emailItem.reason && (
+                                          <p className="text-xs text-muted-foreground">{emailItem.reason}</p>
+                                        )}
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <p className="text-xs text-muted-foreground">Scheduled</p>
+                                        <p className="text-sm font-medium">
+                                          {scheduleDate.toLocaleDateString() === now.toLocaleDateString()
+                                            ? `Today ${scheduleDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                            : scheduleDate.toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={handleWizardBack}>Back</Button>
+                <Button onClick={handleWizardNext} disabled={wizardLoading}>
+                  {wizardLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm & Queue All Emails'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -1,29 +1,35 @@
 "use client"
 
 import * as React from "react"
+import { toast } from "sonner"
 import {
   Plus,
   Search,
   Mail,
   Clock,
-  MoreVertical,
   Edit,
   Trash2,
   Power,
   PowerOff,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   GripVertical,
   X,
   Save,
   Calendar,
-  FolderOpen,
-  Link2,
   Eye,
-  EyeOff
+  Info,
+  Loader2,
+  TrendingUp,
+  CheckCircle2,
+  XCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { AccordionItem } from "@/components/ui/accordion"
+import { AddItemModal } from "@/components/sequences/AddItemModal"
 import { cn } from "@/lib/utils"
 
 interface Template {
@@ -32,7 +38,7 @@ interface Template {
   template_subject: string
   position: number
   delay_days: number
-  delay_hours: number
+  send_time: string
 }
 
 interface Sequence {
@@ -61,6 +67,42 @@ export default function SequencesPage() {
   const [previewItem, setPreviewItem] = React.useState<any | null>(null)
   const [editItem, setEditItem] = React.useState<any | null>(null)
   const [fullTemplateData, setFullTemplateData] = React.useState<any | null>(null)
+  const [categoryInputType, setCategoryInputType] = React.useState<'select' | 'custom'>('select')
+  const [showSequenceEditModal, setShowSequenceEditModal] = React.useState(false)
+  const [tempSequenceNumber, setTempSequenceNumber] = React.useState<number>(1)
+  const [expandedAccordion, setExpandedAccordion] = React.useState<'details' | 'content' | 'sequence' | null>(null)
+  const [editItemDelayDays, setEditItemDelayDays] = React.useState(0)
+  const [editItemSendTime, setEditItemSendTime] = React.useState("09:00")
+
+  // Action loading states
+  const [isCreatingSequence, setIsCreatingSequence] = React.useState(false)
+  const [isDeletingSequence, setIsDeletingSequence] = React.useState(false)
+  const [togglingSequenceId, setTogglingSequenceId] = React.useState<string | null>(null)
+  const [removingItemId, setRemovingItemId] = React.useState<string | null>(null)
+  const [isUpdatingTemplate, setIsUpdatingTemplate] = React.useState(false)
+
+  // Sequence stats state
+  const [sequenceStats, setSequenceStats] = React.useState<Map<string, any>>(new Map())
+  const [loadingStats, setLoadingStats] = React.useState<Set<string>>(new Set())
+
+  // Predefined email categories
+  const emailCategories = [
+    "Welcome",
+    "Onboarding",
+    "Promotion",
+    "Newsletter",
+    "Follow-up",
+    "Reminder",
+    "Announcement",
+    "Survey",
+    "Invitation",
+    "Thank You",
+    "Re-engagement",
+    "Product Update",
+    "Event",
+    "Transactional",
+    "Marketing"
+  ]
 
   // Form states
   const [formData, setFormData] = React.useState({
@@ -69,10 +111,33 @@ export default function SequencesPage() {
     is_active: true
   })
 
+  // Get sequence number for a template based on category
+  function getSequenceNumber(category: string, currentTemplateId?: string): number {
+    // Filter templates with same category
+    const sameCategoryTemplates = templates.filter(t =>
+      t.category === category && t.id !== currentTemplateId
+    )
+
+    // Sort by name to find the highest sequence number
+    const sequenceNumbers = sameCategoryTemplates.map(t => {
+      const match = t.name.match(new RegExp(`^${category}\\s*(\\d+)`, 'i'))
+      return match ? parseInt(match[1]) : 0
+    })
+
+    const maxNum = sequenceNumbers.length > 0 ? Math.max(...sequenceNumbers) : 0
+
+    // Check if current template has a custom sequence number
+    if (currentTemplateId && fullTemplateData?.sequence_number) {
+      return fullTemplateData.sequence_number
+    }
+
+    return maxNum + 1
+  }
+
   const [itemFormData, setItemFormData] = React.useState({
     template_id: "",
     delay_days: 0,
-    delay_hours: 0
+    send_time: "09:00"
   })
 
   React.useEffect(() => {
@@ -102,11 +167,12 @@ export default function SequencesPage() {
 
   const filteredSequences = sequences.filter(seq => {
     const matchesSearch = seq.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (seq.description && seq.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      (seq.description && seq.description.toLowerCase().includes(searchQuery.toLowerCase()))
     return matchesSearch
   })
 
   async function handleCreateSequence() {
+    setIsCreatingSequence(true)
     try {
       const res = await fetch("/api/sequences", {
         method: "POST",
@@ -119,9 +185,17 @@ export default function SequencesPage() {
         setSequences([json.data, ...sequences])
         setShowAddModal(false)
         setFormData({ name: "", description: "", is_active: true })
+        toast.success("Sequence created successfully", {
+          description: json.data.name
+        })
+      } else {
+        toast.error(json.error || "Failed to create sequence")
       }
     } catch (err) {
       console.error("Error creating sequence:", err)
+      toast.error("Failed to create sequence")
+    } finally {
+      setIsCreatingSequence(false)
     }
   }
 
@@ -156,6 +230,7 @@ export default function SequencesPage() {
   }
 
   async function handleToggleActive(sequence: Sequence) {
+    setTogglingSequenceId(sequence.id)
     try {
       const res = await fetch("/api/sequences", {
         method: "PUT",
@@ -176,15 +251,25 @@ export default function SequencesPage() {
             items: seq.items || []
           } : seq
         ))
+        const newStatus = !sequence.is_active ? "activated" : "deactivated"
+        toast.success(`Sequence ${newStatus}`, {
+          description: sequence.name
+        })
+      } else {
+        toast.error(json.error || "Failed to update sequence")
       }
     } catch (err) {
       console.error("Error toggling sequence:", err)
+      toast.error("Failed to update sequence")
+    } finally {
+      setTogglingSequenceId(null)
     }
   }
 
   async function handleDeleteSequence() {
     if (!showDeleteConfirm) return
 
+    setIsDeletingSequence(true)
     try {
       const res = await fetch(`/api/sequences?id=${showDeleteConfirm.id}`, {
         method: "DELETE"
@@ -194,20 +279,33 @@ export default function SequencesPage() {
       if (json.success) {
         setSequences(sequences.filter(seq => seq.id !== showDeleteConfirm.id))
         setShowDeleteConfirm(null)
+        toast.success("Sequence deleted successfully")
+      } else {
+        toast.error(json.error || "Failed to delete sequence")
       }
     } catch (err) {
       console.error("Error deleting sequence:", err)
+      toast.error("Failed to delete sequence")
+    } finally {
+      setIsDeletingSequence(false)
     }
   }
 
-  async function handleAddItem() {
-    if (!selectedSequenceForItem) return
+  async function handleAddItem(templateId?: string, delayDays?: number, sendTime?: string) {
+    if (!selectedSequenceForItem) return { success: false, error: "No sequence selected" }
+
+    // Use passed params or fall back to state
+    const data = {
+      template_id: templateId || itemFormData.template_id,
+      delay_days: delayDays ?? itemFormData.delay_days,
+      send_time: sendTime || itemFormData.send_time
+    }
 
     try {
       const res = await fetch(`/api/sequences/${selectedSequenceForItem.id}/items`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemFormData)
+        body: JSON.stringify(data)
       })
 
       const json = await res.json()
@@ -219,15 +317,20 @@ export default function SequencesPage() {
           setSequences(seqJson.data)
         }
         setShowAddItemModal(false)
-        setItemFormData({ template_id: "", delay_days: 0, delay_hours: 0 })
+        setItemFormData({ template_id: "", delay_days: 0, send_time: "09:00" })
         setSelectedSequenceForItem(null)
+        return { success: true }
+      } else {
+        return { success: false, error: json.error || "Failed to add template" }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding item:", err)
+      return { success: false, error: err.message || "An unexpected error occurred" }
     }
   }
 
   async function handleRemoveItem(sequenceId: string, itemId: string) {
+    setRemovingItemId(itemId)
     try {
       const res = await fetch(`/api/sequences/${sequenceId}/items?item_id=${itemId}`, {
         method: "DELETE"
@@ -239,21 +342,29 @@ export default function SequencesPage() {
           if (seq.id === sequenceId) {
             return {
               ...seq,
-              items: seq.items.filter(item => item.id !== itemId)
+              items: (seq.items || []).filter(item => item.id !== itemId)
             }
           }
           return seq
         }))
+        toast.success("Template removed from sequence")
+      } else {
+        toast.error(json.error || "Failed to remove template")
       }
     } catch (err) {
       console.error("Error removing item:", err)
+      toast.error("Failed to remove template")
+    } finally {
+      setRemovingItemId(null)
     }
   }
 
   async function handleUpdateTemplate() {
     if (!fullTemplateData) return
 
+    setIsUpdatingTemplate(true)
     try {
+      // Update template
       const res = await fetch(`/api/templates/${fullTemplateData.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -267,6 +378,19 @@ export default function SequencesPage() {
 
       const json = await res.json()
       if (json.success) {
+        // Also update sequence item settings if editing from sequence
+        if (editItem && editItem.sequenceId) {
+          await fetch(`/api/sequences/${editItem.sequenceId}/items`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              item_id: editItem.id,
+              delay_days: editItemDelayDays,
+              send_time: editItemSendTime
+            })
+          })
+        }
+
         // Refetch templates and sequences
         const [tempRes, seqRes] = await Promise.all([
           fetch("/api/templates"),
@@ -283,11 +407,17 @@ export default function SequencesPage() {
           items: seq.items || []
         })))
 
+        toast.success("Template updated successfully")
         setEditItem(null)
         setFullTemplateData(null)
+      } else {
+        toast.error(json.error || "Failed to update template")
       }
     } catch (err) {
       console.error("Error updating template:", err)
+      toast.error("Failed to update template")
+    } finally {
+      setIsUpdatingTemplate(false)
     }
   }
 
@@ -313,6 +443,10 @@ export default function SequencesPage() {
       if (json.success) {
         setEditItem({ ...item, sequenceId })
         setFullTemplateData(json.data)
+        setCategoryInputType('select')
+        setEditItemDelayDays(item.delay_days || 0)
+        setEditItemSendTime(item.send_time || "09:00")
+        setExpandedAccordion('sequence')
       }
     } catch (err) {
       console.error("Error fetching template:", err)
@@ -323,7 +457,7 @@ export default function SequencesPage() {
     const sequence = sequences.find(s => s.id === sequenceId)
     if (!sequence) return
 
-    const items = [...sequence.items]
+    const items = [...(sequence.items || [])]
     const currentIndex = items.findIndex(i => i.id === draggedItemId)
     if (currentIndex === -1 || currentIndex === targetIndex) return
 
@@ -389,12 +523,34 @@ export default function SequencesPage() {
     setDraggedItem(null)
   }
 
-  function toggleExpanded(sequenceId: string) {
+  async function toggleExpanded(sequenceId: string) {
     const newExpanded = new Set(expandedSequences)
-    if (newExpanded.has(sequenceId)) {
+    const isCurrentlyExpanded = newExpanded.has(sequenceId)
+
+    if (isCurrentlyExpanded) {
       newExpanded.delete(sequenceId)
     } else {
       newExpanded.add(sequenceId)
+
+      // Fetch stats if not already loaded
+      if (!sequenceStats.has(sequenceId)) {
+        setLoadingStats(prev => new Set(prev).add(sequenceId))
+        try {
+          const res = await fetch(`/api/sequences/${sequenceId}/stats`)
+          const json = await res.json()
+          if (json.success) {
+            setSequenceStats(prev => new Map(prev).set(sequenceId, json.data))
+          }
+        } catch (err) {
+          console.error('Failed to fetch sequence stats:', err)
+        } finally {
+          setLoadingStats(prev => {
+            const next = new Set(prev)
+            next.delete(sequenceId)
+            return next
+          })
+        }
+      }
     }
     setExpandedSequences(newExpanded)
   }
@@ -484,6 +640,10 @@ export default function SequencesPage() {
               onPreviewItem={handlePreviewItem}
               onEditItem={handleEditItem}
               draggedItem={draggedItem}
+              isTogglingActive={togglingSequenceId === sequence.id}
+              removingItemId={removingItemId}
+              stats={sequenceStats.get(sequence.id)}
+              isLoadingStats={loadingStats.has(sequence.id)}
             />
           ))}
         </div>
@@ -495,6 +655,7 @@ export default function SequencesPage() {
           title="Create New Sequence"
           onClose={() => setShowAddModal(false)}
           onSave={handleCreateSequence}
+          isLoading={isCreatingSequence}
         >
           <div className="space-y-4">
             <div>
@@ -561,6 +722,7 @@ export default function SequencesPage() {
           onSave={handleDeleteSequence}
           saveText="Delete"
           saveClassName="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          isLoading={isDeletingSequence}
         >
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -574,63 +736,18 @@ export default function SequencesPage() {
       )}
 
       {/* Add Item Modal */}
-      {showAddItemModal && selectedSequenceForItem && (
-        <Modal
-          title="Add Email to Sequence"
-          onClose={() => {
-            setShowAddItemModal(false)
-            setSelectedSequenceForItem(null)
-            setItemFormData({ template_id: "", delay_days: 0, delay_hours: 0 })
-          }}
-          onSave={handleAddItem}
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Email Template</label>
-              <select
-                className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={itemFormData.template_id}
-                onChange={(e) => setItemFormData({ ...itemFormData, template_id: e.target.value })}
-              >
-                <option value="">Select a template...</option>
-                {templates.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Delay Days</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="0"
-                  value={itemFormData.delay_days}
-                  onChange={(e) => setItemFormData({ ...itemFormData, delay_days: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Delay Hours</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="23"
-                  className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="0"
-                  value={itemFormData.delay_hours}
-                  onChange={(e) => setItemFormData({ ...itemFormData, delay_hours: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This email will be sent after the specified delay from the previous email in the sequence.
-            </p>
-          </div>
-        </Modal>
-      )}
+      <AddItemModal
+        isOpen={showAddItemModal}
+        onClose={() => {
+          setShowAddItemModal(false)
+          setSelectedSequenceForItem(null)
+        }}
+        onAdd={async (templateId, delayDays, sendTime) => {
+          return await handleAddItem(templateId, delayDays, sendTime)
+        }}
+        templates={templates}
+        sequenceName={selectedSequenceForItem?.name}
+      />
 
       {/* Preview Item Modal */}
       {previewItem && fullTemplateData && (
@@ -645,41 +762,41 @@ export default function SequencesPage() {
             setFullTemplateData(null)
           }}
           saveText="Close"
-          size="large"
+          size="xlarge"
         >
           <div className="space-y-4">
             {/* Email Header */}
-            <div className="bg-gradient-to-r from-muted/50 to-muted/30 rounded-t-lg border-b">
-              <div className="p-4 space-y-2">
+            <div className="bg-gradient-to-r from-muted/50 to-muted/30 rounded-t-lg border">
+              <div className="p-3 sm:p-4 space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <Mail className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <label className="text-xs font-medium text-muted-foreground">From:</label>
-                      <p className="text-sm">sender@example.com</p>
+                      <p className="text-sm truncate">sender@example.com</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <label className="text-xs font-medium text-muted-foreground">To:</label>
-                      <p className="text-sm">recipient@example.com</p>
+                      <p className="text-sm truncate">recipient@example.com</p>
                     </div>
                   </div>
                 </div>
                 <div className="pl-11">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <label className="text-xs font-medium text-muted-foreground">Subject:</label>
-                    <p className="text-sm font-semibold">{fullTemplateData.subject}</p>
+                    <p className="text-sm font-semibold truncate">{fullTemplateData.subject}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Email Body */}
+            {/* Email Body - with proper containment */}
             <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-              <div className="p-8 max-w-2xl mx-auto">
+              <div className="p-4 sm:p-6 max-w-full">
                 <div
-                  className="email-content prose prose-base max-w-none"
+                  className="email-content prose prose-sm sm:prose-base max-w-none overflow-x-auto"
                   dangerouslySetInnerHTML={{ __html: fullTemplateData.html_content }}
                   style={{
                     lineHeight: '1.6',
@@ -690,14 +807,12 @@ export default function SequencesPage() {
             </div>
 
             {/* Email Footer Info */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="grid grid-cols-3 gap-4 text-xs">
+            <div className="bg-muted/30 rounded-lg p-3 sm:p-4">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs">
                 <div>
                   <label className="font-medium text-muted-foreground">Delay</label>
                   <p className="mt-1 text-sm">
-                    {previewItem.delay_days > 0 && `${previewItem.delay_days}d `}
-                    {previewItem.delay_hours > 0 && `${previewItem.delay_hours}h`}
-                    {previewItem.delay_days === 0 && previewItem.delay_hours === 0 && "Immediate"}
+                    {previewItem.delay_days > 0 ? `${previewItem.delay_days}d` : "Same day"} at {previewItem.send_time || "09:00"}
                   </p>
                 </div>
                 <div>
@@ -706,24 +821,31 @@ export default function SequencesPage() {
                 </div>
                 <div>
                   <label className="font-medium text-muted-foreground">Category</label>
-                  <p className="mt-1 text-sm">{fullTemplateData.category || 'General'}</p>
+                  <p className="mt-1 text-sm truncate">{fullTemplateData.category || 'General'}</p>
                 </div>
               </div>
             </div>
           </div>
 
           <style jsx global>{`
+            .email-content {
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+            }
             .email-content p {
               margin-bottom: 1em;
+              max-width: 100%;
             }
             .email-content h1, .email-content h2, .email-content h3 {
               margin-top: 1.5em;
               margin-bottom: 0.75em;
               font-weight: 600;
+              word-wrap: break-word;
             }
             .email-content ul, .email-content ol {
               margin-left: 1.5em;
               margin-bottom: 1em;
+              max-width: 100%;
             }
             .email-content li {
               margin-bottom: 0.5em;
@@ -731,6 +853,7 @@ export default function SequencesPage() {
             .email-content a {
               color: #3b82f6;
               text-decoration: underline;
+              word-break: break-word;
             }
             .email-content strong, .email-content b {
               font-weight: 600;
@@ -750,6 +873,7 @@ export default function SequencesPage() {
               border-radius: 4px;
               font-family: monospace;
               font-size: 0.9em;
+              word-break: break-all;
             }
             .email-content pre {
               background-color: #f8fafc;
@@ -758,6 +882,7 @@ export default function SequencesPage() {
               padding: 1em;
               overflow-x: auto;
               margin: 1em 0;
+              max-width: 100%;
             }
             .email-content img {
               max-width: 100%;
@@ -767,13 +892,16 @@ export default function SequencesPage() {
             }
             .email-content table {
               width: 100%;
+              max-width: 100%;
               border-collapse: collapse;
               margin: 1em 0;
+              table-layout: auto;
             }
             .email-content th, .email-content td {
               border: 1px solid #e2e8f0;
               padding: 0.75em;
               text-align: left;
+              word-wrap: break-word;
             }
             .email-content th {
               background-color: #f8fafc;
@@ -810,51 +938,244 @@ export default function SequencesPage() {
           onClose={() => {
             setEditItem(null)
             setFullTemplateData(null)
+            setCategoryInputType('select')
+            setShowSequenceEditModal(false)
+            setExpandedAccordion(null)
           }}
           onSave={handleUpdateTemplate}
+          size="large"
+          isLoading={isUpdatingTemplate}
         >
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Template Name</label>
-              <input
-                type="text"
-                className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={fullTemplateData.name}
-                onChange={(e) => setFullTemplateData({ ...fullTemplateData, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Subject</label>
-              <input
-                type="text"
-                className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={fullTemplateData.subject}
-                onChange={(e) => setFullTemplateData({ ...fullTemplateData, subject: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Category</label>
-              <input
-                type="text"
-                className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={fullTemplateData.category || ''}
-                onChange={(e) => setFullTemplateData({ ...fullTemplateData, category: e.target.value })}
-                placeholder="e.g., Welcome, Promotion, Follow-up"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Email Body (HTML)</label>
-              <textarea
-                className="w-full mt-1 h-64 px-3 py-2 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono text-xs"
+            {/* Accordion 1: Template Details */}
+            <AccordionItem
+              title="Template Details"
+              icon={<Info className="h-4 w-4" />}
+              description={fullTemplateData.name || 'Configure template name, category, and subject'}
+              isExpanded={expandedAccordion === 'details'}
+              onToggle={() => setExpandedAccordion(expandedAccordion === 'details' ? null : 'details')}
+            >
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Template Name</label>
+                  <input
+                    type="text"
+                    className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={fullTemplateData.name}
+                    onChange={(e) => setFullTemplateData({ ...fullTemplateData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Category</label>
+                    {categoryInputType === 'select' ? (
+                      <div className="flex gap-2 mt-1">
+                        <select
+                          className="flex-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          value={fullTemplateData.category || ''}
+                          onChange={(e) => {
+                            if (e.target.value === 'custom') {
+                              setCategoryInputType('custom')
+                              setFullTemplateData({ ...fullTemplateData, category: '' })
+                            } else {
+                              setFullTemplateData({ ...fullTemplateData, category: e.target.value })
+                            }
+                          }}
+                        >
+                          <option value="">Select category...</option>
+                          {emailCategories.map((cat) => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                          <option value="custom">✏️ Custom...</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="text"
+                          className="flex-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          value={fullTemplateData.category || ''}
+                          onChange={(e) => setFullTemplateData({ ...fullTemplateData, category: e.target.value })}
+                          placeholder="Enter custom category..."
+                          autoFocus
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          onClick={() => setCategoryInputType('select')}
+                          title="Back to dropdown"
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sequence Number */}
+                  {fullTemplateData.category && (
+                    <div>
+                      <label className="text-sm font-medium">Sequence Number</label>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-10 px-3 bg-muted/50 border rounded-lg flex items-center">
+                          <span className="text-sm font-medium">
+                            {fullTemplateData.category} {getSequenceNumber(fullTemplateData.category, fullTemplateData.id)}
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 gap-1"
+                          onClick={() => {
+                            setTempSequenceNumber(getSequenceNumber(fullTemplateData.category, fullTemplateData.id))
+                            setShowSequenceEditModal(true)
+                          }}
+                          title="Edit sequence number"
+                        >
+                          <Edit className="h-3 w-3" />
+                          Edit
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Subject</label>
+                  <input
+                    type="text"
+                    className="w-full mt-1 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={fullTemplateData.subject}
+                    onChange={(e) => setFullTemplateData({ ...fullTemplateData, subject: e.target.value })}
+                  />
+                </div>
+              </div>
+            </AccordionItem>
+
+            {/* Accordion 2: Email Content */}
+            <AccordionItem
+              title="Email Content"
+              icon={<Edit className="h-4 w-4" />}
+              description={fullTemplateData.subject || 'Write your email content with the visual editor'}
+              isExpanded={expandedAccordion === 'content'}
+              onToggle={() => setExpandedAccordion(expandedAccordion === 'content' ? null : 'content')}
+            >
+              <RichTextEditor
                 value={fullTemplateData.html_content}
-                onChange={(e) => setFullTemplateData({ ...fullTemplateData, html_content: e.target.value })}
-                placeholder="<p>Your email content here...</p>"
+                onChange={(value) => setFullTemplateData({ ...fullTemplateData, html_content: value })}
+                placeholder="Start writing your email content..."
+                minHeight="200px"
               />
-            </div>
+            </AccordionItem>
+
+            {/* Accordion 3: Sequence Settings */}
+            {editItem && (
+              <AccordionItem
+                title="Sequence Settings"
+                icon={<Clock className="h-4 w-4" />}
+                description={`Delay: ${editItemDelayDays}d at ${editItemSendTime}`}
+                isExpanded={expandedAccordion === 'sequence'}
+                onToggle={() => setExpandedAccordion(expandedAccordion === 'sequence' ? null : 'sequence')}
+              >
+                <div className="bg-muted/30 border border-border/60 rounded-lg p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Delay Days */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                        After previous email
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          className="flex-1 h-9 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          value={editItemDelayDays}
+                          onChange={(e) => setEditItemDelayDays(parseInt(e.target.value) || 0)}
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">days</span>
+                      </div>
+                    </div>
+
+                    {/* Time of Day */}
+                    <div>
+                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">
+                        Send at time
+                      </label>
+                      <input
+                        type="time"
+                        className="w-full h-9 px-3 bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        value={editItemSendTime}
+                        onChange={(e) => setEditItemSendTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </AccordionItem>
+            )}
+
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-xs text-muted-foreground">
                 <strong>Note:</strong> This will update the template for all sequences using it. The changes will apply immediately.
               </p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Sequence Number Edit Modal */}
+      {showSequenceEditModal && (
+        <Modal
+          title={`Edit Sequence Number - ${fullTemplateData?.category || ''}`}
+          onClose={() => setShowSequenceEditModal(false)}
+          onSave={() => {
+            if (fullTemplateData) {
+              setFullTemplateData({ ...fullTemplateData, sequence_number: tempSequenceNumber })
+            }
+            setShowSequenceEditModal(false)
+          }}
+          size="small"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Sequence Number</label>
+              <input
+                type="number"
+                min="1"
+                className="w-full mt-2 h-10 px-3 bg-card border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={tempSequenceNumber}
+                onChange={(e) => setTempSequenceNumber(parseInt(e.target.value) || 1)}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                This will be displayed as <strong>{fullTemplateData?.category || 'Email'} {tempSequenceNumber}</strong>
+              </p>
+            </div>
+
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                <strong>Existing {fullTemplateData?.category || ''} emails:</strong>
+              </p>
+              <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                {templates
+                  .filter(t => t.category === fullTemplateData?.category && t.id !== fullTemplateData?.id)
+                  .sort((a, b) => {
+                    const aNum = a.name.match(new RegExp(`^${fullTemplateData?.category}\\s*(\\d+)`, 'i'))?.[1] || '0'
+                    const bNum = b.name.match(new RegExp(`^${fullTemplateData?.category}\\s*(\\d+)`, 'i'))?.[1] || '0'
+                    return parseInt(aNum) - parseInt(bNum)
+                  })
+                  .slice(0, 5)
+                  .map((t) => (
+                    <div key={t.id} className="text-xs flex items-center justify-between p-2 bg-background rounded">
+                      <span>{t.name}</span>
+                      <span className="text-muted-foreground">{t.subject || 'No subject'}</span>
+                    </div>
+                  ))}
+                {templates.filter(t => t.category === fullTemplateData?.category && t.id !== fullTemplateData?.id).length === 0 && (
+                  <p className="text-xs text-muted-foreground">No other emails in this category yet.</p>
+                )}
+              </div>
             </div>
           </div>
         </Modal>
@@ -878,7 +1199,11 @@ function SequenceCard({
   onDragEnd,
   onPreviewItem,
   onEditItem,
-  draggedItem
+  draggedItem,
+  isTogglingActive,
+  removingItemId,
+  stats,
+  isLoadingStats
 }: {
   sequence: Sequence
   isExpanded: boolean
@@ -895,9 +1220,13 @@ function SequenceCard({
   onPreviewItem: (item: any) => void
   onEditItem: (itemId: string, item: any) => void
   draggedItem: { sequenceId: string; itemId: string; index: number } | null
+  isTogglingActive?: boolean
+  removingItemId?: string | null
+  stats?: any
+  isLoadingStats?: boolean
 }) {
   const totalDelay = (sequence.items || []).reduce((acc, item) => {
-    return acc + (item.delay_days || 0) + ((item.delay_hours || 0) / 24)
+    return acc + (item.delay_days || 0)
   }, 0)
 
   return (
@@ -965,7 +1294,7 @@ function SequenceCard({
                   onDrop={(e) => onDrop(e, index)}
                   onDragEnd={onDragEnd}
                   className={cn(
-                    "p-3 bg-background rounded-lg border border-border/60 group/item hover:border-primary/30 transition-colors cursor-move",
+                    "relative p-3 pr-16 bg-background rounded-lg border border-border/60 group/item hover:border-primary/30 transition-colors cursor-move overflow-hidden",
                     draggedItem?.itemId === item.id && "opacity-50",
                     draggedItem?.sequenceId === sequence.id && draggedItem?.index !== index && "border-primary/50"
                   )}
@@ -987,46 +1316,50 @@ function SequenceCard({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.template_name}</p>
                             <p className="text-xs text-muted-foreground truncate">{item.template_subject}</p>
-                            {(item.delay_days > 0 || item.delay_hours > 0) && (
+                            {(item.delay_days > 0 || item.send_time) && (
                               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                                 <Calendar className="h-3 w-3" />
                                 <span>
-                                  {item.delay_days > 0 && `${item.delay_days}d `}
-                                  {item.delay_hours > 0 && `${item.delay_hours}h`}
-                                  {item.delay_days === 0 && item.delay_hours === 0 && "Immediate"}
+                                  {item.delay_days > 0 ? `${item.delay_days}d` : "Same day"} at {item.send_time || "09:00"}
                                 </span>
                               </div>
                             )}
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => onPreviewItem(item)}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => onEditItem(sequence.id, item)}
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => onRemoveItem(item.id)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
                       </div>
+                    </div>
+
+                    {/* Action Buttons - Absolute positioned with overlay */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity z-10">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 bg-background/95 backdrop-blur-sm border shadow-sm hover:bg-accent"
+                        onClick={() => onPreviewItem(item)}
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 bg-background/95 backdrop-blur-sm border shadow-sm hover:bg-accent"
+                        onClick={() => onEditItem(sequence.id, item)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 bg-background/95 backdrop-blur-sm border shadow-sm hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => onRemoveItem(item.id)}
+                        disabled={removingItemId === item.id}
+                      >
+                        {removingItemId === item.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="h-3 w-3" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1041,8 +1374,97 @@ function SequenceCard({
             onClick={onAddItem}
           >
             <Plus className="h-4 w-4" />
-            Add Email
+            Add More Templates
           </Button>
+
+          {/* Sequence Stats / History Section */}
+          <div className="mt-6 pt-4 border-t border-border/60">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <h4 className="text-sm font-semibold">Sending Progress</h4>
+            </div>
+
+            {isLoadingStats ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : stats && stats.positions && stats.positions.length > 0 ? (
+              <div className="space-y-3">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-3 gap-2 p-3 bg-muted/50 rounded-lg">
+                  <div className="text-center">
+                    <p className="text-lg font-bold">{stats.total_contacts || 0}</p>
+                    <p className="text-xs text-muted-foreground">Contacts</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold">{stats.total_emails || 0}</p>
+                    <p className="text-xs text-muted-foreground">Emails Sent</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold">{stats.sequence_items?.length || 0}</p>
+                    <p className="text-xs text-muted-foreground">In Sequence</p>
+                  </div>
+                </div>
+
+                {/* Per-Email Progress */}
+                <div className="space-y-2">
+                  {stats.positions.map((pos: any) => {
+                    const percent = pos.total > 0 ? Math.round((pos.sent / pos.total) * 100) : 0;
+
+                    return (
+                      <div key={pos.position} className="p-3 bg-background rounded-lg border">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                              {pos.position}
+                            </div>
+                            <span className="text-sm font-medium">
+                              Email {pos.position}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-emerald-500">{pos.sent} sent</span>
+                            {pos.failed > 0 && (
+                              <span className="text-destructive">{pos.failed} failed</span>
+                            )}
+                            {pos.queued > 0 && (
+                              <span className="text-amber-500">{pos.queued} queued</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary transition-all"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {percent}% complete ({pos.sent}/{pos.total} recipients)
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Recent Activity */}
+                {stats.recent_activity && stats.recent_activity.length > 0 && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => window.location.href = '/history'}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      View full history
+                      <ChevronRight className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-sm text-muted-foreground">
+                No sending activity yet for this sequence
+              </div>
+            )}
+          </div>
         </CardContent>
       )}
 
@@ -1062,8 +1484,14 @@ function SequenceCard({
                 : "text-green-500 hover:text-green-600 hover:bg-green-500/10"
             )}
             onClick={onToggleActive}
+            disabled={isTogglingActive}
           >
-            {sequence.is_active ? (
+            {isTogglingActive ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                {sequence.is_active ? "Deactivating..." : "Activating..."}
+              </>
+            ) : sequence.is_active ? (
               <>
                 <PowerOff className="h-3.5 w-3.5 mr-1" />
                 Deactivate
@@ -1096,6 +1524,8 @@ function Modal({
   onSave,
   saveText = "Save",
   saveClassName = "",
+  size = "medium",
+  isLoading = false,
   children
 }: {
   title: string
@@ -1103,27 +1533,50 @@ function Modal({
   onSave: () => void
   saveText?: string
   saveClassName?: string
+  size?: "small" | "medium" | "large" | "xlarge" | "full"
+  isLoading?: boolean
   children: React.ReactNode
 }) {
+  const sizeClasses = {
+    small: "max-w-sm",
+    medium: "max-w-md",
+    large: "max-w-2xl",
+    xlarge: "max-w-4xl",
+    full: "max-w-5xl"
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <div className="bg-card rounded-xl border shadow-lg w-full max-w-md animate-in fade-in duration-200">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+      <div className={cn(
+        "bg-card rounded-xl border shadow-lg w-full animate-in fade-in duration-200 flex flex-col",
+        sizeClasses[size],
+        size === "full" ? "h-[90vh]" : "max-h-[90vh]"
+      )}>
+        <div className="flex items-center justify-between p-4 border-b shrink-0">
+          <h3 className="text-lg font-semibold truncate">{title}</h3>
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose} disabled={isLoading}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="p-4">{children}</div>
+        <div className="p-4 overflow-y-auto overflow-x-hidden flex-1 min-h-0">{children}</div>
 
-        <div className="flex items-center justify-end gap-2 p-4 border-t">
-          <Button variant="outline" onClick={onClose}>
+        <div className="flex items-center justify-end gap-2 p-4 border-t shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button className={cn("gap-2", saveClassName)} onClick={onSave}>
-            <Save className="h-4 w-4" />
-            {saveText}
+          <Button className={cn("gap-2", saveClassName)} onClick={onSave} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {saveText}...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {saveText}
+              </>
+            )}
           </Button>
         </div>
       </div>

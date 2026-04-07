@@ -5,9 +5,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
-    
+    const search = searchParams.get('search');
+
     let query = `
-      SELECT t.*, 
+      SELECT t.*,
              COALESCE(
                json_agg(
                  json_build_object('group_id', g.id, 'group_name', g.name, 'position', m.position)
@@ -17,17 +18,28 @@ export async function GET(request: Request) {
       LEFT JOIN template_group_mapping m ON t.id = m.template_id
       LEFT JOIN template_groups g ON m.group_id = g.id
     `;
+    const conditions: string[] = [];
     const params: any[] = [];
-    
+    let paramIndex = 1;
+
     if (category) {
-      query += ` WHERE t.category = $1`;
+      conditions.push(`t.category = $${paramIndex++}`);
       params.push(category);
     }
-    
+
+    if (search) {
+      conditions.push(`(t.name ILIKE $${paramIndex++} OR t.subject ILIKE $${paramIndex++})`);
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
     query += ` GROUP BY t.id ORDER BY t.created_at DESC`;
-    
+
     const templates = await executeQuery(query, params);
-    
+
     return NextResponse.json({ success: true, data: templates });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
