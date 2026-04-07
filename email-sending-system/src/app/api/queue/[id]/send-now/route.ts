@@ -1,0 +1,110 @@
+import { NextResponse } from 'next/server';
+import { executeQuery } from '@/lib/db/postgres';
+import { sendEmailWithNodemailer } from '@/lib/email/sender';
+
+interface RouteContext {
+  params: {
+    id: string;
+  };
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    const { id } = context.params;
+
+    // 1. Fetch the queue item with all required data
+    const queueItems = await executeQuery(`
+      SELECT q.*, s.app_password, s.email as sender_email, s.smtp_host, s.smtp_port, s.smtp_user, s.password
+      FROM email_queue q
+      LEFT JOIN email_senders s ON q.sender_id = s.id
+      WHERE q.id = $1
+    `, [id]);
+
+    if (!queueItems || queueItems.length === 0) {
+      return NextResponse.json({ success: false, error: 'Queue item not found' }, { status: 404 });
+    }
+
+    const item = queueItems[0];
+
+    // Check if already sent
+    if (item.status === 'sent') {
+      return NextResponse.json({ success: false, error: 'Email already sent' }, { status: 400 });
+    }
+
+    // 2. Assign sender if not already assigned
+    let senderCredentials = item;
+    if (!item.sender_id) {
+      const avSender = await executeQuery(
+        `SELECT * FROM email_senders WHERE is_active = true AND sent_today < daily_limit LIMIT 1`
+      );
+      if (avSender.length === 0) {
+        return NextResponse.json({ success: false, error: 'No active senders available with capacity' }, { status: 400 });
+      }
+
+      senderCredentials = avSender[0];
+      await executeQuery(`UPDATE email_queue SET sender_id = $1 WHERE id = $2`, [senderCredentials.id, item.id]);
+    }
+
+    // 3. Mark as sending
+    await executeQuery(
+      `UPDATE email_queue SET status = 'sending', updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // 4. Send the email
+    try {
+      const info = await sendEmailWithNodemailer(
+        senderCredentials.id || item.sender_id,
+        item.recipient_email,
+        item.subject,
+        item.html_content
+      );
+
+      // 5. Mark as sent
+      await executeQuery(`
+        UPDATE email_queue
+        SET status = 'sent', sent_at = NOW(), error_message = NULL, updated_at = NOW()
+        WHERE id = $1
+      `, [id]);
+
+      // 6. Update send log
+      await executeQuery(`
+        INSERT INTO email_send_log (contact_id, contact_email, campaign_id, send_type, status, sent_at)
+        VALUES ($1, $2, $3, $4, 'sent', NOW())
+      `, [item.contact_id, item.recipient_email, item.campaign_id, `manual_send_pos_${item.sequence_position}`]);
+
+      // 7. Increment sender today count
+      await executeQuery(
+        `UPDATE email_senders SET sent_today = sent_today + 1 WHERE id = $1`,
+        [senderCredentials.id || item.sender_id]
+      );
+
+      // 8. Fetch updated item
+      const [updatedItem] = await executeQuery(`SELECT * FROM email_queue WHERE id = $1`, [id]);
+
+      return NextResponse.json({
+        success: true,
+        data: updatedItem,
+        message: 'Email sent successfully'
+      });
+
+    } catch (sendError: any) {
+      // Mark as failed
+      const attempts = (item.attempts || 0) + 1;
+      await executeQuery(`
+        UPDATE email_queue
+        SET status = 'failed', attempts = $1, error_message = $2, updated_at = NOW()
+        WHERE id = $3
+      `, [attempts, sendError.message, id]);
+
+      return NextResponse.json({
+        success: false,
+        error: sendError.message,
+        data: { ...item, status: 'failed', attempts, error_message: sendError.message }
+      }, { status: 500 });
+    }
+
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

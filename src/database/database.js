@@ -127,6 +127,7 @@ function initDatabase() {
     { name: "meta_description", type: "TEXT" },
     { name: "retry_count", type: "INTEGER DEFAULT 0" },
     { name: "last_retried_at", type: "DATETIME" },
+    { name: "timezone", type: "TEXT" },
   ];
 
   for (const col of migrationColumns) {
@@ -287,6 +288,16 @@ function initDatabase() {
   for (const col of aiColumns) {
     try {
       db.exec(`ALTER TABLE sites ADD COLUMN ${col.name} ${col.type}`);
+    } catch (e) {
+      // Column already exists
+    }
+  }
+
+  // Migrations for sync tracking
+  const syncTables = ['sites', 'searches', 'contacts', 'company_executives', 'keywords'];
+  for (const table of syncTables) {
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN is_sync_to_prod INTEGER DEFAULT 0`);
     } catch (e) {
       // Column already exists
     }

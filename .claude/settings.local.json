@@ -60,7 +60,31 @@
       "Bash(node -e \"try { const { all } = require\\('./src/database/database.js'\\); const countries = all\\('SELECT * FROM country_timezones LIMIT 1'\\); console.log\\('DB OK'\\); } catch\\(e\\) { console.log\\('DB Error:', e.message\\); } try { require\\('./src/services/email/timezone-scheduler.js'\\); console.log\\('Scheduler OK'\\); } catch\\(e\\) { console.log\\('Scheduler Error:', e.message\\); }\")",
       "Bash(node test-api-response.js)",
       "Bash(node -c \"src/services/email/timezone-scheduler.js\")",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(node:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm add:*)",
+      "Bash(ls -la src/app/api/status/ src/app/api/campaigns/*/stats/ src/app/api/senders/*/)",
+      "Bash(ls -la src/app/api/queue/[id]/)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell:*)",
+      "Bash(curl -s \"http://localhost:8080/api/contacts/all?page=1&limit=2\")",
+      "Bash(curl -s http://localhost:3000/api/contacts?page=1)",
+      "Bash(limit=5 2>&1)",
+      "Bash(curl -v http://localhost:3000/api/contacts)",
+      "Bash(curl -s \"http://localhost:3000/api/contacts?page=1&limit=5\")",
+      "Bash(curl -s \"http://localhost:3000/api/contacts?page=1&limit=2\")",
+      "Bash(curl -s \"http://localhost:3000/api/contacts?page=1&limit=20\")",
+      "Bash(python -m json.tool)",
+      "Bash(python -c \"import sys, json; data = json.load\\(sys.stdin\\); print\\('Success:', data.get\\('success'\\)\\); print\\('Data type:', type\\(data.get\\('data'\\)\\)\\); print\\('Data length:', len\\(data.get\\('data', []\\)\\)\\); print\\('Meta:', data.get\\('meta'\\)\\)\")",
+      "Bash(curl -s \"http://localhost:3000/contacts\")",
+      "Bash(curl -s \"http://localhost:3000/api/contacts\" -w \"\\\\nHTTP Status: %{http_code}\\\\n\")",
+      "Bash(curl -s \"http://localhost:3000/api/contacts\")",
+      "Bash(curl -s http://localhost:3000/api/status/stats)",
+      "Bash(curl -s http://localhost:3001/api/sequences)",
+      "Bash(findstr :3001)",
+      "Bash(timeout 5)",
+      "Bash(cmd //c taskkill //PID 8896 //F)"
     ]
   }
 }

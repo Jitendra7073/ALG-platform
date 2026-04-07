@@ -215,6 +215,10 @@ app.use("/api/email", timezoneAwareApi);
 // Mount LinkedIn credentials API routes
 app.use("/api/linkedin/credentials", linkedinCredentialsRouter);
 
+// Sync Logic Route
+const syncApiRouter = require("./sync-database-api.js");
+app.use("/api", syncApiRouter);
+
 // ============ API ROUTES ============
 
 // =====================================================
