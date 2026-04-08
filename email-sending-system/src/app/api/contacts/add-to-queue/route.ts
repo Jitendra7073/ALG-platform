@@ -167,7 +167,7 @@ export async function POST(request: Request) {
         if (templateInfo.delay_days) {
           scheduledAt.setDate(scheduledAt.getDate() + templateInfo.delay_days);
         }
-        if (templateInfo.delay_hours) {
+        if ('delay_hours' in templateInfo && templateInfo.delay_hours) {
           scheduledAt.setHours(scheduledAt.getHours() + templateInfo.delay_hours);
         }
 

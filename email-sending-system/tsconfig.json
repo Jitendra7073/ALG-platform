@@ -24,11 +24,17 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/**/__tests__/**",
+    "src/**/examples/**",
+    "src/app/history/**",
+    "src/components/ui/rich-text-editor.tsx",
+    "src/lib/db/seed-country-timezones.ts"
+  ]
 }

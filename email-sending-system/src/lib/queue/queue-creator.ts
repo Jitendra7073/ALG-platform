@@ -60,7 +60,7 @@ export async function createQueueEntryWithValidation(params: QueueEntryParams): 
     let scheduleResult;
     if (params.sequence_position === 1 || !params.previous_scheduled_at) {
       // First email - no dependency
-      scheduleResult = calculateOptimalSchedule({
+      scheduleResult = await calculateOptimalSchedule({
         recipient_country: country || 'US',
         recipient_timezone: timezone,
         base_time: new Date().toISOString(),
@@ -68,7 +68,7 @@ export async function createQueueEntryWithValidation(params: QueueEntryParams): 
       });
     } else {
       // Follow-up email - depends on previous
-      scheduleResult = calculateDependentSchedule(
+      scheduleResult = await calculateDependentSchedule(
         params.previous_scheduled_at,
         params.gap_days || 5,
         {
@@ -100,7 +100,7 @@ export async function createQueueEntryWithValidation(params: QueueEntryParams): 
       timezone: timezone,
       country_code: country,
       schedule_validation: JSON.stringify(validationResult),
-      adjustment_reason: scheduleResult.adjustments.map(a => a.reason).join('; ') || null,
+      adjustment_reason: scheduleResult.adjustments.map((a: any) => a.reason).join('; ') || null,
       timezone_conversion_data: JSON.stringify(scheduleResult.timezone_conversion),
       metadata: JSON.stringify({
         country_info: scheduleResult.country_info,

@@ -342,7 +342,7 @@ export async function revalidateDependencySchedule(
   }
 
   return {
-    still_valid,
+    still_valid: stillValid,
     reasons
   };
 }

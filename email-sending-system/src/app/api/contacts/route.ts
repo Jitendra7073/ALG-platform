@@ -85,8 +85,11 @@ export async function GET(request: Request) {
       total: 0
     };
     statsData.forEach((row: any) => {
-      stats[row.type] = parseInt(row.count);
-      stats.total += parseInt(row.count);
+      const contactType = row.type as 'email' | 'phone' | 'linkedin';
+      if (contactType in stats) {
+        stats[contactType] = parseInt(row.count);
+        stats.total += parseInt(row.count);
+      }
     });
 
     // Enrich results with timezone confidence scores
@@ -161,9 +164,9 @@ export async function POST(request: Request) {
     let detectionSource = 'provided';
 
     if (!detectedTimezone && country_code) {
-      const detection = detectTimezone(country_code);
-      detectedTimezone = detection.timezone;
-      detectionConfidence = detection.confidence;
+      const detection = await detectTimezone(country_code);
+      detectedTimezone = detection?.timezone;
+      detectionConfidence = detection?.confidence;
       detectionSource = 'auto-detected';
     } else if (detectedTimezone) {
       detectionConfidence = getTimezoneConfidence(detectedTimezone, country_code);

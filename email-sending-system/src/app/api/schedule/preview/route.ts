@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db/postgres';
-import { calculateSchedule } from '@/lib/schedule/timezone-calculator';
+import { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';
 
 /**
  * POST /api/schedule/preview
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
         const template = templateGroup.templates[i];
         const isFirstEmail = i === 0;
 
-        const calculation = calculateSchedule({
+        const calculation = await calculateOptimalSchedule({
           recipient_country: contact.country || 'US',
           recipient_timezone: contact.timezone,
           base_time: baseTime,

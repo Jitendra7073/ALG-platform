@@ -6,7 +6,7 @@
  */
 
 import { executeQuery, dbPool } from '@/lib/db/postgres';
-import { calculateSchedule } from '@/lib/schedule/timezone-calculator';
+import { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';
 
 export interface ActivationResult {
   activated_count: number;
@@ -89,7 +89,7 @@ export async function activateDependentEmails(
         );
 
         // Calculate new schedule based on actual send time
-        const schedule = calculateSchedule({
+        const schedule = await calculateOptimalSchedule({
           recipient_country: dependent.country_code || 'US',
           recipient_timezone: dependent.recipient_timezone || 'UTC',
           base_time: sentAt.toISOString(), // Use ACTUAL send time

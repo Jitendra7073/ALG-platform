@@ -12,10 +12,11 @@ import { executeQuery } from '@/lib/db/postgres';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const emailId = parseInt(params.id);
+    const { id } = await params;
+    const emailId = parseInt(id);
 
     if (isNaN(emailId)) {
       return NextResponse.json({

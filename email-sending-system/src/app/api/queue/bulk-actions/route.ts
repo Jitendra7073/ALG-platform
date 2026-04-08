@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: `Successfully performed ${action} for ${recipientEmail}`,
-      affectedCount: result.rowCount || queueIds.length
+      affectedCount: Array.isArray(result) ? result.length : queueIds.length
     });
   } catch (error: any) {
     return NextResponse.json({

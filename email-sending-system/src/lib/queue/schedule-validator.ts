@@ -9,7 +9,7 @@
  */
 
 import { executeQuery } from '@/lib/db/postgres';
-import { calculateSchedule } from '@/lib/schedule/timezone-calculator';
+import { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';
 
 export interface ValidationResult {
   valid: boolean;
@@ -48,7 +48,7 @@ export async function revalidateSchedule(params: ScheduleValidationParams): Prom
     const countryRules = await getCountryTimezoneRules(country_code);
 
     // Calculate what the schedule SHOULD be now
-    const recalculatedSchedule = calculateSchedule({
+    const recalculatedSchedule = await calculateOptimalSchedule({
       recipient_country: country_code,
       recipient_timezone,
       base_time: new Date().toISOString(), // Recalculate from now

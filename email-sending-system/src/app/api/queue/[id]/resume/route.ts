@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db/postgres';
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function POST(request: Request, context: RouteContext) {

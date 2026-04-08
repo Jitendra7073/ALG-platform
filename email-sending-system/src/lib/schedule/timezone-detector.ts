@@ -171,8 +171,8 @@ async function getCountryTimezoneFromDB(countryCode: string): Promise<TimezoneDe
     `;
     const result = await executeQuery(query, [countryCode.toUpperCase()]);
 
-    if (result.rows.length > 0) {
-      const row = result.rows[0];
+    if (result.length > 0) {
+      const row = result[0];
       return {
         timezone: row.default_timezone,
         country_code: row.country_code,

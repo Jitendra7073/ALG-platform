@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     }
 
     // Calculate schedule using the timezone calculator
-    const calculationResult = calculateOptimalSchedule({
+    const calculationResult = await calculateOptimalSchedule({
       recipient_country,
       recipient_timezone: countryInfo?.default_timezone || recipient_timezone,
       base_time,

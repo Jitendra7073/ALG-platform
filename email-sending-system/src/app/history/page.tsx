@@ -19,6 +19,7 @@ import {
   Circle,
   MoreHorizontal,
   AlertCircle,
+  AlertTriangle,
   Pause,
   Play,
   X,

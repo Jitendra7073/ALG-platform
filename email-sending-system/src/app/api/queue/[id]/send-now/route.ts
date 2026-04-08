@@ -3,9 +3,9 @@ import { executeQuery } from "@/lib/db/postgres";
 import { sendEmailWithNodemailer } from "@/lib/email/sender";
 
 interface RouteContext {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function POST(request: Request, context: RouteContext) {

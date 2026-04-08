@@ -68,5 +68,6 @@ export function calculateExecutionTime(
 
 /**
  * Export the enhanced calculator for easy migration
+ * @deprecated Use calculateOptimalSchedule from @/lib/schedule/timezone-calculator instead
  */
-export { calculateSchedule } from '@/lib/schedule/timezone-calculator';
+export { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';

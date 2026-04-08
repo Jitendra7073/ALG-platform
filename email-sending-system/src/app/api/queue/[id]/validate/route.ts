@@ -16,10 +16,11 @@ import { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const emailId = parseInt(params.id);
+    const { id } = await params;
+    const emailId = parseInt(id);
 
     if (isNaN(emailId)) {
       return NextResponse.json({
@@ -91,7 +92,7 @@ export async function POST(
     const timezone = email.timezone || email.site_timezone;
 
     // Recalculate schedule with current rules
-    const recalculatedSchedule = calculateOptimalSchedule({
+    const recalculatedSchedule = await calculateOptimalSchedule({
       recipient_country: country,
       recipient_timezone: timezone || undefined,
       base_time: baseTime,
@@ -149,7 +150,9 @@ export async function POST(
         validated_at: new Date().toISOString(),
         validation_method: 'timezone_aware_recalculation',
         rules_version: 'current',
-        can_auto_adjust: email.status === 'pending'
+        can_auto_adjust: email.status === 'pending',
+        auto_adjusted: false,
+        adjusted_at: undefined as string | undefined
       }
     };
 

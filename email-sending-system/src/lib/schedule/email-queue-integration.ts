@@ -6,7 +6,7 @@
  */
 
 import { executeQuery, dbPool } from '@/lib/db/postgres';
-import { calculateSchedule } from './timezone-calculator';
+import { calculateOptimalSchedule } from './timezone-calculator';
 
 export interface EmailScheduleParams {
   campaign_id: string;
@@ -24,7 +24,7 @@ export interface EmailScheduleParams {
   html_content: string;
   text_content?: string;
   sequence_position?: number;
-  parent_queue_id?: string;
+  parent_queue_id?: string | null;
 }
 
 export interface BatchScheduleParams {
@@ -71,7 +71,7 @@ export async function scheduleEmail(params: EmailScheduleParams): Promise<string
     } = params;
 
     // Calculate timezone-aware schedule
-    const schedule = calculateSchedule({
+    const schedule = await calculateOptimalSchedule({
       recipient_country,
       recipient_timezone,
       base_time,
@@ -179,7 +179,7 @@ export async function scheduleBatchEmails(params: BatchScheduleParams): Promise<
         }
 
         // Calculate timezone-aware schedule
-        const schedule = calculateSchedule({
+        const schedule = await calculateOptimalSchedule({
           recipient_country: contact.country_code,
           recipient_timezone: contact.timezone,
           base_time,
@@ -309,7 +309,7 @@ export async function scheduleEmailSequence(params: {
       scheduledIds.push(queueId);
 
       // Update base time for next email (use the scheduled time)
-      const schedule = calculateSchedule({
+      const schedule = await calculateOptimalSchedule({
         recipient_country: params.contact.country_code || 'US',
         recipient_timezone: params.contact.timezone,
         base_time: baseTime,
@@ -377,7 +377,7 @@ export async function rescheduleEmails(params: {
         const email = emailResult.rows[0];
 
         // Recalculate schedule
-        const schedule = calculateSchedule({
+        const schedule = await calculateOptimalSchedule({
           recipient_country: email.country_code || 'US',
           recipient_timezone: email.recipient_timezone,
           base_time: params.new_base_time,

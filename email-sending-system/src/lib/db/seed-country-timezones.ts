@@ -197,12 +197,13 @@ export async function verifySeedData(): Promise<{
     result.count = parseInt(countResult[0]?.count || '0', 10);
 
     // Get sample records
-    result.sample = await executeQuery(`
+    const sampleResult = await executeQuery(`
       SELECT country_code, country_name, default_timezone, weekend_days
       FROM country_timezones
       ORDER BY country_name
       LIMIT 5
     `);
+    result.sample = sampleResult as any;
 
     // Validate critical countries exist
     const criticalCountries = ['US', 'GB', 'IN', 'CA', 'AU'];

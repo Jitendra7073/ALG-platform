@@ -45,7 +45,7 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> | null }) =>
     }
   }
 
-  const setHeading = (level: number) => {
+  const setHeading = (level: 1 | 2 | 3 | 4 | 5 | 6) => {
     editor.chain().focus().toggleHeading({ level }).run()
   }
 
@@ -243,7 +243,7 @@ export function RichTextEditor({
   // Update editor content when value changes externally
   React.useEffect(() => {
     if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value, false)
+      editor.commands.setContent(value, { emitUpdate: false })
     }
   }, [value, editor])
 

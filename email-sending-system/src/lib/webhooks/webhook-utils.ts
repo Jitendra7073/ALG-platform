@@ -60,11 +60,11 @@ export function extractSignature(request: NextRequest): string | null {
  */
 export class WebhookRateLimiter {
   private requests: Map<string, number[]> = new Map();
-  private readonly windowMs: number;
+  private readonly _windowMs: number;
   private readonly maxRequests: number;
 
   constructor(windowMs: number = 60000, maxRequests: number = 100) {
-    this.windowMs = windowMs;
+    this._windowMs = windowMs;
     this.maxRequests = maxRequests;
 
     // Clean up old entries every minute
@@ -78,7 +78,7 @@ export class WebhookRateLimiter {
    */
   isRateLimited(identifier: string): boolean {
     const now = Date.now();
-    const windowStart = now - this.windowMs;
+    const windowStart = now - this._windowMs;
 
     // Get existing requests for this identifier
     let timestamps = this.requests.get(identifier) || [];
@@ -103,7 +103,7 @@ export class WebhookRateLimiter {
    */
   getRemainingRequests(identifier: string): number {
     const now = Date.now();
-    const windowStart = now - this.windowMs;
+    const windowStart = now - this._windowMs;
     const timestamps = this.requests.get(identifier) || [];
     const validTimestamps = timestamps.filter(timestamp => timestamp > windowStart);
 
@@ -118,11 +118,18 @@ export class WebhookRateLimiter {
   }
 
   /**
+   * Get the rate limiter window size in milliseconds
+   */
+  get windowMs(): number {
+    return this._windowMs;
+  }
+
+  /**
    * Clean up old entries
    */
   private cleanup(): void {
     const now = Date.now();
-    const windowStart = now - this.windowMs;
+    const windowStart = now - this._windowMs;
 
     for (const [identifier, timestamps] of this.requests.entries()) {
       const validTimestamps = timestamps.filter(timestamp => timestamp > windowStart);

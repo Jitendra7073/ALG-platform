@@ -4,12 +4,12 @@
  * Run with: npm test (if jest is configured) or use these examples for manual testing
  */
 
-import { calculateSchedule, isValidTimezone } from '../timezone-calculator';
+import { calculateOptimalSchedule, isValidTimezone } from '../timezone-calculator';
 
 describe('Timezone Calculator', () => {
-  describe('calculateSchedule', () => {
-    test('should adjust weekend date to Monday', () => {
-      const result = calculateSchedule({
+  describe('calculateOptimalSchedule', () => {
+    test('should adjust weekend date to Monday', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'US',
         recipient_timezone: 'America/New_York',
         base_time: '2026-04-06T09:00:00Z', // Sunday
@@ -24,8 +24,8 @@ describe('Timezone Calculator', () => {
       expect(result.adjustments[0].reason).toContain('Sunday');
     });
 
-    test('should respect different weekend days for Middle East', () => {
-      const result = calculateSchedule({
+    test('should respect different weekend days for Middle East', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'AE', // UAE - Friday/Saturday weekend
         recipient_timezone: 'Asia/Dubai',
         base_time: '2026-04-04T09:00:00Z', // Friday
@@ -39,8 +39,8 @@ describe('Timezone Calculator', () => {
       expect(result.country_info.weekend_days).toContain('Saturday');
     });
 
-    test('should adjust time outside business hours', () => {
-      const result = calculateSchedule({
+    test('should adjust time outside business hours', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'US',
         recipient_timezone: 'America/New_York',
         base_time: '2026-04-07T20:00:00Z', // Monday 8PM
@@ -51,11 +51,11 @@ describe('Timezone Calculator', () => {
       console.log('Business Hours Test:', JSON.stringify(result, null, 2));
 
       // Should adjust to next day at 9AM
-      expect(result.adjustments.some(a => a.type === 'business_hours')).toBe(true);
+      expect(result.adjustments.some((a: any) => a.type === 'business_hours')).toBe(true);
     });
 
-    test('should apply gap correctly', () => {
-      const result = calculateSchedule({
+    test('should apply gap correctly', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'US',
         recipient_timezone: 'America/New_York',
         base_time: '2026-04-07T09:00:00Z',
@@ -77,8 +77,8 @@ describe('Timezone Calculator', () => {
       expect(daysDiff).toBeLessThan(3.2); // Approximately 3.1 days
     });
 
-    test('should handle India timezone correctly', () => {
-      const result = calculateSchedule({
+    test('should handle India timezone correctly', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'IN',
         recipient_timezone: 'Asia/Kolkata',
         base_time: '2026-04-07T09:00:00Z',
@@ -93,8 +93,8 @@ describe('Timezone Calculator', () => {
       expect(result.country_info.weekend_days).toEqual(['Sunday']);
     });
 
-    test('should work with default timezone when none provided', () => {
-      const result = calculateSchedule({
+    test('should work with default timezone when none provided', async () => {
+      const result = await calculateOptimalSchedule({
         recipient_country: 'GB',
         base_time: '2026-04-07T09:00:00Z',
         gap_days: 0,
@@ -122,12 +122,12 @@ describe('Timezone Calculator', () => {
 });
 
 // Example usage for manual testing
-export function runManualTests() {
+export async function runManualTests() {
   console.log('=== Manual Timezone Calculator Tests ===\n');
 
   // Test 1: Weekend adjustment
   console.log('Test 1: Weekend Adjustment (Sunday -> Monday)');
-  const test1 = calculateSchedule({
+  const test1 = await calculateOptimalSchedule({
     recipient_country: 'US',
     recipient_timezone: 'America/New_York',
     base_time: '2026-04-06T09:00:00Z', // Sunday
@@ -139,7 +139,7 @@ export function runManualTests() {
 
   // Test 2: Business hours adjustment
   console.log('Test 2: Business Hours Adjustment (8PM -> Next Day 9AM)');
-  const test2 = calculateSchedule({
+  const test2 = await calculateOptimalSchedule({
     recipient_country: 'US',
     recipient_timezone: 'America/New_York',
     base_time: '2026-04-07T20:00:00Z', // Monday 8PM
@@ -151,7 +151,7 @@ export function runManualTests() {
 
   // Test 3: Gap application
   console.log('Test 3: Gap Application (3 days, 2 hours, 30 minutes)');
-  const test3 = calculateSchedule({
+  const test3 = await calculateOptimalSchedule({
     recipient_country: 'US',
     recipient_timezone: 'America/New_York',
     base_time: '2026-04-07T09:00:00Z',
@@ -165,7 +165,7 @@ export function runManualTests() {
 
   // Test 4: Multi-day gap across weekend
   console.log('Test 4: Multi-day Gap Across Weekend');
-  const test4 = calculateSchedule({
+  const test4 = await calculateOptimalSchedule({
     recipient_country: 'US',
     recipient_timezone: 'America/New_York',
     base_time: '2026-04-03T09:00:00Z', // Friday
@@ -177,7 +177,7 @@ export function runManualTests() {
 
   // Test 5: Different country (India - only Sunday weekend)
   console.log('Test 5: India Timezone (Saturday business day)');
-  const test5 = calculateSchedule({
+  const test5 = await calculateOptimalSchedule({
     recipient_country: 'IN',
     recipient_timezone: 'Asia/Kolkata',
     base_time: '2026-04-05T09:00:00Z', // Saturday
@@ -189,7 +189,7 @@ export function runManualTests() {
 
   // Test 6: Middle East weekend (Friday-Saturday)
   console.log('Test 6: UAE Timezone (Friday-Saturday weekend)');
-  const test6 = calculateSchedule({
+  const test6 = await calculateOptimalSchedule({
     recipient_country: 'AE',
     recipient_timezone: 'Asia/Dubai',
     base_time: '2026-04-04T09:00:00Z', // Friday
