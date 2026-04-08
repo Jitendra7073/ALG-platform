@@ -9,7 +9,7 @@ interface RouteContext {
 
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
 
     // 1. Check if queue item exists
     const queueItems = await executeQuery(

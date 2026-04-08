@@ -1,4 +1,5 @@
 import { Sidebar } from "./sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +11,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <h1 className="text-lg font-semibold tracking-tight">Email System</h1>
           </div>
           <div className="flex items-center gap-4">
-             {/* User profile dropdown would go here */}
+            <ThemeToggle />
           </div>
         </header>
         <div className="flex-1 p-4 md:p-8 overflow-y-auto">

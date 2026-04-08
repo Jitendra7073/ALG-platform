@@ -69,6 +69,26 @@ export async function GET(request: Request) {
 
     const data = await executeQuery(query, params);
 
+    // Get overall stats for all contact types
+    const statsQuery = `
+      SELECT
+        type,
+        COUNT(*) as count
+      FROM contacts
+      GROUP BY type
+    `;
+    const statsData = await executeQuery(statsQuery, []);
+    const stats = {
+      email: 0,
+      phone: 0,
+      linkedin: 0,
+      total: 0
+    };
+    statsData.forEach((row: any) => {
+      stats[row.type] = parseInt(row.count);
+      stats.total += parseInt(row.count);
+    });
+
     // Enrich results with timezone confidence scores
     const enrichedData = data.map((contact: any) => {
       const tz = contact.timezone || contact.detected_timezone;
@@ -86,7 +106,8 @@ export async function GET(request: Request) {
         page,
         limit,
         totalPages: Math.ceil(total / limit)
-      }
+      },
+      stats
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

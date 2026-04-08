@@ -13,7 +13,69 @@ import {
 import { workerLogger } from '@/lib/workers/worker-logger';
 
 export async function GET(request: Request) {
-  // Check authorization in prod (CRON_SECRET) etc..
+  // Check CRON_SECRET authorization
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return NextResponse.json({
+      success: false,
+      error: 'CRON_SECRET not configured'
+    }, { status: 500 });
+  }
+
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({
+      success: false,
+      error: 'Unauthorized'
+    }, { status: 401 });
+  }
+
+  // Check queue mode setting
+  const modeSetting = await executeQuery(`
+    SELECT value FROM email_settings WHERE key = 'queue_mode'
+  `);
+
+  if (modeSetting.length === 0 || modeSetting[0].value !== 'auto') {
+    workerLogger.log('info', 'worker', 'Queue mode is not set to auto, skipping processing');
+    workerLogger.endRun();
+    return NextResponse.json({
+      success: true,
+      message: 'Queue mode is manual, auto-processing skipped'
+    });
+  }
+
+  // Check queue interval setting and last process time
+  const settingsResult = await executeQuery(`
+    SELECT
+      (SELECT value FROM email_settings WHERE key = 'queue_interval')::int as interval_minutes,
+      (SELECT value FROM email_settings WHERE key = 'last_queue_process') as last_process
+  `);
+
+  if (settingsResult.length > 0) {
+    const intervalMinutes = settingsResult[0].interval_minutes || 15;
+    const lastProcess = settingsResult[0].last_process;
+
+    if (lastProcess) {
+      const lastProcessTime = new Date(lastProcess);
+      const now = new Date();
+      const minutesSinceLastProcess = (now.getTime() - lastProcessTime.getTime()) / (1000 * 60);
+
+      // Only process if enough time has passed (with 1 minute buffer for cron timing)
+      if (minutesSinceLastProcess < (intervalMinutes - 1)) {
+        workerLogger.log('info', 'worker',
+          `Skipping - only ${minutesSinceLastProcess.toFixed(1)} minutes since last run (required: ${intervalMinutes}m)`
+        );
+        workerLogger.endRun();
+        return NextResponse.json({
+          success: true,
+          message: `Skipping - too soon since last process (${minutesSinceLastProcess.toFixed(1)}m ago, required: ${intervalMinutes}m)`,
+          minutes_since_last: minutesSinceLastProcess,
+          required_interval: intervalMinutes
+        });
+      }
+    }
+  }
 
   // Start worker run
   workerLogger.startRun();
@@ -233,6 +295,15 @@ export async function GET(request: Request) {
 
     const totalProcessingTime = Date.now() - startTime;
     workerLogger.log('info', 'worker', `Batch processing completed in ${totalProcessingTime}ms`);
+
+    // Update last process time for countdown timer
+    await executeQuery(`
+      INSERT INTO email_settings (key, value, label, description, updated_at)
+      VALUES ('last_queue_process', NOW(), 'Last Queue Process', 'Timestamp of last auto-queue processing', NOW())
+      ON CONFLICT (key) DO UPDATE SET
+        value = NOW(),
+        updated_at = NOW()
+    `);
 
     workerLogger.endRun();
 

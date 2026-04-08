@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   Globe,
+  Send,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,8 @@ const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Contacts", href: "/contacts", icon: Users },
   { name: "Sequences", href: "/sequences", icon: Mail },
+  { name: "Templates", href: "/templates", icon: FileText },
+  { name: "Senders", href: "/senders", icon: Send },
   { name: "Countries", href: "/countries", icon: Globe },
   { name: "History", href: "/history", icon: History },
 ];

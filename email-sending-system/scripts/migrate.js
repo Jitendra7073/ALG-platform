@@ -247,7 +247,10 @@ async function runMigrations() {
       INSERT INTO email_settings (key, value, label, description) VALUES
         ('per_email_delay', '60', 'Per-Email Delay', 'Seconds between emails'),
         ('cycle_cooldown_min', '10', 'Cycle Cooldown Min', 'Minutes after full cycle'),
-        ('cycle_cooldown_max', '13', 'Cycle Cooldown Max', 'Minutes after full cycle')
+        ('cycle_cooldown_max', '13', 'Cycle Cooldown Max', 'Minutes after full cycle'),
+        ('queue_mode', 'manual', 'Queue Mode', 'Email queue processing mode: auto or manual'),
+        ('queue_interval', '5', 'Queue Interval', 'Auto-processing interval in minutes (fixed at 5)'),
+        ('last_queue_process', NOW(), 'Last Queue Process', 'Timestamp of last auto-queue processing')
       ON CONFLICT (key) DO NOTHING;
     `);
 

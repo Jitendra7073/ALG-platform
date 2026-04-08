@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db/postgres';
-import { calculateSchedule, isValidTimezone } from '@/lib/schedule/timezone-calculator';
+import { calculateOptimalSchedule, isValidTimezone } from '@/lib/schedule/timezone-calculator';
 
 export async function POST(request: Request) {
   try {
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     }
 
     // Calculate schedule using the timezone calculator
-    const calculationResult = calculateSchedule({
+    const calculationResult = calculateOptimalSchedule({
       recipient_country,
       recipient_timezone: countryInfo?.default_timezone || recipient_timezone,
       base_time,

@@ -26,6 +26,23 @@ export async function POST(request: Request) {
 
     await client.query('BEGIN');
 
+    // CRITICAL: Check for active senders before queuing emails
+    const activeSendersResult = await client.query(
+      `SELECT COUNT(*) as count FROM email_senders WHERE is_active = true`
+    );
+
+    const activeSenderCount = parseInt(activeSendersResult.rows[0].count);
+
+    if (activeSenderCount === 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({
+        success: false,
+        error: 'NO_ACTIVE_SENDERS',
+        message: 'No active email senders found. Please add or activate at least one email sender before queuing emails.',
+        requires_sender_setup: true
+      }, { status: 400 });
+    }
+
     let templatesToAdd = [];
 
     if (sequence_id) {

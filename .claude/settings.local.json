@@ -84,7 +84,13 @@
       "Bash(curl -s http://localhost:3001/api/sequences)",
       "Bash(findstr :3001)",
       "Bash(timeout 5)",
-      "Bash(cmd //c taskkill //PID 8896 //F)"
+      "Bash(cmd //c taskkill //PID 8896 //F)",
+      "Bash(pnpm run:*)",
+      "Bash(npx ts-node -e ':*)",
+      "Bash(ls -la .env*)",
+      "Bash(dir .env*)",
+      "Bash(dir /s /b \"src\\\\app\\\\api\\\\queue\\\\batch-processor\\\\*.ts\")",
+      "Bash(sqlite3 prisma/dev.db \"SELECT id, template_id, sequence_id, scheduled_for, status, created_at FROM email_queue ORDER BY created_at DESC LIMIT 20;\")"
     ]
   }
 }

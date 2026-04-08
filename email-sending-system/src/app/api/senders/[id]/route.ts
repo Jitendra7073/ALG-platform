@@ -16,14 +16,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await request.json();
-    
-    const allowedFields = ['name', 'app_password', 'is_active', 'daily_limit', 'service', 'smtp_host', 'smtp_port'];
+
+    const allowedFields = ['name', 'email', 'app_password', 'is_active', 'daily_limit', 'service', 'smtp_host', 'smtp_port', 'smtp_user'];
     const fieldsToUpdate = [];
     const values = [];
     let paramIndex = 1;
 
     for (const [key, value] of Object.entries(body)) {
-      if (allowedFields.includes(key)) {
+      if (allowedFields.includes(key) && value !== undefined) {
         fieldsToUpdate.push(`${key} = $${paramIndex}`);
         values.push(value);
         paramIndex++;
@@ -35,11 +35,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     fieldsToUpdate.push(`updated_at = NOW()`);
-    values.push(id); 
+    values.push(id);
 
     const query = `UPDATE email_senders SET ${fieldsToUpdate.join(', ')} WHERE id = $${paramIndex} RETURNING *`;
     const result = await executeQuery(query, values);
-    
+
     if (result.length === 0) return NextResponse.json({ success: false, error: 'Sender not found' }, { status: 404 });
     return NextResponse.json({ success: true, data: result[0] });
   } catch (error: any) {

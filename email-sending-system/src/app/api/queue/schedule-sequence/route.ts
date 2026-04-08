@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { executeQuery, dbPool } from '@/lib/db/postgres';
+import { dbPool } from '@/lib/db/postgres';
 
 interface EmailToSchedule {
   contact_id: number;
@@ -36,6 +36,23 @@ export async function POST(request: Request) {
     }
 
     await client.query('BEGIN');
+
+    // CRITICAL: Check for active senders before queuing emails
+    const activeSendersResult = await client.query(
+      `SELECT COUNT(*) as count FROM email_senders WHERE is_active = true`
+    );
+
+    const activeSenderCount = parseInt(activeSendersResult.rows[0].count);
+
+    if (activeSenderCount === 0) {
+      await client.query('ROLLBACK');
+      return NextResponse.json({
+        success: false,
+        error: 'NO_ACTIVE_SENDERS',
+        message: 'No active email senders found. Please add or activate at least one email sender before queuing emails.',
+        requires_sender_setup: true
+      }, { status: 400 });
+    }
 
     // Get sequence info with items
     const sequenceResult = await client.query(
@@ -116,16 +133,12 @@ export async function POST(request: Request) {
       // Sort by position to ensure proper ordering
       contactEmails.sort((a, b) => a.position - b.position);
 
-      // Calculate scheduled times for this contact's sequence
-      let previousScheduledAt = baseTime;
-
       for (let i = 0; i < sequenceItems.length; i++) {
         const item = sequenceItems[i];
         const contactEmail = contactEmails.find(e => e.position === item.position);
 
         if (!contactEmail) {
-          // If no specific email for this position, use the contact's email
-          const firstEmail = contactEmails[0];
+          // If no specific email for this position and this is the first item, skip
           if (i === 0) {
             continue; // Skip if no first email
           }
@@ -134,16 +147,10 @@ export async function POST(request: Request) {
         // Calculate scheduled time
         let scheduledAt: Date;
 
-        if (i === 0) {
-          // First email uses delivery option time
-          scheduledAt = new Date(previousScheduledAt);
-        } else {
-          // Subsequent emails: previous scheduled time + delay_days
-          const previousItem = sequenceItems[i - 1];
-          const delayDays = previousItem.delay_days || 0;
-          scheduledAt = new Date(previousScheduledAt);
-          scheduledAt.setDate(scheduledAt.getDate() + delayDays);
-        }
+        // delay_days represents days after the FIRST email (baseTime), not after the previous email
+        const delayDays = item.delay_days || 0;
+        scheduledAt = new Date(baseTime);
+        scheduledAt.setDate(scheduledAt.getDate() + delayDays);
 
         // Set the send_time for this email
         const [hours, minutes] = item.send_time.split(':').map(Number);
@@ -219,8 +226,6 @@ export async function POST(request: Request) {
           status: status
         });
 
-        // Store queue ID for next email's dependency
-        previousScheduledAt = scheduledAt;
         queuedCount++;
 
         // If this is not the first email, update its dependency

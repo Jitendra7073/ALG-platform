@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { executeQuery } from '@/lib/db/postgres';
-import { calculateSchedule } from '@/lib/schedule/timezone-calculator';
+import { calculateOptimalSchedule } from '@/lib/schedule/timezone-calculator';
 
 /**
  * POST /api/queue/[id]/validate
@@ -91,7 +91,7 @@ export async function POST(
     const timezone = email.timezone || email.site_timezone;
 
     // Recalculate schedule with current rules
-    const recalculatedSchedule = calculateSchedule({
+    const recalculatedSchedule = calculateOptimalSchedule({
       recipient_country: country,
       recipient_timezone: timezone || undefined,
       base_time: baseTime,

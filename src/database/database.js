@@ -303,6 +303,16 @@ function initDatabase() {
     }
   }
 
+  // Create helper function to mark records for re-sync
+  // This will be called when updating records that need to be synced again
+  function markForSync(table, id) {
+    try {
+      db.prepare(`UPDATE ${table} SET is_sync_to_prod = 0 WHERE id = ?`).run(id);
+    } catch (e) {
+      // Table might not have is_sync_to_prod column
+    }
+  }
+
   // Migration: Cleanup legacy records that have no text_content
   try {
     db.exec(`
@@ -677,7 +687,7 @@ function updateKeyword(id, keyword) {
     db.prepare(
       `
       UPDATE keywords
-      SET keyword = ?, updated_at = CURRENT_TIMESTAMP
+      SET keyword = ?, updated_at = CURRENT_TIMESTAMP, is_sync_to_prod = 0
       WHERE id = ?
     `,
     ).run(keyword.trim(), id);
@@ -844,7 +854,7 @@ function updateExcludedDomain(id, domain, reason) {
   db.exec("PRAGMA foreign_keys = OFF");
   try {
     db.prepare(
-      `UPDATE excluded_domains SET domain = ?, reason = ? WHERE id = ?`,
+      `UPDATE excluded_domains SET domain = ?, reason = ?, is_sync_to_prod = 0 WHERE id = ?`,
     ).run(normalized, reason ? reason.trim() : null, id);
     return getExcludedDomainById(id);
   } finally {
@@ -977,7 +987,7 @@ function updateIgnoredTag(id, tag, matchType, scope, reason) {
   db.exec("PRAGMA foreign_keys = OFF");
   try {
     db.prepare(
-      `UPDATE ignored_tags SET tag = ?, match_type = ?, scope = ?, reason = ? WHERE id = ?`,
+      `UPDATE ignored_tags SET tag = ?, match_type = ?, scope = ?, reason = ?, is_sync_to_prod = 0 WHERE id = ?`,
     ).run(
       tag.trim().toLowerCase(),
       matchType,
@@ -1148,7 +1158,7 @@ function updateKeywordStatus(id, status) {
     db.prepare(
       `
       UPDATE keywords
-      SET status = ?, updated_at = CURRENT_TIMESTAMP
+      SET status = ?, updated_at = CURRENT_TIMESTAMP, is_sync_to_prod = 0
       WHERE id = ?
     `,
     ).run(status, id);
@@ -1473,7 +1483,8 @@ function updateSiteAIResults(siteId, aiData) {
         value_proposition = ?,
         ai_reasoning = ?,
         ai_is_wordpress = ?,
-        ai_is_genuine_match = ?
+        ai_is_genuine_match = ?,
+        is_sync_to_prod = 0
       WHERE id = ?
     `,
       )
@@ -1516,7 +1527,7 @@ function updateSiteAIStatus(siteId, status) {
   const db = initDatabase();
   db.exec("PRAGMA foreign_keys = OFF");
   try {
-    db.prepare(`UPDATE sites SET ai_status = ? WHERE id = ?`).run(
+    db.prepare(`UPDATE sites SET ai_status = ?, is_sync_to_prod = 0 WHERE id = ?`).run(
       status,
       siteId,
     );
@@ -2401,7 +2412,8 @@ function updateSiteAIResults(siteId, aiData) {
         tags = ?,
         primary_language = ?,
         value_proposition = ?,
-        ai_reasoning = ?
+        ai_reasoning = ?,
+        is_sync_to_prod = 0
       WHERE id = ?
     `,
       )
@@ -2433,7 +2445,7 @@ function updateSiteAIStatus(siteId, status) {
   db.exec("PRAGMA foreign_keys = OFF");
   try {
     const result = db
-      .prepare("UPDATE sites SET ai_processed = 1, ai_status = ? WHERE id = ?")
+      .prepare("UPDATE sites SET ai_processed = 1, ai_status = ?, is_sync_to_prod = 0 WHERE id = ?")
       .run(status, siteId);
     return result.changes > 0;
   } finally {
@@ -2549,7 +2561,7 @@ function updateSite(id, data) {
       .prepare(
         `
       UPDATE sites
-      SET confidence_score = ?, indicators = ?
+      SET confidence_score = ?, indicators = ?, is_sync_to_prod = 0
       WHERE id = ?
     `,
       )
@@ -2592,7 +2604,7 @@ function updateContact(id, data) {
       .prepare(
         `
       UPDATE contacts
-      SET value = ?
+      SET value = ?, is_sync_to_prod = 0
       WHERE id = ?
     `,
       )
@@ -2637,7 +2649,7 @@ function updateExecutive(id, data) {
       .prepare(
         `
       UPDATE company_executives
-      SET name = ?, role_category = ?, headline = ?, profile_url = ?
+      SET name = ?, role_category = ?, headline = ?, profile_url = ?, is_sync_to_prod = 0
       WHERE id = ?
     `,
       )

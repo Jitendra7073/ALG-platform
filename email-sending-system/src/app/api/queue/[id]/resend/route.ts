@@ -9,7 +9,7 @@ interface RouteContext {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
 
     // 1. Fetch the queue item
     const queueItems = await executeQuery(

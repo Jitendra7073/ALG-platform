@@ -11,11 +11,14 @@ import { createQueueEntryWithValidation, generateIdempotencyKey, QueueEntryParam
 export async function isDependencyMet(parentQueueId: string | null): Promise<boolean> {
   if (!parentQueueId) return true; // No dependency, it's the first email in the chain
 
-  const { data: parentRecord, error } = await supabaseAdmin
+  // Use .limit(1) instead of .single() to handle potential duplicates gracefully
+  const { data: parentRecords, error } = await supabaseAdmin
     .from('email_queue')
     .select('status')
     .eq('id', parentQueueId)
-    .single();
+    .limit(1);
+
+  const parentRecord = parentRecords && parentRecords.length > 0 ? parentRecords[0] : null;
 
   if (error || !parentRecord) {
     console.error('Failed to locate parent dependency', error);
