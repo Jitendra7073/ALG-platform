@@ -29,60 +29,84 @@ router.post('/sync-to-prod', async (req, res) => {
 
     // 1. Sync Sites Table
     const unsyncedSites = sqliteDb
-      .prepare(`SELECT * FROM sites WHERE is_sync_to_prod = 0 LIMIT 100`)
+      .prepare(`SELECT * FROM sites WHERE is_sync_to_prod = 0`)
       .all();
 
     if (unsyncedSites.length > 0) {
+      console.log(`📡 Syncing ${unsyncedSites.length} sites to production...`);
       const client = await pgPool.connect();
+      const syncedIds = [];
       try {
-        await client.query('BEGIN');
-        const siteIds = [];
         for (const site of unsyncedSites) {
-          const query = `
-            INSERT INTO sites (
-              id, search_id, url, country, is_wordpress, confidence_score,
-              indicators, error, search_query, emails, phones,
-              linkedin_profiles, text_content, page_title, meta_description,
-              created_at, updated_at
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6,
-              $7, $8, $9, $10, $11,
-              $12, $13, $14, $15, $16,
-              $17
-            )
-            ON CONFLICT (id) DO UPDATE SET
-              is_wordpress = EXCLUDED.is_wordpress,
-              confidence_score = EXCLUDED.confidence_score,
-              indicators = EXCLUDED.indicators,
-              error = EXCLUDED.error,
-              emails = EXCLUDED.emails,
-              phones = EXCLUDED.phones,
-              linkedin_profiles = EXCLUDED.linkedin_profiles,
-              text_content = EXCLUDED.text_content,
-              page_title = EXCLUDED.page_title,
-              meta_description = EXCLUDED.meta_description,
-              updated_at = CURRENT_TIMESTAMP
-          `;
-          const values = [
-            site.id, site.search_id, site.url, site.country, site.is_wordpress === 1 ? true : false,
-            site.confidence_score, site.indicators, site.error, site.search_query,
-            site.emails, site.phones, site.linkedin_profiles, site.text_content,
-            site.page_title, site.meta_description, site.created_at, site.updated_at
-          ];
-          await client.query(query, values);
-          siteIds.push(site.id);
+          try {
+            // First, try to match by URL (Business Primary Key)
+            const existingRes = await client.query('SELECT id FROM sites WHERE url = $1', [site.url]);
+
+            if (existingRes.rows.length > 0) {
+              const prodId = existingRes.rows[0].id;
+              await client.query(`
+                UPDATE sites SET
+                  search_id = $2, is_wordpress = $3, confidence_score = $4,
+                  indicators = $5, error = $6, search_query = $7, emails = $8,
+                  phones = $9, linkedin_profiles = $10, text_content = $11,
+                  page_title = $12, meta_description = $13, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $1
+              `, [
+                prodId, site.search_id, site.is_wordpress === 1, site.confidence_score,
+                site.indicators, site.error, site.search_query, site.emails, site.phones,
+                site.linkedin_profiles, site.text_content, site.page_title, site.meta_description
+              ]);
+              syncedIds.push(site.id);
+            } else {
+              // Try inserting with local ID
+              try {
+                await client.query(`
+                  INSERT INTO sites (
+                    id, search_id, url, country, is_wordpress, confidence_score,
+                    indicators, error, search_query, emails, phones,
+                    linkedin_profiles, text_content, page_title, meta_description,
+                    created_at, updated_at
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                `, [
+                  site.id, site.search_id, site.url, site.country, site.is_wordpress === 1,
+                  site.confidence_score, site.indicators, site.error, site.search_query,
+                  site.emails, site.phones, site.linkedin_profiles, site.text_content,
+                  site.page_title, site.meta_description, site.created_at, site.updated_at
+                ]);
+                syncedIds.push(site.id);
+              } catch (insErr) {
+                if (insErr.code === '23505') {
+                  // ID already taken in Prod! Use a dynamic ID from Prod's sequence/max
+                  await client.query(`
+                    INSERT INTO sites (
+                      id, search_id, url, country, is_wordpress, confidence_score,
+                      indicators, error, search_query, emails, phones,
+                      linkedin_profiles, text_content, page_title, meta_description,
+                      created_at, updated_at
+                    ) VALUES ((SELECT COALESCE(MAX(id), 0) + 1 FROM sites), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                  `, [
+                    site.search_id, site.url, site.country, site.is_wordpress === 1,
+                    site.confidence_score, site.indicators, site.error, site.search_query,
+                    site.emails, site.phones, site.linkedin_profiles, site.text_content,
+                    site.page_title, site.meta_description, site.created_at, site.updated_at
+                  ]);
+                  syncedIds.push(site.id);
+                } else {
+                  throw insErr;
+                }
+              }
+            }
+          } catch (rowError) {
+            console.error(`❌ Sync failed for site ${site.url}:`, rowError.message);
+          }
         }
-        await client.query('COMMIT');
 
-        // Mark as synced locally
-        const placeholders = siteIds.map(() => "?").join(",");
-        sqliteDb.prepare(`UPDATE sites SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...siteIds);
-
-        results.sitesSynced = siteIds.length;
-      } catch (e) {
-        await client.query('ROLLBACK');
-        console.error("Error syncing sites to Prod", e);
-        throw e;
+        if (syncedIds.length > 0) {
+          const placeholders = syncedIds.map(() => "?").join(",");
+          sqliteDb.prepare(`UPDATE sites SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...syncedIds);
+          console.log(`✅ Successfully synced ${syncedIds.length} sites.`);
+        }
+        results.sitesSynced = syncedIds.length;
       } finally {
         client.release();
       }
@@ -90,47 +114,54 @@ router.post('/sync-to-prod', async (req, res) => {
       results.sitesSynced = 0;
     }
 
-    // 2. Sync Contacts Table
+    // 2. Sync Contacts Table (Only after sites are attempt to sync)
     const unsyncedContacts = sqliteDb
-      .prepare(`SELECT * FROM contacts WHERE is_sync_to_prod = 0 LIMIT 100`)
+      .prepare(`
+        SELECT contacts.*, sites.url as site_url 
+        FROM contacts 
+        JOIN sites ON contacts.site_id = sites.id 
+        WHERE contacts.is_sync_to_prod = 0
+      `)
       .all();
 
     if (unsyncedContacts.length > 0) {
+      console.log(`📡 Syncing ${unsyncedContacts.length} contacts to production...`);
       const client = await pgPool.connect();
+      const syncedContactIds = [];
       try {
-        await client.query('BEGIN');
-        const contactIds = [];
         for (const contact of unsyncedContacts) {
-          const query = `
-            INSERT INTO contacts (
-              id, site_id, type, value, source_page, created_at, updated_at
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7
-            )
-            ON CONFLICT (id) DO UPDATE SET
-              type = EXCLUDED.type,
-              value = EXCLUDED.value,
-              source_page = EXCLUDED.source_page,
-              updated_at = CURRENT_TIMESTAMP
-          `;
-          const values = [
-            contact.id, contact.site_id, contact.type, contact.value,
-            contact.source_page, contact.created_at, contact.updated_at
-          ];
-          await client.query(query, values);
-          contactIds.push(contact.id);
+          try {
+            // Find the correct site ID in Production using the Site URL
+            const siteRes = await client.query('SELECT id FROM sites WHERE url = $1', [contact.site_url]);
+            if (siteRes.rows.length === 0) {
+              console.warn(`⚠️ Skipping contact ${contact.id}: Site ${contact.site_url} not found in Prod.`);
+              continue;
+            }
+            const prodSiteId = siteRes.rows[0].id;
+
+            await client.query(`
+              INSERT INTO contacts (id, site_id, type, value, source_page, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7)
+              ON CONFLICT (id) DO UPDATE SET
+                site_id = EXCLUDED.site_id,
+                type = EXCLUDED.type,
+                value = EXCLUDED.value,
+                source_page = EXCLUDED.source_page,
+                updated_at = EXCLUDED.updated_at
+            `, [contact.id, prodSiteId, contact.type, contact.value, contact.source_page, contact.created_at, contact.updated_at]);
+
+            syncedContactIds.push(contact.id);
+          } catch (rowError) {
+            console.warn(`⚠️ Sync error for contact ${contact.id}:`, rowError.message);
+          }
         }
-        await client.query('COMMIT');
 
-        // Mark as synced
-        const placeholders = contactIds.map(() => "?").join(",");
-        sqliteDb.prepare(`UPDATE contacts SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...contactIds);
-
-        results.contactsSynced = contactIds.length;
-      } catch (e) {
-        await client.query('ROLLBACK');
-        console.error("Error syncing contacts to Prod", e);
-        throw e;
+        if (syncedContactIds.length > 0) {
+          const placeholders = syncedContactIds.map(() => "?").join(",");
+          sqliteDb.prepare(`UPDATE contacts SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...syncedContactIds);
+          console.log(`✅ Successfully synced ${syncedContactIds.length} contacts.`);
+        }
+        results.contactsSynced = syncedContactIds.length;
       } finally {
         client.release();
       }
@@ -138,47 +169,40 @@ router.post('/sync-to-prod', async (req, res) => {
       results.contactsSynced = 0;
     }
 
-    // 3. Sync Keywords Table (NEW)
+    // 3. Sync Keywords Table
     const unsyncedKeywords = sqliteDb
-      .prepare(`SELECT * FROM keywords WHERE is_sync_to_prod = 0 LIMIT 100`)
+      .prepare(`SELECT * FROM keywords WHERE is_sync_to_prod = 0`)
       .all();
 
     if (unsyncedKeywords.length > 0) {
+      console.log(`📡 Syncing ${unsyncedKeywords.length} keywords to production...`);
       const client = await pgPool.connect();
+      const syncedKeywordIds = [];
       try {
-        await client.query('BEGIN');
-        const keywordIds = [];
         for (const keyword of unsyncedKeywords) {
-          const query = `
-            INSERT INTO keywords (
-              id, keyword, status, max_sites, created_at, updated_at
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6
-            )
-            ON CONFLICT (id) DO UPDATE SET
-              keyword = EXCLUDED.keyword,
-              status = EXCLUDED.status,
-              max_sites = EXCLUDED.max_sites,
-              updated_at = CURRENT_TIMESTAMP
-          `;
-          const values = [
-            keyword.id, keyword.keyword, keyword.status, keyword.max_sites,
-            keyword.created_at, keyword.updated_at
-          ];
-          await client.query(query, values);
-          keywordIds.push(keyword.id);
+          try {
+            await client.query(`
+              INSERT INTO keywords (id, keyword, status, max_sites, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6)
+              ON CONFLICT (id) DO UPDATE SET
+                keyword = EXCLUDED.keyword,
+                status = EXCLUDED.status,
+                max_sites = EXCLUDED.max_sites,
+                updated_at = EXCLUDED.updated_at
+            `, [keyword.id, keyword.keyword, keyword.status, keyword.max_sites, keyword.created_at, keyword.updated_at]);
+
+            syncedKeywordIds.push(keyword.id);
+          } catch (rowError) {
+            console.warn(`⚠️ Sync error for keyword ${keyword.keyword}:`, rowError.message);
+          }
         }
-        await client.query('COMMIT');
 
-        // Mark as synced
-        const placeholders = keywordIds.map(() => "?").join(",");
-        sqliteDb.prepare(`UPDATE keywords SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...keywordIds);
-
-        results.keywordsSynced = keywordIds.length;
-      } catch (e) {
-        await client.query('ROLLBACK');
-        console.error("Error syncing keywords to Prod", e);
-        throw e;
+        if (syncedKeywordIds.length > 0) {
+          const placeholders = syncedKeywordIds.map(() => "?").join(",");
+          sqliteDb.prepare(`UPDATE keywords SET is_sync_to_prod = 1 WHERE id IN (${placeholders})`).run(...syncedKeywordIds);
+          console.log(`✅ Successfully synced ${syncedKeywordIds.length} keywords.`);
+        }
+        results.keywordsSynced = syncedKeywordIds.length;
       } finally {
         client.release();
       }
